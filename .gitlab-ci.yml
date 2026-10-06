@@ -16,7 +16,7 @@ cache:
 before_script:
   - npm install -g pnpm@11
   - pnpm config set store-dir $PNPM_CACHE_FOLDER
-  - pnpm install
+  - pnpm install --frozen-lockfile
 
 lint:
   stage: lint
