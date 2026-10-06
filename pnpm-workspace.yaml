@@ -4,3 +4,8 @@ allowBuilds:
   esbuild: true
   protobufjs: true
   ssh2: true
+
+overrides:
+  # Force uuid to patched version across all transitive deps (GHSA-w5hq-g745-h8pq).
+  # Sequelize@6 pins uuid@8 internally; this override bumps it to the safe release.
+  uuid: '>=11.1.1'

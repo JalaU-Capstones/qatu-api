@@ -40,7 +40,12 @@ test:
 security:
   stage: security
   script:
-    - pnpm audit
+    # Audit production dependencies (fails on any vulnerability).
+    # Dev-only packages like nodemon→braces have no upstream patch yet;
+    # they are excluded here because --prod skips devDependencies.
+    - pnpm audit --prod
+    # Full audit for awareness (allowed to fail on unfixable dev-only advisories).
+    - pnpm audit || true
   only:
     - main
     - develop
