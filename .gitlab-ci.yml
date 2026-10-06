@@ -1,0 +1,47 @@
+image: node:26
+
+stages:
+  - lint
+  - test
+  - build
+  - security
+
+variables:
+  PNPM_CACHE_FOLDER: '$CI_PROJECT_DIR/.pnpm-store'
+
+cache:
+  paths:
+    - .pnpm-store
+
+before_script:
+  - npm install -g pnpm@11
+  - pnpm config set store-dir $PNPM_CACHE_FOLDER
+  - pnpm install
+
+lint:
+  stage: lint
+  script:
+    - pnpm lint
+    - pnpm format:check
+  only:
+    - main
+    - develop
+    - merge_requests
+
+test:
+  stage: test
+  script:
+    - pnpm test
+  only:
+    - main
+    - develop
+    - merge_requests
+
+security:
+  stage: security
+  script:
+    - pnpm audit
+  only:
+    - main
+    - develop
+    - merge_requests
