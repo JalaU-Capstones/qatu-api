@@ -8,7 +8,7 @@ export default [
   js.configs.recommended,
   pluginSecurity.configs.recommended,
   {
-    ignores: ['node_modules/', 'dist/', 'coverage/', 'pnpm-lock.yaml'],
+    ignores: ['node_modules/', 'dist/', 'coverage/', 'pnpm-lock.yaml', '.pnpm-store/'],
   },
   {
     files: [

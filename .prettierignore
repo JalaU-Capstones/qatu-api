@@ -3,3 +3,5 @@ dist/
 coverage/
 pnpm-lock.yaml
 .git/
+# pnpm content-addressable store (placed inside project root in GitLab CI)
+.pnpm-store/
