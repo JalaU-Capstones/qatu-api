@@ -76,6 +76,7 @@ Detailed documentation is available in the `.docs/` directory:
 - [Troubleshooting](.docs/TROUBLESHOOTING.md) — Common issues with Docker, pnpm, Node.js, PostgreSQL, RabbitMQ, Husky, ESLint, and Vitest.
 - [Git Rules](.docs/GIT_RULES.md) — Branching strategy (GitFlow), commit message convention (Conventional Commits), merge request guidelines, code review checklist, and remote configuration.
 - [Supabase Setup](.docs/supabase/SETUP.md) — Step-by-step guide to configure Supabase for development using the free tier (local CLI or remote cloud).
+- [Supabase Team Workflow](.docs/supabase/TEAM_WORKFLOW.md) — How to work with Supabase locally as a team, what to commit, and how to capture schema changes.
 
 ## License
 
