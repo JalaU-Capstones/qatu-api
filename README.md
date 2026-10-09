@@ -41,7 +41,7 @@ Qatu (Quechua word for "store") is an online digital marketplace where sellers c
    cp .env.example .env
    ```
 
-   Update `.env` with appropriate values.
+   For Supabase configuration, follow the [Supabase Setup Guide](.docs/supabase/SETUP.md). Update `.env` with appropriate values.
 
 4. **Start Infrastructure:**
 
@@ -70,9 +70,12 @@ make help
 
 ## Documentation
 
-- [Architecture](.docs/ARCHITECTURE.md)
-- [Troubleshooting](.docs/TROUBLESHOOTING.md)
-- [Git Rules](.docs/GIT_RULES.md)
+Detailed documentation is available in the `.docs/` directory:
+
+- [Architecture](.docs/ARCHITECTURE.md) — Onion Architecture, layers, dependency rule, folder structure, cross-cutting concerns, and testing strategy.
+- [Troubleshooting](.docs/TROUBLESHOOTING.md) — Common issues with Docker, pnpm, Node.js, PostgreSQL, RabbitMQ, Husky, ESLint, and Vitest.
+- [Git Rules](.docs/GIT_RULES.md) — Branching strategy (GitFlow), commit message convention (Conventional Commits), merge request guidelines, code review checklist, and remote configuration.
+- [Supabase Setup](.docs/supabase/SETUP.md) — Step-by-step guide to configure Supabase for development using the free tier (local CLI or remote cloud).
 
 ## License
 
