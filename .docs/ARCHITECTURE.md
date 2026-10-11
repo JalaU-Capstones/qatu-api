@@ -113,3 +113,17 @@ Files use PascalCase for classes (e.g., `PlaceOrderUseCase.js`, `UserRepository.
 - [Wiki: Architecture/Data-Model](#)
 - [Wiki: Architecture/Security](#)
 - [Wiki: Architecture/API-Design](#)
+
+### Migrations
+
+Migrations are versioned in `src/infrastructure/persistence/migrations/` and run via Sequelize CLI. The order is defined by the filename timestamp prefix. Every migration:
+
+- Creates one logical unit (a table, a group of related triggers, or a set of seed data).
+- Wraps statements in a transaction.
+- Includes a working `down` step.
+- Enables RLS and adds policies for every table.
+- Uses `IF NOT EXISTS` / `IF EXISTS` for idempotency.
+
+Seeders live in `src/infrastructure/persistence/seeders/` and are idempotent. They populate roles, categories, and the admin user for development and staging.
+
+See [`.docs/MIGRATIONS.md`](MIGRATIONS.md) for the full guide.
