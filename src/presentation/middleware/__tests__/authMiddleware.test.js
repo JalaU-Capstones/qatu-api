@@ -11,7 +11,11 @@ describe('authMiddleware', () => {
   });
 
   it('allows to continue and adds req.user if JWT is valid', () => {
-    const payload = { sub: 'b78a9c20-7212-4c28-98f2-d4b3ff255b08', role: 'authenticated', email: 'test@qatu.com' };
+    const payload = {
+      sub: 'b78a9c20-7212-4c28-98f2-d4b3ff255b08',
+      role: 'authenticated',
+      email: 'test@qatu.com',
+    };
     const token = jwt.sign(payload, secret);
 
     const req = { headers: { authorization: `Bearer ${token}` } };
