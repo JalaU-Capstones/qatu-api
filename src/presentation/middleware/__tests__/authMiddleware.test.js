@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import jwt from 'jsonwebtoken';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { authMiddleware } from '../authMiddleware.js';
 
 describe('authMiddleware', () => {

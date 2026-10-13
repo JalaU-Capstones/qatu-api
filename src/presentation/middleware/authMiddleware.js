@@ -30,7 +30,7 @@ export function authMiddleware(req, res, next) {
     };
 
     return next();
-  } catch (error) {
+  } catch {
     return res.status(401).json({
       error: 'Unauthorized',
       message: 'Invalid or expired token.',
