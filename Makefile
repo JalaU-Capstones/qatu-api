@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help install dev start lint lint-fix format format-check test test-watch test-coverage test-integration build docker-up docker-down docker-logs db-migrate db-migrate-undo db-seed clean
+.PHONY: help install dev start lint lint-fix format format-check test test-watch test-coverage test-integration build docker-up docker-down docker-logs db-migrate db-migrate-undo db-seed clean openapi-bundle openapi-lint openapi-validate openapi-preview
 
 help:
 	@echo "Qatu API - Available targets:"
@@ -21,6 +21,10 @@ help:
 	@echo "  db-migrate         Run Sequelize migrations"
 	@echo "  db-migrate-undo    Rollback last migration"
 	@echo "  db-seed            Run seeders"
+	@echo "  openapi-bundle     Bundle modular OpenAPI spec into dist/openapi.bundle.yaml"
+	@echo "  openapi-lint       Lint OpenAPI spec with Redocly and Spectral"
+	@echo "  openapi-validate   Validate OpenAPI spec with Redocly"
+	@echo "  openapi-preview    Preview OpenAPI documentation with Redocly"
 	@echo "  clean              Remove node_modules and build artifacts"
 
 install:
@@ -73,6 +77,18 @@ db-migrate-undo:
 
 db-seed:
 	pnpm db:seed
+
+openapi-bundle:
+	pnpm openapi:bundle
+
+openapi-lint:
+	pnpm openapi:lint
+
+openapi-validate:
+	pnpm openapi:validate
+
+openapi-preview:
+	pnpm openapi:preview
 
 clean:
 	rm -rf node_modules dist coverage

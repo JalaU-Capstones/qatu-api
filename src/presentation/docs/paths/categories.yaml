@@ -1,0 +1,210 @@
+list:
+  get:
+    operationId: listCategories
+    summary: List all categories
+    description: |
+      Returns all active product categories. This is a public endpoint — no authentication required.
+    tags:
+      - categories
+    security: []
+    parameters:
+      - $ref: '../components/parameters/pagination.yaml#/page'
+      - $ref: '../components/parameters/pagination.yaml#/limit'
+    responses:
+      '200':
+        description: List of categories.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/Category.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/PaginationMeta'
+            examples:
+              categoriesList:
+                summary: Sample category list
+                value:
+                  data:
+                    - id: 'b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'
+                      name: Electronics
+                      slug: electronics
+                      description: 'Gadgets and electronic devices.'
+                      parent_id: null
+                      position: 1
+                      is_active: true
+                      created_at: '2025-01-15T08:00:00.000Z'
+                      updated_at: '2025-01-15T08:00:00.000Z'
+                  meta:
+                    page: 1
+                    per_page: 20
+                    total: 1
+                    total_pages: 1
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+adminCreate:
+  post:
+    operationId: adminCreateCategory
+    summary: Create a category (admin)
+    description: Creates a new product category. Admin only.
+    tags:
+      - categories
+      - admin
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - name
+            properties:
+              name:
+                type: string
+                minLength: 2
+                maxLength: 100
+                example: Electronics
+              slug:
+                type: string
+                minLength: 2
+                maxLength: 100
+                pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+                example: electronics
+              description:
+                type: string
+                maxLength: 500
+                example: 'Gadgets and electronic devices.'
+              parent_id:
+                type: [string, 'null']
+                format: uuid
+                description: ID of the parent category for nested categories.
+                example: null
+          examples:
+            createCategory:
+              summary: Create Electronics category
+              value:
+                name: Electronics
+                slug: electronics
+                description: 'Gadgets and electronic devices.'
+                parent_id: null
+    responses:
+      '201':
+        description: Category created successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Category.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '409':
+        $ref: '../components/responses/errors.yaml#/Conflict'
+      '422':
+        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+adminUpdate:
+  patch:
+    operationId: adminUpdateCategory
+    summary: Update a category (admin)
+    description: Updates an existing category by ID. Admin only.
+    tags:
+      - categories
+      - admin
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/categoryId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            minProperties: 1
+            properties:
+              name:
+                type: string
+                minLength: 2
+                maxLength: 100
+                example: Consumer Electronics
+              slug:
+                type: string
+                minLength: 2
+                maxLength: 100
+                pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+                example: consumer-electronics
+              description:
+                type: string
+                maxLength: 500
+                example: 'Consumer-grade gadgets and devices.'
+              parent_id:
+                type: [string, 'null']
+                format: uuid
+                example: null
+    responses:
+      '200':
+        description: Category updated successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Category.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+adminDelete:
+  delete:
+    operationId: adminDeleteCategory
+    summary: Delete a category (admin)
+    description: |
+      Deletes a category by ID. Admin only.
+      Cannot delete a category that has associated products.
+    tags:
+      - categories
+      - admin
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/categoryId'
+    responses:
+      '204':
+        description: Category deleted successfully.
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '409':
+        $ref: '../components/responses/errors.yaml#/Conflict'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'

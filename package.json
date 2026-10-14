@@ -21,7 +21,11 @@
     "db:migrate": "sequelize-cli db:migrate",
     "db:migrate:undo": "sequelize-cli db:migrate:undo",
     "db:seed": "sequelize-cli db:seed:all",
-    "prepare": "husky"
+    "prepare": "husky",
+    "openapi:bundle": "redocly bundle qatu@v1 -o dist/openapi.bundle.yaml",
+    "openapi:lint": "redocly lint qatu@v1 && spectral lint src/presentation/docs/openapi.yaml",
+    "openapi:validate": "redocly lint qatu@v1 --format=stylish",
+    "openapi:preview": "redocly preview-docs qatu@v1"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
@@ -32,6 +36,7 @@
     "express-rate-limit": "^7.2.0",
     "helmet": "^8.3.0",
     "joi": "^18.2.9",
+    "js-yaml": "^5.4.3",
     "pg": "^8.11.5",
     "pg-hstore": "^2.3.4",
     "pino": "^10.4.0",
@@ -44,6 +49,8 @@
     "@commitlint/cli": "^19.2.1",
     "@commitlint/config-conventional": "^19.1.0",
     "@eslint/js": "^10.0.1",
+    "@redocly/cli": "^2.63.0",
+    "@stoplight/spectral-cli": "^6.17.0",
     "@testcontainers/postgresql": "^12.2.0",
     "@testcontainers/rabbitmq": "^12.2.0",
     "@vitest/coverage-v8": "^5.0.3",

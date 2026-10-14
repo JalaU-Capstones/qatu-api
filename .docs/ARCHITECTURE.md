@@ -74,7 +74,8 @@ src/
     ├── controllers/      # Express controllers
     ├── routes/           # Express routes
     ├── middlewares/      # Express middlewares
-    └── validators/       # Joi schemas
+    ├── validators/       # Joi schemas
+    └── docs/             # OpenAPI 3.1 specification & Swagger UI
 ```
 
 Files use PascalCase for classes (e.g., `PlaceOrderUseCase.js`, `UserRepository.js`).
@@ -84,6 +85,7 @@ Files use PascalCase for classes (e.g., `PlaceOrderUseCase.js`, `UserRepository.
 - **Authentication:** Handled via Supabase Auth in the Infrastructure layer. A custom middleware in the Presentation layer verifies the JWT token.
 - **Authorization:** Enforced at the database level using PostgreSQL Row Level Security (RLS). Policies are established in migrations.
 - **Validation:** Conducted in the Presentation layer using Joi schemas before requests reach the Application layer.
+- **API Specification:** Modular OpenAPI 3.1.0 contract maintained in `src/presentation/docs/` as the single source of truth; served via Swagger UI at `/api-docs`.
 - **Logging:** Centralized using Pino across all layers for consistent and performant logging.
 - **Messaging:** Treated as an infrastructure concern using RabbitMQ. Publishers and consumers live in the Infrastructure layer.
 - **Error Handling:** Errors propagate from the Domain layer outwards, mapped to corresponding HTTP status codes in a global error handling middleware in the Presentation layer.
@@ -108,6 +110,7 @@ Files use PascalCase for classes (e.g., `PlaceOrderUseCase.js`, `UserRepository.
 
 ## 1.8 References
 
+- [OpenAPI Specification](OPENAPI.md)
 - [Wiki: Architecture/Overview](#)
 - [Wiki: Architecture/Backend](#)
 - [Wiki: Architecture/Data-Model](#)
