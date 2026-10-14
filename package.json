@@ -8,6 +8,7 @@
     "pnpm": ">=11.0.0"
   },
   "scripts": {
+    "predev": "pnpm openapi:bundle",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "lint": "eslint .",

@@ -30,7 +30,7 @@ help:
 install:
 	pnpm install
 
-dev:
+dev: openapi-bundle
 	pnpm dev
 
 start:
