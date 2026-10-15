@@ -7,6 +7,12 @@ describe('Username Value Object', () => {
     expect(username.getValue()).toBe('john_doe_99');
   });
 
+  it('should reject empty or non-string username', () => {
+    expect(() => new Username('')).toThrow('Username is required');
+    expect(() => new Username(null)).toThrow('Username is required');
+    expect(() => new Username(undefined)).toThrow('Username is required');
+  });
+
   it('should reject invalid usernames', () => {
     expect(() => new Username('ab')).toThrow('Username must be between 3 and 30 characters');
     expect(() => new Username('user with spaces')).toThrow(

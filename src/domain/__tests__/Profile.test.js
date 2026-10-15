@@ -19,17 +19,33 @@ describe('Profile Entity', () => {
     expect(profile.createdAt).toBeInstanceOf(Date);
   });
 
-  it('should instantiate with value objects', () => {
+  it('should instantiate with value objects and serialize to JSON correctly', () => {
     const profile = new Profile({
       id: 'uuid-456',
       username: new Username('janedoe'),
       fullName: new FullName('Jane Doe'),
+      email: 'jane@example.com',
+      avatar_path: 'avatars/jane.jpg',
+      bio: 'My bio',
       role: 'buyer',
     });
 
     expect(profile.username).toBe('janedoe');
     expect(profile.fullName).toBe('Jane Doe');
     expect(profile.isBuyer()).toBe(true);
+
+    const json = profile.toJSON();
+    expect(json).toEqual({
+      id: 'uuid-456',
+      username: 'janedoe',
+      full_name: 'Jane Doe',
+      email: 'jane@example.com',
+      avatar_path: 'avatars/jane.jpg',
+      bio: 'My bio',
+      locale: 'en',
+      created_at: expect.any(String),
+      updated_at: expect.any(String),
+    });
   });
 
   it('should throw when missing required fields', () => {

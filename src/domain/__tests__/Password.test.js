@@ -7,6 +7,13 @@ describe('Password Value Object', () => {
     expect(password.getValue()).toBe('StrongP@ssw0rd!');
   });
 
+  it('should throw descriptive requirements message when password is empty or non-string', () => {
+    const expectedMessage = Password.REQUIREMENTS_MESSAGE;
+    expect(() => new Password('')).toThrow(expectedMessage);
+    expect(() => new Password(null)).toThrow(expectedMessage);
+    expect(() => new Password(undefined)).toThrow(expectedMessage);
+  });
+
   it('should throw descriptive requirements message when password is weak', () => {
     const expectedMessage = Password.REQUIREMENTS_MESSAGE;
     expect(() => new Password('short1!')).toThrow(expectedMessage);
