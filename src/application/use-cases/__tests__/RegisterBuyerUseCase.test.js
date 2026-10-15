@@ -14,6 +14,20 @@ describe('RegisterBuyerUseCase', () => {
     full_name: 'Jane Buyer',
   };
 
+  // Profile object returned by the DB trigger (read back via findById).
+  const triggerCreatedProfile = {
+    id: 'auth-uuid-123',
+    username: 'buyer_jane',
+    fullName: 'Jane Buyer',
+    full_name: 'Jane Buyer',
+    email: 'buyer@example.com',
+    avatarPath: null,
+    bio: null,
+    locale: 'en',
+    createdAt: new Date('2026-10-15T10:00:00.000Z'),
+    updatedAt: new Date('2026-10-15T10:00:00.000Z'),
+  };
+
   beforeEach(() => {
     authServiceMock = {
       emailExists: vi.fn().mockResolvedValue(false),
@@ -30,8 +44,11 @@ describe('RegisterBuyerUseCase', () => {
     };
 
     profileRepositoryMock = {
-      create: vi.fn().mockImplementation(async (profile) => profile),
-      findById: vi.fn(),
+      // create is no longer called by the use case — the on_auth_user_created
+      // DB trigger handles the insert. Keep the mock defined so tests that
+      // assert it was NOT called can still reference it.
+      create: vi.fn(),
+      findById: vi.fn().mockResolvedValue(triggerCreatedProfile),
       findByUsername: vi.fn(),
     };
 
@@ -55,7 +72,7 @@ describe('RegisterBuyerUseCase', () => {
     });
   });
 
-  it('should successfully register a buyer and create profile with buyer role', async () => {
+  it('should successfully register a buyer and read the trigger-created profile', async () => {
     const request = new RegisterRequestDTO(validPayload);
     const result = await useCase.execute(request);
 
@@ -71,11 +88,11 @@ describe('RegisterBuyerUseCase', () => {
       })
     );
 
-    expect(profileRepositoryMock.create).toHaveBeenCalled();
-    const createdProfileArg = profileRepositoryMock.create.mock.calls[0][0];
-    expect(createdProfileArg.id).toBe('auth-uuid-123');
-    expect(createdProfileArg.role).toBe('buyer');
-    expect(createdProfileArg.username).toBe('buyer_jane');
+    // The use case must NOT call create — the DB trigger already inserted the row.
+    expect(profileRepositoryMock.create).not.toHaveBeenCalled();
+
+    // The use case must call findById to read back the trigger-created profile.
+    expect(profileRepositoryMock.findById).toHaveBeenCalledWith('auth-uuid-123');
 
     expect(result.data.user).toEqual({
       id: 'auth-uuid-123',
@@ -87,9 +104,21 @@ describe('RegisterBuyerUseCase', () => {
     expect(result.data.token).toBe('valid.jwt.token');
     expect(result.meta.timestamp).toBeDefined();
 
-    // Check getters
+    // Convenience getters on RegisterResponseDTO
     expect(result.user.id).toBe('auth-uuid-123');
     expect(result.session.access_token).toBe('valid.jwt.token');
+  });
+
+  it('should use fallback profile when findById returns null (in-memory / no trigger)', async () => {
+    profileRepositoryMock.findById.mockResolvedValue(null);
+    const request = new RegisterRequestDTO(validPayload);
+    const result = await useCase.execute(request);
+
+    expect(result.data.profile.id).toBe('auth-uuid-123');
+    expect(result.data.profile.username).toBe('buyer_jane');
+    expect(result.data.profile.full_name).toBe('Jane Buyer');
+    expect(result.data.profile.locale).toBe('en');
+    expect(result.data.profile.avatar_path).toBeNull();
   });
 
   it('should throw an error if email already exists without creating user or profile', async () => {
@@ -100,6 +129,7 @@ describe('RegisterBuyerUseCase', () => {
 
     expect(authServiceMock.registerUser).not.toHaveBeenCalled();
     expect(profileRepositoryMock.create).not.toHaveBeenCalled();
+    expect(profileRepositoryMock.findById).not.toHaveBeenCalled();
   });
 
   it('should reject invalid email format', async () => {

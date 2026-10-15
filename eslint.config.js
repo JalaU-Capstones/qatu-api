@@ -49,6 +49,7 @@ export default [
   {
     files: [
       'src/infrastructure/config/sequelize.config.js',
+      'src/infrastructure/config/sequelize.config.cjs',
       'src/infrastructure/persistence/migrations/**/*.js',
       'src/infrastructure/persistence/seeders/**/*.js',
     ],
@@ -60,6 +61,8 @@ export default [
         exports: 'readonly',
         __dirname: 'readonly',
         __filename: 'readonly',
+        process: 'readonly',
+        console: 'readonly',
       },
     },
     rules: {
