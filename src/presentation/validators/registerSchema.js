@@ -25,10 +25,12 @@ export const registerSchema = Joi.object({
       'Username must be between 3 and 30 characters and contain only alphanumeric characters and underscores.',
     'any.required': 'Username is required',
   }),
-  fullName: Joi.string().min(2).max(100).required().messages({
-    'string.empty': 'Full name is required',
+  full_name: Joi.string().min(2).max(100).allow('', null).optional().messages({
     'string.min': 'Full name must be between 2 and 100 characters long.',
     'string.max': 'Full name must be between 2 and 100 characters long.',
-    'any.required': 'Full name is required',
+  }),
+  fullName: Joi.string().min(2).max(100).allow('', null).optional().messages({
+    'string.min': 'Full name must be between 2 and 100 characters long.',
+    'string.max': 'Full name must be between 2 and 100 characters long.',
   }),
 });

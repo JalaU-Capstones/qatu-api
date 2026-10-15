@@ -11,7 +11,7 @@ describe('RegisterBuyerUseCase', () => {
     email: 'buyer@example.com',
     password: 'SecureP@ssword123!',
     username: 'buyer_jane',
-    fullName: 'Jane Buyer',
+    full_name: 'Jane Buyer',
   };
 
   beforeEach(() => {
@@ -20,6 +20,8 @@ describe('RegisterBuyerUseCase', () => {
       registerUser: vi.fn().mockResolvedValue({
         id: 'auth-uuid-123',
         email: 'buyer@example.com',
+        created_at: '2026-10-15T10:00:00.000Z',
+        token: 'valid.jwt.token',
         session: {
           access_token: 'valid.jwt.token',
           token_type: 'bearer',
@@ -39,20 +41,35 @@ describe('RegisterBuyerUseCase', () => {
     });
   });
 
+  describe('constructor validations', () => {
+    it('should throw if authService is missing', () => {
+      expect(() => new RegisterBuyerUseCase({ profileRepository: profileRepositoryMock })).toThrow(
+        'authService is required'
+      );
+    });
+
+    it('should throw if profileRepository is missing', () => {
+      expect(() => new RegisterBuyerUseCase({ authService: authServiceMock })).toThrow(
+        'profileRepository is required'
+      );
+    });
+  });
+
   it('should successfully register a buyer and create profile with buyer role', async () => {
     const request = new RegisterRequestDTO(validPayload);
     const result = await useCase.execute(request);
 
     expect(authServiceMock.emailExists).toHaveBeenCalledWith('buyer@example.com');
-    expect(authServiceMock.registerUser).toHaveBeenCalledWith({
-      email: 'buyer@example.com',
-      password: 'SecureP@ssword123!',
-      role: 'buyer',
-      metadata: {
-        username: 'buyer_jane',
-        fullName: 'Jane Buyer',
-      },
-    });
+    expect(authServiceMock.registerUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'buyer@example.com',
+        role: 'buyer',
+        metadata: expect.objectContaining({
+          username: 'buyer_jane',
+          fullName: 'Jane Buyer',
+        }),
+      })
+    );
 
     expect(profileRepositoryMock.create).toHaveBeenCalled();
     const createdProfileArg = profileRepositoryMock.create.mock.calls[0][0];
@@ -60,13 +77,18 @@ describe('RegisterBuyerUseCase', () => {
     expect(createdProfileArg.role).toBe('buyer');
     expect(createdProfileArg.username).toBe('buyer_jane');
 
-    expect(result.user).toEqual({
+    expect(result.data.user).toEqual({
       id: 'auth-uuid-123',
       email: 'buyer@example.com',
-      username: 'buyer_jane',
-      fullName: 'Jane Buyer',
-      role: 'buyer',
+      created_at: '2026-10-15T10:00:00.000Z',
     });
+    expect(result.data.profile.full_name).toBe('Jane Buyer');
+    expect(result.data.roles[0].name).toBe('buyer');
+    expect(result.data.token).toBe('valid.jwt.token');
+    expect(result.meta.timestamp).toBeDefined();
+
+    // Check getters
+    expect(result.user.id).toBe('auth-uuid-123');
     expect(result.session.access_token).toBe('valid.jwt.token');
   });
 

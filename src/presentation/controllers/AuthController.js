@@ -25,11 +25,7 @@ export class AuthController {
 
       const result = await this.registerBuyerUseCase.execute(requestDto);
 
-      return res.status(201).json({
-        message: 'Buyer registered successfully',
-        user: result.user,
-        session: result.session,
-      });
+      return res.status(201).json(result);
     } catch (error) {
       return next(error);
     }

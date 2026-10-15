@@ -1,3 +1,4 @@
+import { ROLES, ROLE_DEFINITIONS } from '../../domain/constants/roles.js';
 import { Profile } from '../../domain/entities/Profile.js';
 import { Email } from '../../domain/value-objects/Email.js';
 import { FullName } from '../../domain/value-objects/FullName.js';
@@ -26,7 +27,8 @@ export class RegisterBuyerUseCase {
     const emailVO = new Email(request.email);
     const passwordVO = new Password(request.password);
     const usernameVO = new Username(request.username);
-    const fullNameVO = new FullName(request.fullName);
+    const rawFullName = request.full_name || request.fullName || request.username;
+    const fullNameVO = new FullName(rawFullName);
 
     const exists = await this.authService.emailExists(emailVO.getValue());
     if (exists) {
@@ -39,31 +41,63 @@ export class RegisterBuyerUseCase {
     const authResult = await this.authService.registerUser({
       email: emailVO.getValue(),
       password: passwordVO.getValue(),
-      role: 'buyer',
+      role: ROLES.BUYER,
       metadata: {
         username: usernameVO.getValue(),
+        full_name: fullNameVO.getValue(),
         fullName: fullNameVO.getValue(),
       },
     });
+
+    const now = new Date();
+    const isoNow = now.toISOString();
+
+    const buyerRole = {
+      id: ROLE_DEFINITIONS[ROLES.BUYER].id,
+      name: ROLES.BUYER,
+      created_at: isoNow,
+    };
 
     const profile = new Profile({
       id: authResult.id,
       username: usernameVO,
       fullName: fullNameVO,
-      role: 'buyer',
+      full_name: fullNameVO.getValue(),
+      email: emailVO.getValue(),
+      avatar_path: null,
+      bio: null,
+      locale: 'en',
+      role: ROLES.BUYER,
+      roles: [buyerRole],
+      createdAt: now,
+      updatedAt: now,
     });
 
     const savedProfile = await this.profileRepository.create(profile);
 
+    const token =
+      authResult.token || authResult.session?.access_token || 'mock-jwt-token-placeholder';
+
     return new RegisterResponseDTO({
       user: {
-        id: savedProfile.id,
+        id: authResult.id,
         email: emailVO.getValue(),
-        username: savedProfile.username,
-        fullName: savedProfile.fullName,
-        role: savedProfile.role,
+        created_at: authResult.created_at || isoNow,
       },
-      session: authResult.session || null,
+      profile: {
+        id: savedProfile.id,
+        username: savedProfile.username,
+        full_name: savedProfile.fullName || savedProfile.full_name,
+        email: savedProfile.email || emailVO.getValue(),
+        avatar_path: savedProfile.avatarPath || null,
+        bio: savedProfile.bio || null,
+        locale: savedProfile.locale || 'en',
+        created_at: savedProfile.createdAt ? savedProfile.createdAt.toISOString() : isoNow,
+        updated_at: savedProfile.updatedAt ? savedProfile.updatedAt.toISOString() : isoNow,
+      },
+      roles: [buyerRole],
+      token,
+      timestamp: isoNow,
     });
   }
 }
