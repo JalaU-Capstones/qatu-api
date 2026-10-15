@@ -13,6 +13,27 @@ export class ProfileRepository extends IProfileRepository {
   }
 
   /**
+   * Maps a database row into a domain Profile entity.
+   *
+   * @param {Object} row
+   * @returns {Profile}
+   */
+  mapRowToEntity(row) {
+    if (!row) return null;
+    return new Profile({
+      id: row.id,
+      username: row.username,
+      fullName: row.full_name,
+      email: row.email || null,
+      avatarPath: row.avatar_path || null,
+      bio: row.bio || null,
+      locale: row.locale || 'en',
+      createdAt: row.created_at ? new Date(row.created_at) : undefined,
+      updatedAt: row.updated_at ? new Date(row.updated_at) : undefined,
+    });
+  }
+
+  /**
    * @param {Profile} profile
    * @returns {Promise<Profile>}
    */
@@ -24,26 +45,23 @@ export class ProfileRepository extends IProfileRepository {
           id: profile.id,
           username: profile.username,
           full_name: profile.fullName,
-          role: profile.role,
-          created_at: profile.createdAt.toISOString(),
-          updated_at: profile.updatedAt.toISOString(),
+          email: profile.email,
+          avatar_path: profile.avatarPath,
+          bio: profile.bio,
+          locale: profile.locale,
         })
         .select()
         .single();
 
       if (!error && data) {
-        return new Profile({
-          id: data.id,
-          username: data.username,
-          fullName: data.full_name,
-          role: data.role,
-          createdAt: new Date(data.created_at),
-          updatedAt: new Date(data.updated_at),
-        });
+        return this.mapRowToEntity(data);
+      }
+      if (error) {
+        throw new Error(`Failed to create profile: ${error.message}`);
       }
     }
 
-    // Fallback in-memory storage (e.g. for offline dev or unit testing)
+    // In-memory store fallback (useful for tests or standalone mode)
     this.inMemoryStore.set(profile.id, profile);
     return profile;
   }
@@ -57,14 +75,7 @@ export class ProfileRepository extends IProfileRepository {
       const { data, error } = await this.client.from('profiles').select('*').eq('id', id).single();
 
       if (!error && data) {
-        return new Profile({
-          id: data.id,
-          username: data.username,
-          fullName: data.full_name,
-          role: data.role,
-          createdAt: new Date(data.created_at),
-          updatedAt: new Date(data.updated_at),
-        });
+        return this.mapRowToEntity(data);
       }
     }
 
@@ -80,18 +91,11 @@ export class ProfileRepository extends IProfileRepository {
       const { data, error } = await this.client
         .from('profiles')
         .select('*')
-        .eq('username', username)
+        .ilike('username', username)
         .single();
 
       if (!error && data) {
-        return new Profile({
-          id: data.id,
-          username: data.username,
-          fullName: data.full_name,
-          role: data.role,
-          createdAt: new Date(data.created_at),
-          updatedAt: new Date(data.updated_at),
-        });
+        return this.mapRowToEntity(data);
       }
     }
 
