@@ -1,0 +1,140 @@
+type: object
+description: A product offered by a seller on the Qatu Marketplace.
+required:
+  - id
+  - seller_id
+  - name
+  - slug
+  - price
+  - currency
+  - stock
+  - state
+  - created_at
+  - updated_at
+properties:
+  id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Unique identifier of the product.
+    examples:
+      - '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+  seller_id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Identifier of the seller (profile) who owns the product.
+    examples:
+      - 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f'
+  category_id:
+    type: [string, 'null']
+    format: uuid
+    description: Identifier of the category. Null when uncategorized.
+    examples:
+      - 'b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'
+  name:
+    type: string
+    minLength: 3
+    maxLength: 200
+    description: Display name of the product.
+    examples:
+      - 'Ergonomic office chair'
+  slug:
+    type: string
+    pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+    description: URL-friendly identifier. Unique per seller.
+    examples:
+      - 'ergonomic-office-chair'
+  description:
+    type: [string, 'null']
+    maxLength: 5000
+    description: Long-form product description.
+    examples:
+      - 'High quality ergonomic mesh chair with adjustable lumbar support and armrests.'
+  price:
+    type: number
+    format: double
+    minimum: 0
+    description: Unit price in the specified currency.
+    examples:
+      - 129.99
+  currency:
+    type: string
+    enum:
+      - USD
+      - EUR
+      - BOB
+      - PEN
+      - ARS
+      - COP
+      - MXN
+      - BRL
+    description: ISO 4217 currency code.
+    examples:
+      - 'USD'
+  stock:
+    type: integer
+    minimum: 0
+    description: Available inventory count.
+    examples:
+      - 25
+  attributes:
+    type: object
+    additionalProperties: true
+    description: Free-form key-value attributes (color, size, etc.).
+    examples:
+      - color: 'black'
+        material: 'mesh'
+  primary_image_path:
+    type: [string, 'null']
+    description: Path to the primary image in Supabase Storage.
+    examples:
+      - 'product-images/7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c/chair-front.webp'
+  state:
+    type: string
+    enum:
+      - draft
+      - published
+      - unpublished
+      - archived
+    description: Lifecycle state of the product.
+    examples:
+      - 'published'
+  average_rating:
+    type: number
+    format: float
+    minimum: 0
+    maximum: 5
+    readOnly: true
+    description: Recomputed average rating score between 0 and 5.
+    examples:
+      - 4.80
+  ratings_count:
+    type: integer
+    minimum: 0
+    readOnly: true
+    description: Total count of ratings received for this product.
+    examples:
+      - 12
+  published_at:
+    type: [string, 'null']
+    format: date-time
+    readOnly: true
+    description: Timestamp when the product was first published.
+    examples:
+      - '2026-10-10T14:30:00.000Z'
+  created_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Product record creation timestamp.
+    examples:
+      - '2026-10-09T08:00:00.000Z'
+  updated_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Product record last update timestamp.
+    examples:
+      - '2026-10-10T14:30:00.000Z'
+additionalProperties: false

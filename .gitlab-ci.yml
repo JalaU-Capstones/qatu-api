@@ -28,6 +28,17 @@ lint:
     - develop
     - merge_requests
 
+openapi:lint:
+  stage: lint
+  script:
+    - pnpm openapi:bundle
+    - pnpm openapi:lint
+    - pnpm openapi:validate
+  only:
+    - main
+    - develop
+    - merge_requests
+
 test:
   stage: test
   script:

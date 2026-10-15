@@ -1,0 +1,202 @@
+listOrCreate:
+  get:
+    operationId: listOrders
+    summary: List orders
+    description: |
+      Returns a paginated list of orders for the authenticated user.
+      Buyers see their own orders; sellers see orders containing their products; admins see all orders.
+    tags:
+      - orders
+    parameters:
+      - $ref: '../components/parameters/pagination.yaml#/page'
+      - $ref: '../components/parameters/pagination.yaml#/limit'
+      - name: status
+        in: query
+        description: Filter orders by status.
+        schema:
+          type: string
+          enum: [pending, confirmed, shipped, delivered, cancelled]
+    responses:
+      '200':
+        description: Paginated list of orders.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/Order.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/PaginationMeta'
+            examples:
+              orderList:
+                $ref: '../components/examples/orders.yaml#/orderList'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+  post:
+    operationId: createOrder
+    summary: Create an order
+    description: |
+      Places a new order from the authenticated buyer's cart contents.
+      Clears the cart on success. Requires at least one item in the cart.
+    tags:
+      - orders
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              shipping_address:
+                type: object
+                required:
+                  - street
+                  - city
+                  - country
+                properties:
+                  street:
+                    type: string
+                    example: '123 Main St'
+                  city:
+                    type: string
+                    example: 'Buenos Aires'
+                  state:
+                    type: string
+                    example: 'CABA'
+                  postal_code:
+                    type: string
+                    example: 'C1001'
+                  country:
+                    type: string
+                    example: 'AR'
+          examples:
+            createOrder:
+              $ref: '../components/examples/orders.yaml#/createOrder'
+    responses:
+      '201':
+        description: Order created successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Order.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              orderDetail:
+                $ref: '../components/examples/orders.yaml#/orderDetail'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '422':
+        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+getById:
+  get:
+    operationId: getOrderById
+    summary: Get an order by ID
+    description: |
+      Returns a single order with its items. Buyers may only access their own orders.
+      Sellers may access orders containing their products. Admins may access all.
+    tags:
+      - orders
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/orderId'
+    responses:
+      '200':
+        description: Order details.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Order.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              orderDetail:
+                $ref: '../components/examples/orders.yaml#/orderDetail'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+updateStatus:
+  patch:
+    operationId: updateOrderStatus
+    summary: Update order status
+    description: |
+      Updates the status of an order. Sellers may mark orders as `confirmed`, `shipped`, or `delivered`.
+      Buyers may cancel `pending` orders. Admins may set any status.
+    tags:
+      - orders
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/orderId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - status
+            properties:
+              status:
+                type: string
+                enum: [confirmed, shipped, delivered, cancelled]
+                example: confirmed
+          examples:
+            confirmOrder:
+              summary: Seller confirms the order
+              value:
+                status: confirmed
+            cancelOrder:
+              summary: Buyer cancels the order
+              value:
+                status: cancelled
+    responses:
+      '200':
+        description: Order status updated successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Order.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '409':
+        $ref: '../components/responses/errors.yaml#/Conflict'
+      '422':
+        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'

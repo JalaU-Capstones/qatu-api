@@ -1,0 +1,310 @@
+salesReport:
+  get:
+    operationId: adminGetSalesReport
+    summary: Get sales report (admin)
+    description: |
+      Returns aggregated sales data for a date range. Admin only.
+      Includes total revenue, order counts, top products, and top sellers.
+    tags:
+      - admin
+    parameters:
+      - name: from
+        in: query
+        required: true
+        description: Start date (ISO 8601 date, inclusive).
+        schema:
+          type: string
+          format: date
+          example: '2026-01-01'
+      - name: to
+        in: query
+        required: true
+        description: End date (ISO 8601 date, inclusive).
+        schema:
+          type: string
+          format: date
+          example: '2026-10-14'
+      - name: group_by
+        in: query
+        description: Group results by time period.
+        schema:
+          type: string
+          enum: [day, week, month]
+          default: month
+    responses:
+      '200':
+        description: Sales report data.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  properties:
+                    total_revenue:
+                      type: number
+                      format: float
+                      example: 48750.50
+                    total_orders:
+                      type: integer
+                      example: 342
+                    period_breakdown:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          period:
+                            type: string
+                            example: '2026-10'
+                          revenue:
+                            type: number
+                            format: float
+                            example: 5420.00
+                          order_count:
+                            type: integer
+                            example: 38
+                    top_products:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          product_id:
+                            type: string
+                            format: uuid
+                          title:
+                            type: string
+                          revenue:
+                            type: number
+                            format: float
+                          units_sold:
+                            type: integer
+                    top_sellers:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          seller_id:
+                            type: string
+                            format: uuid
+                          display_name:
+                            type: string
+                          revenue:
+                            type: number
+                            format: float
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              salesReport:
+                summary: Monthly sales report
+                value:
+                  data:
+                    total_revenue: 48750.50
+                    total_orders: 342
+                    period_breakdown:
+                      - period: '2026-10'
+                        revenue: 5420.00
+                        order_count: 38
+                    top_products:
+                      - product_id: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+                        title: 'Handcrafted Leather Wallet'
+                        revenue: 1249.75
+                        units_sold: 25
+                    top_sellers:
+                      - seller_id: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f'
+                        display_name: 'Artisan Crafts Co.'
+                        revenue: 8300.00
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+usersReport:
+  get:
+    operationId: adminGetUsersReport
+    summary: Get users report (admin)
+    description: |
+      Returns aggregated user registration and activity metrics. Admin only.
+    tags:
+      - admin
+    parameters:
+      - name: from
+        in: query
+        required: true
+        description: Start date (ISO 8601 date, inclusive).
+        schema:
+          type: string
+          format: date
+          example: '2026-01-01'
+      - name: to
+        in: query
+        required: true
+        description: End date (ISO 8601 date, inclusive).
+        schema:
+          type: string
+          format: date
+          example: '2026-10-14'
+    responses:
+      '200':
+        description: User metrics report.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  properties:
+                    total_users:
+                      type: integer
+                      example: 1248
+                    new_registrations:
+                      type: integer
+                      example: 87
+                    active_buyers:
+                      type: integer
+                      example: 312
+                    active_sellers:
+                      type: integer
+                      example: 45
+                    pending_seller_applications:
+                      type: integer
+                      example: 12
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              usersReport:
+                summary: Users report
+                value:
+                  data:
+                    total_users: 1248
+                    new_registrations: 87
+                    active_buyers: 312
+                    active_sellers: 45
+                    pending_seller_applications: 12
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+productsReport:
+  get:
+    operationId: adminGetProductsReport
+    summary: Get products report (admin)
+    description: |
+      Returns aggregated product metrics including listings, categories distribution,
+      and top-rated products. Admin only.
+    tags:
+      - admin
+    parameters:
+      - name: from
+        in: query
+        required: true
+        description: Start date (ISO 8601 date, inclusive).
+        schema:
+          type: string
+          format: date
+          example: '2026-01-01'
+      - name: to
+        in: query
+        required: true
+        description: End date (ISO 8601 date, inclusive).
+        schema:
+          type: string
+          format: date
+          example: '2026-10-14'
+    responses:
+      '200':
+        description: Products metrics report.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  properties:
+                    total_products:
+                      type: integer
+                      example: 856
+                    published_products:
+                      type: integer
+                      example: 712
+                    draft_products:
+                      type: integer
+                      example: 144
+                    new_listings:
+                      type: integer
+                      example: 63
+                    top_categories:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          category_id:
+                            type: string
+                            format: uuid
+                          name:
+                            type: string
+                          product_count:
+                            type: integer
+                    top_rated_products:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          product_id:
+                            type: string
+                            format: uuid
+                          title:
+                            type: string
+                          average_rating:
+                            type: number
+                            format: float
+                          rating_count:
+                            type: integer
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              productsReport:
+                summary: Products report
+                value:
+                  data:
+                    total_products: 856
+                    published_products: 712
+                    draft_products: 144
+                    new_listings: 63
+                    top_categories:
+                      - category_id: 'b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'
+                        name: Electronics
+                        product_count: 142
+                    top_rated_products:
+                      - product_id: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+                        title: 'Handcrafted Leather Wallet'
+                        average_rating: 4.8
+                        rating_count: 156
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'

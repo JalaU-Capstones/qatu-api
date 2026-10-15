@@ -1,0 +1,35 @@
+type: object
+description: Authenticated user account representation managed by Supabase Auth.
+required:
+  - id
+  - email
+  - created_at
+properties:
+  id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Unique identifier of the user account.
+    examples:
+      - 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+  email:
+    type: string
+    format: email
+    description: Primary email address associated with the account.
+    examples:
+      - 'user@example.com'
+  created_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Timestamp when the user account was created.
+    examples:
+      - '2026-10-14T10:00:00.000Z'
+  updated_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Timestamp when the user account was last updated.
+    examples:
+      - '2026-10-14T10:00:00.000Z'
+additionalProperties: false

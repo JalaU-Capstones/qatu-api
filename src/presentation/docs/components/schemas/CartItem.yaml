@@ -1,0 +1,62 @@
+type: object
+description: An item in a buyer's shopping cart.
+required:
+  - id
+  - profile_id
+  - product_id
+  - quantity
+  - saved_for_later
+  - created_at
+  - updated_at
+properties:
+  id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Unique identifier of the cart item.
+    examples:
+      - '5b4a3c2d-1e0f-9a8b-7c6d-5e4f3a2b1c0d'
+  profile_id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Profile identifier of the buyer who owns the cart item.
+    examples:
+      - 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+  product_id:
+    type: string
+    format: uuid
+    description: Product identifier referenced by this cart item.
+    examples:
+      - '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+  quantity:
+    type: integer
+    minimum: 1
+    maximum: 1000
+    description: Desired purchase quantity for this product.
+    examples:
+      - 2
+  saved_for_later:
+    type: boolean
+    default: false
+    description: Indicates whether this item is stored for future consideration rather than active checkout.
+    examples:
+      - false
+  product:
+    $ref: './Product.yaml'
+    description: Optional populated product details.
+  created_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Timestamp when item was added to the cart.
+    examples:
+      - '2026-10-14T11:00:00.000Z'
+  updated_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Timestamp when quantity or save status was last updated.
+    examples:
+      - '2026-10-14T11:00:00.000Z'
+additionalProperties: false

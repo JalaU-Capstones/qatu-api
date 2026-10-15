@@ -1,0 +1,35 @@
+type: object
+description: System authorization role assigned to users.
+required:
+  - id
+  - name
+  - created_at
+properties:
+  id:
+    type: integer
+    readOnly: true
+    description: Unique smallint identifier of the role.
+    examples:
+      - 1
+  name:
+    type: string
+    enum:
+      - buyer
+      - seller
+      - admin
+    description: Canonical role name determining permissions.
+    examples:
+      - 'buyer'
+  description:
+    type: [string, 'null']
+    description: Human-readable description of capabilities granted by this role.
+    examples:
+      - 'Default role granted to all registered marketplace shoppers.'
+  created_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Timestamp when the role definition was created.
+    examples:
+      - '2026-10-01T00:00:00.000Z'
+additionalProperties: false

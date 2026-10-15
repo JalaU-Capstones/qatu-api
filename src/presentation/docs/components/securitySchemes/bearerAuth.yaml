@@ -1,0 +1,6 @@
+type: http
+scheme: bearer
+bearerFormat: JWT
+description: |
+  JWT issued by Supabase Auth. Send in the `Authorization: Bearer <token>` header.
+  Required for all protected endpoints. See `Architecture/Security`.

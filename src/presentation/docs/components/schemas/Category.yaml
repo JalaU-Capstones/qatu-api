@@ -1,0 +1,71 @@
+type: object
+description: Product classification category within the catalog hierarchy.
+required:
+  - id
+  - name
+  - slug
+  - position
+  - is_active
+  - created_at
+  - updated_at
+properties:
+  id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Unique identifier of the category.
+    examples:
+      - 'b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'
+  name:
+    type: string
+    minLength: 2
+    maxLength: 80
+    description: Display name of the category.
+    examples:
+      - 'Home & Living'
+  slug:
+    type: string
+    pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+    description: Unique URL-safe slug identifier.
+    examples:
+      - 'home-and-living'
+  description:
+    type: [string, 'null']
+    maxLength: 1000
+    description: Descriptive overview of items found in this category.
+    examples:
+      - 'Furniture, home decor, kitchenware, and textiles.'
+  parent_id:
+    type: [string, 'null']
+    format: uuid
+    description: Optional parent category UUID for nested subcategories.
+    examples:
+      - null
+  position:
+    type: integer
+    minimum: 0
+    default: 0
+    description: Sorting position index for UI display ordering.
+    examples:
+      - 1
+  is_active:
+    type: boolean
+    default: true
+    description: Flag indicating whether this category is actively visible to buyers.
+    examples:
+      - true
+  created_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Timestamp when the category was created.
+    examples:
+      - '2026-10-01T00:00:00.000Z'
+  updated_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Timestamp when the category was last modified.
+    examples:
+      - '2026-10-01T00:00:00.000Z'
+additionalProperties: false

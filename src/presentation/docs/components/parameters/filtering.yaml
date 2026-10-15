@@ -1,0 +1,177 @@
+search:
+  name: search
+  in: query
+  description: Full-text search term applied to name and description fields.
+  required: false
+  schema:
+    type: string
+  examples:
+    searchExample:
+      summary: Search query
+      value: 'ergonomic chair'
+
+categoryId:
+  name: category_id
+  in: query
+  description: Filter items by category UUID identifier.
+  required: false
+  schema:
+    type: string
+    format: uuid
+  examples:
+    categoryExample:
+      summary: Category UUID
+      value: 'b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'
+
+filterCategoryId:
+  name: category_id
+  in: query
+  description: Filter items by category UUID identifier.
+  required: false
+  schema:
+    type: string
+    format: uuid
+  examples:
+    categoryExample:
+      summary: Category UUID
+      value: 'b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'
+
+minPrice:
+  name: min_price
+  in: query
+  description: Minimum price filter (inclusive).
+  required: false
+  schema:
+    type: number
+    format: double
+    minimum: 0
+  examples:
+    minPriceExample:
+      summary: Minimum price
+      value: 50.00
+
+maxPrice:
+  name: max_price
+  in: query
+  description: Maximum price filter (inclusive).
+  required: false
+  schema:
+    type: number
+    format: double
+    minimum: 0
+  examples:
+    maxPriceExample:
+      summary: Maximum price
+      value: 500.00
+
+sellerId:
+  name: seller_id
+  in: query
+  description: Filter products or ratings by seller profile UUID.
+  required: false
+  schema:
+    type: string
+    format: uuid
+  examples:
+    sellerExample:
+      summary: Seller profile UUID
+      value: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f'
+
+filterSellerId:
+  name: seller_id
+  in: query
+  description: Filter products or ratings by seller profile UUID.
+  required: false
+  schema:
+    type: string
+    format: uuid
+  examples:
+    sellerExample:
+      summary: Seller profile UUID
+      value: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f'
+
+state:
+  name: state
+  in: query
+  description: Filter products by lifecycle state (for sellers and administrators).
+  required: false
+  schema:
+    type: string
+    enum:
+      - draft
+      - published
+      - unpublished
+      - archived
+  examples:
+    stateExample:
+      summary: Product state
+      value: 'published'
+
+sort:
+  name: sort
+  in: query
+  description: Field name to sort the result collection by.
+  required: false
+  schema:
+    type: string
+    default: 'created_at'
+  examples:
+    sortExample:
+      summary: Sort field
+      value: 'price'
+
+order:
+  name: order
+  in: query
+  description: Sort direction (ascending or descending).
+  required: false
+  schema:
+    type: string
+    enum:
+      - asc
+      - desc
+    default: 'asc'
+  examples:
+    orderExample:
+      summary: Ascending order
+      value: 'asc'
+
+status:
+  name: status
+  in: query
+  description: Filter items by status code (e.g., order status or application status).
+  required: false
+  schema:
+    type: string
+  examples:
+    statusExample:
+      summary: Filter status
+      value: 'pending'
+
+sortBy:
+  name: sort_by
+  in: query
+  description: Field to sort results by.
+  required: false
+  schema:
+    type: string
+    enum: [price, created_at, title, rating]
+    default: created_at
+  examples:
+    sortByPrice:
+      summary: Sort by price
+      value: price
+
+sortOrder:
+  name: sort_order
+  in: query
+  description: Sort direction.
+  required: false
+  schema:
+    type: string
+    enum: [asc, desc]
+    default: asc
+  examples:
+    ascending:
+      summary: Ascending
+      value: asc

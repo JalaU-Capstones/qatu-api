@@ -1,0 +1,192 @@
+create:
+  post:
+    operationId: createSellerApplication
+    summary: Submit a seller application
+    description: |
+      Allows an authenticated buyer to apply to become a seller.
+      A user may only have one pending or active application at a time.
+    tags:
+      - seller-applications
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - business_name
+              - business_description
+            properties:
+              business_name:
+                type: string
+                minLength: 2
+                maxLength: 120
+                example: 'Andean Artisan Crafts'
+              business_description:
+                type: string
+                minLength: 20
+                maxLength: 2000
+                example: 'We produce hand-woven alpaca wool textiles and ceramic homeware sourced directly from local cooperatives.'
+          examples:
+            sellerApplicationCreate:
+              $ref: '../components/examples/auth.yaml#/sellerApplicationCreate'
+    responses:
+      '201':
+        description: Seller application submitted successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/SellerApplication.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              sellerApplicationResponse:
+                $ref: '../components/examples/auth.yaml#/sellerApplicationResponse'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '409':
+        $ref: '../components/responses/errors.yaml#/Conflict'
+      '422':
+        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+getMine:
+  get:
+    operationId: getMySellerApplication
+    summary: Get my seller application
+    description: Returns the authenticated user's most recent seller application.
+    tags:
+      - seller-applications
+    responses:
+      '200':
+        description: Current user's seller application.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/SellerApplication.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+adminList:
+  get:
+    operationId: adminListSellerApplications
+    summary: List all seller applications (admin)
+    description: |
+      Returns a paginated list of seller applications. Admin only.
+      Can be filtered by `status` (pending, approved, rejected).
+    tags:
+      - seller-applications
+      - admin
+    parameters:
+      - $ref: '../components/parameters/pagination.yaml#/page'
+      - $ref: '../components/parameters/pagination.yaml#/limit'
+      - name: status
+        in: query
+        description: Filter applications by status.
+        schema:
+          type: string
+          enum: [pending, approved, rejected]
+    responses:
+      '200':
+        description: Paginated list of seller applications.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/SellerApplication.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/PaginationMeta'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+adminReview:
+  patch:
+    operationId: adminReviewSellerApplication
+    summary: Approve or reject a seller application (admin)
+    description: |
+      Updates the status of a seller application to `approved` or `rejected`.
+      Admin only. On approval, the user's role is elevated to `seller`.
+    tags:
+      - seller-applications
+      - admin
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/applicationId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - status
+            properties:
+              status:
+                type: string
+                enum: [approved, rejected]
+                example: approved
+              rejection_reason:
+                type: string
+                maxLength: 500
+                description: Required when `status` is `rejected`.
+                example: 'Insufficient business description.'
+          examples:
+            approveApplication:
+              summary: Approve application
+              value:
+                status: approved
+            rejectApplication:
+              summary: Reject application
+              value:
+                status: rejected
+                rejection_reason: 'Insufficient business description.'
+    responses:
+      '200':
+        description: Seller application reviewed successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/SellerApplication.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'

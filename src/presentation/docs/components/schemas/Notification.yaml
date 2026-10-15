@@ -1,0 +1,72 @@
+type: object
+description: An in-app notification sent to a user when marketplace events occur.
+required:
+  - id
+  - profile_id
+  - type
+  - title
+  - payload
+  - created_at
+properties:
+  id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Unique identifier of the notification.
+    examples:
+      - 'd4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a'
+  profile_id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Profile identifier of the notification recipient.
+    examples:
+      - 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+  type:
+    type: string
+    enum:
+      - order_placed
+      - order_status_changed
+      - message_received
+      - seller_approved
+      - seller_rejected
+      - rating_received
+    description: Event type that triggered this notification.
+    examples:
+      - 'order_placed'
+  title:
+    type: string
+    description: Short notification headline displayed to the user.
+    examples:
+      - 'Order confirmed'
+  body:
+    type: [string, 'null']
+    description: Detailed notification message body.
+    examples:
+      - 'Your order ORD-00100042 has been confirmed and is being prepared.'
+  action_url:
+    type: [string, 'null']
+    description: Optional deep-link URL to the relevant resource.
+    examples:
+      - '/orders/9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+  payload:
+    type: object
+    additionalProperties: true
+    description: Event-specific metadata associated with the notification.
+    examples:
+      - order_id: '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+        order_number: 'ORD-00100042'
+  read_at:
+    type: [string, 'null']
+    format: date-time
+    description: Timestamp when user read the notification. Null means unread.
+    examples:
+      - null
+  created_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Notification creation timestamp.
+    examples:
+      - '2026-10-14T11:05:00.000Z'
+additionalProperties: false

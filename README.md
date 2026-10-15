@@ -105,12 +105,30 @@ make db-seed-undo
 
 See `.docs/MIGRATIONS.md` for detailed guidance.
 
+## API Documentation
+
+The REST API contract is defined using **OpenAPI 3.1.0** and served interactively via Swagger UI:
+
+- **Swagger UI:** `http://localhost:3000/api-docs` (when development server is running)
+- **OpenAPI JSON:** `http://localhost:3000/api-docs/openapi.json`
+- **Developer Guide:** [OpenAPI Developer Guide](src/presentation/docs/README.md) and [Contract Overview](.docs/OPENAPI.md)
+
+### OpenAPI Commands
+
+| Command                 | Makefile Target         | Description                                                  |
+| ----------------------- | ----------------------- | ------------------------------------------------------------ |
+| `pnpm openapi:bundle`   | `make openapi-bundle`   | Bundle modular specification into `dist/openapi.bundle.yaml` |
+| `pnpm openapi:lint`     | `make openapi-lint`     | Lint specification with Redocly CLI and Spectral             |
+| `pnpm openapi:validate` | `make openapi-validate` | Validate specification against OpenAPI 3.1 schemas           |
+| `pnpm openapi:preview`  | `make openapi-preview`  | Live preview specification in browser using Redocly          |
+
 ## Documentation
 
 Detailed documentation is available in the `.docs/` directory:
 
 - [Architecture](.docs/ARCHITECTURE.md) — Onion Architecture, layers, dependency rule, folder structure, cross-cutting concerns, and testing strategy.
 - [Migrations](.docs/MIGRATIONS.md) — Migration workflow, naming conventions, RLS policies, trigger ordering, and seeder guidelines.
+- [OpenAPI Specification](.docs/OPENAPI.md) — OpenAPI 3.1 contract, Swagger UI, Redocly tooling, linting, and guide for adding endpoints.
 - [Troubleshooting](.docs/TROUBLESHOOTING.md) — Common issues with Docker, pnpm, Node.js, PostgreSQL, RabbitMQ, Husky, ESLint, Vitest, and Migrations.
 - [Git Rules](.docs/GIT_RULES.md) — Branching strategy (GitFlow), commit message convention (Conventional Commits), merge request guidelines, code review checklist, and remote configuration.
 - [Supabase Setup](.docs/supabase/SETUP.md) — Step-by-step guide to configure Supabase for development using the free tier (local CLI or remote cloud).

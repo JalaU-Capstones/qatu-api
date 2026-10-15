@@ -1,0 +1,117 @@
+listOrCreate:
+  get:
+    operationId: listConversations
+    summary: List conversations
+    description: |
+      Returns all conversations the authenticated user participates in,
+      ordered by most recent message. Includes buyer-seller and support conversations.
+    tags:
+      - conversations
+    parameters:
+      - $ref: '../components/parameters/pagination.yaml#/page'
+      - $ref: '../components/parameters/pagination.yaml#/limit'
+    responses:
+      '200':
+        description: List of conversations.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/Conversation.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/PaginationMeta'
+            examples:
+              conversationList:
+                summary: User's conversations
+                value:
+                  data:
+                    - id: 'b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e'
+                      buyer_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+                      seller_id: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f'
+                      product_id: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+                      last_message_at: '2026-10-14T11:30:00.000Z'
+                      created_at: '2026-10-14T10:00:00.000Z'
+                      updated_at: '2026-10-14T11:30:00.000Z'
+                  meta:
+                    page: 1
+                    per_page: 20
+                    total: 1
+                    total_pages: 1
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+  post:
+    operationId: createConversation
+    summary: Start a conversation
+    description: |
+      Creates a new conversation between the authenticated buyer and a seller,
+      optionally linked to a product. Returns the existing conversation if one already exists
+      for this buyer-seller-product combination.
+    tags:
+      - conversations
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - seller_id
+            properties:
+              seller_id:
+                type: string
+                format: uuid
+                example: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f'
+              product_id:
+                type: [string, 'null']
+                format: uuid
+                description: Product the conversation is about (optional).
+                example: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+          examples:
+            createConversation:
+              summary: Start conversation about a product
+              value:
+                seller_id: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f'
+                product_id: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+    responses:
+      '201':
+        description: Conversation created.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Conversation.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '200':
+        description: Existing conversation returned.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Conversation.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'

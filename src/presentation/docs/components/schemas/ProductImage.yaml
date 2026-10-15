@@ -1,0 +1,49 @@
+type: object
+description: Additional product image gallery item stored in Supabase Storage.
+required:
+  - id
+  - product_id
+  - path
+  - position
+  - created_at
+properties:
+  id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Unique identifier of the product image.
+    examples:
+      - '8f3c0b7d-2e3e-4c7f-9d4b-0e6a2f3b5c8d'
+  product_id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Associated product UUID.
+    examples:
+      - '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+  path:
+    type: string
+    description: Storage path of the image in Supabase Storage product-images bucket.
+    examples:
+      - 'product-images/7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c/side-view.webp'
+  alt_text:
+    type: [string, 'null']
+    maxLength: 200
+    description: Descriptive alternative text for accessibility.
+    examples:
+      - 'Side view of ergonomic office chair showing adjustable armrests'
+  position:
+    type: integer
+    minimum: 0
+    default: 0
+    description: Sequential position for sorting images in gallery view.
+    examples:
+      - 1
+  created_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Image upload record creation timestamp.
+    examples:
+      - '2026-10-10T12:00:00.000Z'
+additionalProperties: false

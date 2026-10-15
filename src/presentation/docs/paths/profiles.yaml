@@ -1,0 +1,113 @@
+getById:
+  get:
+    operationId: getProfileById
+    summary: Get a public profile by ID
+    description: |
+      Returns publicly visible profile information for any user. No authentication required.
+    tags:
+      - profiles
+    security: []
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/id'
+    responses:
+      '200':
+        description: Profile retrieved successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Profile.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              default:
+                summary: Public profile
+                value:
+                  data:
+                    id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+                    username: 'john_doe'
+                    full_name: 'John Doe'
+                    email: null
+                    avatar_path: null
+                    bio: 'Artisan collector.'
+                    locale: 'en'
+                    created_at: '2026-10-01T00:00:00.000Z'
+                    updated_at: '2026-10-01T00:00:00.000Z'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '429':
+        $ref: '../components/responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+updateMe:
+  patch:
+    operationId: updateMyProfile
+    summary: Update own profile
+    description: |
+      Partially updates the authenticated user's profile fields.
+      Only the fields provided in the request body are updated.
+    tags:
+      - profiles
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              full_name:
+                type: string
+                maxLength: 100
+                description: Display full name.
+                examples:
+                  - 'Jane Doe'
+              bio:
+                type: string
+                maxLength: 500
+                description: Short profile biography.
+                examples:
+                  - 'Online marketplace enthusiast.'
+              locale:
+                type: string
+                description: Preferred locale code.
+                examples:
+                  - 'es'
+              avatar_path:
+                type: string
+                description: Storage path to uploaded avatar image.
+                examples:
+                  - 'avatars/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/avatar.webp'
+            additionalProperties: false
+          examples:
+            default:
+              summary: Update bio and locale
+              value:
+                bio: 'Updated bio text.'
+                locale: 'es'
+    responses:
+      '200':
+        description: Profile updated successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Profile.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '429':
+        $ref: '../components/responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
