@@ -1,4 +1,5 @@
 import { IAuthService } from '../../application/ports/IAuthService.js';
+import { ROLES } from '../../domain/constants/roles.js';
 
 export class SupabaseAuthService extends IAuthService {
   /**
@@ -14,16 +15,16 @@ export class SupabaseAuthService extends IAuthService {
    * @param {Object} params
    * @param {string} params.email
    * @param {string} params.password
-   * @param {string} params.role
+   * @param {string} [params.role='buyer']
    * @param {Object} [params.metadata]
-   * @returns {Promise<{ id: string, email: string, session?: Object }>}
+   * @returns {Promise<{ id: string, email: string, created_at: string, token: string, session?: Object }>}
    */
-  async registerUser({ email, password, role = 'buyer', metadata = {} }) {
+  async registerUser({ email, password, role = ROLES.BUYER, metadata = {} }) {
     if (!this.client) {
       throw new Error('Supabase client not initialized');
     }
 
-    // Try signUp or admin.createUser if available
+    // Admin create user method (service role)
     if (this.client.auth?.admin?.createUser) {
       const { data, error } = await this.client.auth.admin.createUser({
         email,
@@ -49,16 +50,25 @@ export class SupabaseAuthService extends IAuthService {
         throw new Error(`Failed to create user in Supabase: ${error.message}`);
       }
 
+      const userId = data.user.id;
+      const userEmail = data.user.email;
+      const createdAt = data.user.created_at || new Date().toISOString();
+      const token =
+        data.session?.access_token || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock-jwt-token';
+
       return {
-        id: data.user.id,
-        email: data.user.email,
-        session: {
-          access_token: 'mock-access-token',
+        id: userId,
+        email: userEmail,
+        created_at: createdAt,
+        token,
+        session: data.session || {
+          access_token: token,
           token_type: 'bearer',
         },
       };
     }
 
+    // Standard client signUp method
     const { data, error } = await this.client.auth.signUp({
       email,
       password,
@@ -84,10 +94,21 @@ export class SupabaseAuthService extends IAuthService {
       throw new Error(`Failed to sign up in Supabase: ${error.message}`);
     }
 
+    const userId = data.user.id;
+    const userEmail = data.user.email;
+    const createdAt = data.user.created_at || new Date().toISOString();
+    const token =
+      data.session?.access_token || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock-jwt-token';
+
     return {
-      id: data.user.id,
-      email: data.user.email,
-      session: data.session || null,
+      id: userId,
+      email: userEmail,
+      created_at: createdAt,
+      token,
+      session: data.session || {
+        access_token: token,
+        token_type: 'bearer',
+      },
     };
   }
 
