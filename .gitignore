@@ -11,3 +11,10 @@ coverage/
 docker/data/
 pnpm-debug.log*
 *.tsbuildinfo
+
+# Supabase local development state and secrets
+supabase/.temp/
+supabase/.branches/
+supabase/.env
+supabase/.env.local
+supabase/.env.*.local

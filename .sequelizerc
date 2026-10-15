@@ -1,0 +1,7 @@
+import path from 'path';
+
+export const config = path.resolve('src', 'infrastructure', 'config', 'sequelize.config.js');
+export const migrationsPath = path.resolve('src', 'infrastructure', 'persistence', 'migrations');
+export const seedersPath = path.resolve('src', 'infrastructure', 'persistence', 'seeders');
+export const modelsPath = path.resolve('src', 'infrastructure', 'persistence', 'models');
+export { migrationsPath as 'migrations-path', seedersPath as 'seeders-path', modelsPath as 'models-path' };

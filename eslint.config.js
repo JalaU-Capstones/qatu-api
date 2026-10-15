@@ -46,5 +46,26 @@ export default [
       'security/detect-object-injection': 'warn',
     },
   },
+  {
+    files: [
+      'src/infrastructure/config/sequelize.config.js',
+      'src/infrastructure/persistence/migrations/**/*.js',
+      'src/infrastructure/persistence/seeders/**/*.js',
+    ],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        require: 'readonly',
+        module: 'readonly',
+        exports: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+      },
+    },
+    rules: {
+      'no-console': 'off',
+      'no-unused-vars': 'off',
+    },
+  },
   prettierConfig,
 ];

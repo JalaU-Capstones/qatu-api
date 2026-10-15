@@ -20,7 +20,10 @@
     "test:integration": "vitest run --config vitest.config.integration.js",
     "db:migrate": "sequelize-cli db:migrate",
     "db:migrate:undo": "sequelize-cli db:migrate:undo",
+    "db:migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "db:migrate:status": "sequelize-cli db:migrate:status",
     "db:seed": "sequelize-cli db:seed:all",
+    "db:seed:undo": "sequelize-cli db:seed:undo:all",
     "prepare": "husky"
   },
   "dependencies": {
@@ -57,6 +60,7 @@
     "nodemon": "^3.1.0",
     "prettier": "^3.2.5",
     "sequelize-cli": "^6.6.2",
+    "supabase": "^2.120.0",
     "supertest": "^7.3.1",
     "vitest": "^5.0.3"
   },

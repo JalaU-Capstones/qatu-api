@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help install dev start lint lint-fix format format-check test test-watch test-coverage test-integration build docker-up docker-down docker-logs db-migrate db-migrate-undo db-seed clean
+.PHONY: help install dev start lint lint-fix format format-check test test-watch test-coverage test-integration build docker-up docker-down docker-logs db-migrate db-migrate-undo db-migrate-undo-all db-migrate-status db-seed db-seed-undo clean
 
 help:
 	@echo "Qatu API - Available targets:"
@@ -20,7 +20,10 @@ help:
 	@echo "  docker-logs        View Docker Compose logs"
 	@echo "  db-migrate         Run Sequelize migrations"
 	@echo "  db-migrate-undo    Rollback last migration"
+	@echo "  db-migrate-undo-all Rollback all migrations"
+	@echo "  db-migrate-status  Show migration status"
 	@echo "  db-seed            Run seeders"
+	@echo "  db-seed-undo       Rollback all seeders"
 	@echo "  clean              Remove node_modules and build artifacts"
 
 install:
@@ -71,8 +74,17 @@ db-migrate:
 db-migrate-undo:
 	pnpm db:migrate:undo
 
+db-migrate-undo-all:
+	pnpm db:migrate:undo:all
+
+db-migrate-status:
+	pnpm db:migrate:status
+
 db-seed:
 	pnpm db:seed
+
+db-seed-undo:
+	pnpm db:seed:undo
 
 clean:
 	rm -rf node_modules dist coverage
