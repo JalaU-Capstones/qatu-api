@@ -1,17 +1,30 @@
 import { createClient } from '@supabase/supabase-js';
-import dotenv from 'dotenv';
+import { env } from './env.js';
 
-dotenv.config();
+/**
+ * Creates and validates a Supabase client instance.
+ *
+ * @param {string} [url] - Supabase instance URL
+ * @param {string} [key] - Service role or anon API key
+ * @returns {import('@supabase/supabase-js').SupabaseClient}
+ */
+export function createSupabaseClient(
+  url = env.SUPABASE_URL,
+  key = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY
+) {
+  if (!url) {
+    throw new Error('SUPABASE_URL is required. Set it in your environment or .env file.');
+  }
+  if (!key) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY is required.');
+  }
 
-const supabaseUrl = process.env.SUPABASE_URL || 'http://localhost:54321';
-const supabaseKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  'dummy-supabase-key-for-development';
+  return createClient(url, key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
 
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false,
-  },
-});
+export const supabase = createSupabaseClient();
