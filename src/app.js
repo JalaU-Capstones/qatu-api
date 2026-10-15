@@ -1,12 +1,10 @@
-import cors from 'cors';
-import dotenv from 'dotenv';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import { registerApiDocs } from './presentation/docs/swagger.js';
+import { corsMiddleware } from './presentation/middleware/corsMiddleware.js';
 import { errorHandler } from './presentation/middleware/errorHandler.js';
 import { authRouter } from './presentation/routes/authRoutes.js';
-
-dotenv.config();
 
 export function createApp({ authRoutes = authRouter } = {}) {
   const app = express();
@@ -14,38 +12,28 @@ export function createApp({ authRoutes = authRouter } = {}) {
   // Security Headers
   app.use(helmet());
 
-  // CORS Configuration
-  const allowedOrigins = [
-    process.env.FRONTEND_URL || 'http://localhost:5173',
-    'http://localhost:3000',
-  ];
-
-  app.use(
-    cors({
-      origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          callback(new Error('Not allowed by CORS'));
-        }
-      },
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-    })
-  );
+  // Dedicated CORS Middleware
+  app.use(corsMiddleware);
 
   // Payload Limit & JSON Body Parser
   app.use(express.json({ limit: '10kb' }));
+
+  // Interactive Swagger UI API Documentation
+  registerApiDocs(app);
 
   // Rate Limiting on Authentication Endpoints
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 20, // Limit each IP to 20 requests per window
     message: {
-      error: 'Too Many Requests',
-      message:
-        'Too many registration/auth requests from this IP. Please try again after 15 minutes.',
+      error: {
+        code: 'TOO_MANY_REQUESTS',
+        message:
+          'Too many registration/auth requests from this IP. Please try again after 15 minutes.',
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
     },
     standardHeaders: true,
     legacyHeaders: false,
@@ -56,8 +44,9 @@ export function createApp({ authRoutes = authRouter } = {}) {
     res.json({ status: 'ok' });
   });
 
-  // API Routes
+  // API Routes (mounted on /v1/auth and /auth for compatibility)
   app.use('/v1/auth', authLimiter, authRoutes);
+  app.use('/auth', authLimiter, authRoutes);
 
   // Global Error Handler
   app.use(errorHandler);
