@@ -12,9 +12,14 @@ export function validateRequest(schema) {
       }));
 
       return res.status(400).json({
-        error: 'Bad Request',
-        message: details[0]?.message || 'Validation error',
-        details,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid input data',
+          details,
+        },
+        meta: {
+          timestamp: new Date().toISOString(),
+        },
       });
     }
 

@@ -11,7 +11,7 @@ describe('validateRequest Middleware with registerSchema', () => {
         email: 'user@example.com',
         password: 'ValidPassword123!',
         username: 'valid_user',
-        fullName: 'Valid User',
+        full_name: 'Valid User',
       },
     };
     const res = {};
@@ -28,7 +28,7 @@ describe('validateRequest Middleware with registerSchema', () => {
         email: 'invalid-email',
         password: 'ValidPassword123!',
         username: 'valid_user',
-        fullName: 'Valid User',
+        full_name: 'Valid User',
       },
     };
     const json = vi.fn();
@@ -40,8 +40,19 @@ describe('validateRequest Middleware with registerSchema', () => {
     expect(status).toHaveBeenCalledWith(400);
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
-        error: 'Bad Request',
-        message: 'Invalid email format',
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid input data',
+          details: expect.arrayContaining([
+            expect.objectContaining({
+              field: 'email',
+              message: 'Invalid email format',
+            }),
+          ]),
+        },
+        meta: expect.objectContaining({
+          timestamp: expect.any(String),
+        }),
       })
     );
     expect(next).not.toHaveBeenCalled();
@@ -53,7 +64,7 @@ describe('validateRequest Middleware with registerSchema', () => {
         email: 'user@example.com',
         password: 'weak',
         username: 'valid_user',
-        fullName: 'Valid User',
+        full_name: 'Valid User',
       },
     };
     const json = vi.fn();
@@ -65,8 +76,15 @@ describe('validateRequest Middleware with registerSchema', () => {
     expect(status).toHaveBeenCalledWith(400);
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
-        error: 'Bad Request',
-        message: expect.stringContaining('Password must be at least 8 characters long'),
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid input data',
+          details: expect.arrayContaining([
+            expect.objectContaining({
+              field: 'password',
+            }),
+          ]),
+        },
       })
     );
     expect(next).not.toHaveBeenCalled();
