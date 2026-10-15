@@ -12,21 +12,27 @@ export class SupabaseAuthService extends IAuthService {
   }
 
   /**
+   * Registers a user in Supabase Auth and acquires a real JWT session via signInWithPassword.
+   *
    * @param {Object} params
    * @param {string} params.email
    * @param {string} params.password
    * @param {string} [params.role='buyer']
    * @param {Object} [params.metadata]
-   * @returns {Promise<{ id: string, email: string, created_at: string, token: string, session?: Object }>}
+   * @returns {Promise<{ id: string, email: string, created_at: string, token: string, refresh_token?: string, session?: Object }>}
    */
   async registerUser({ email, password, role = ROLES.BUYER, metadata = {} }) {
     if (!this.client) {
       throw new Error('Supabase client not initialized');
     }
 
+    let userId;
+    let userEmail;
+    let createdAt;
+
     // Admin create user method (service role)
     if (this.client.auth?.admin?.createUser) {
-      const { data, error } = await this.client.auth.admin.createUser({
+      const { data: created, error: createError } = await this.client.auth.admin.createUser({
         email,
         password,
         email_confirm: true,
@@ -36,83 +42,80 @@ export class SupabaseAuthService extends IAuthService {
         },
       });
 
-      if (error) {
+      if (createError) {
         if (
-          error.message?.toLowerCase().includes('already') ||
-          error.status === 422 ||
-          error.status === 409
+          createError.message?.toLowerCase().includes('already') ||
+          createError.status === 422 ||
+          createError.status === 409
         ) {
           const err = new Error('Email already registered');
           err.code = 'EMAIL_ALREADY_EXISTS';
           err.statusCode = 409;
           throw err;
         }
-        throw new Error(`Failed to create user in Supabase: ${error.message}`);
+        throw new Error(`Failed to create user in Supabase: ${createError.message}`);
       }
 
-      const userId = data.user.id;
-      const userEmail = data.user.email;
-      const createdAt = data.user.created_at || new Date().toISOString();
-      const token =
-        data.session?.access_token || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock-jwt-token';
-
-      return {
-        id: userId,
-        email: userEmail,
-        created_at: createdAt,
-        token,
-        session: data.session || {
-          access_token: token,
-          token_type: 'bearer',
+      userId = created.user.id;
+      userEmail = created.user.email;
+      createdAt = created.user.created_at || new Date().toISOString();
+    } else {
+      // Standard client fallback
+      const { data: created, error: createError } = await this.client.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            ...metadata,
+            role,
+          },
         },
-      };
+      });
+
+      if (createError) {
+        if (
+          createError.message?.toLowerCase().includes('already') ||
+          createError.status === 422 ||
+          createError.status === 409
+        ) {
+          const err = new Error('Email already registered');
+          err.code = 'EMAIL_ALREADY_EXISTS';
+          err.statusCode = 409;
+          throw err;
+        }
+        throw new Error(`Failed to sign up in Supabase: ${createError.message}`);
+      }
+
+      userId = created.user.id;
+      userEmail = created.user.email;
+      createdAt = created.user.created_at || new Date().toISOString();
     }
 
-    // Standard client signUp method
-    const { data, error } = await this.client.auth.signUp({
+    // Immediately authenticate with credentials to obtain a real Supabase session
+    const { data: signed, error: signInError } = await this.client.auth.signInWithPassword({
       email,
       password,
-      options: {
-        data: {
-          ...metadata,
-          role,
-        },
-      },
     });
 
-    if (error) {
-      if (
-        error.message?.toLowerCase().includes('already') ||
-        error.status === 422 ||
-        error.status === 409
-      ) {
-        const err = new Error('Email already registered');
-        err.code = 'EMAIL_ALREADY_EXISTS';
-        err.statusCode = 409;
-        throw err;
-      }
-      throw new Error(`Failed to sign up in Supabase: ${error.message}`);
+    if (signInError || !signed?.session?.access_token) {
+      throw new Error(
+        `Failed to sign in newly created user: ${signInError?.message || 'No session returned'}`
+      );
     }
-
-    const userId = data.user.id;
-    const userEmail = data.user.email;
-    const createdAt = data.user.created_at || new Date().toISOString();
-    const token =
-      data.session?.access_token || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.mock-jwt-token';
 
     return {
       id: userId,
       email: userEmail,
       created_at: createdAt,
-      token,
-      session: data.session || {
-        access_token: token,
-        token_type: 'bearer',
-      },
+      token: signed.session.access_token,
+      refresh_token: signed.session.refresh_token,
+      session: signed.session,
     };
   }
 
   /**
+   * Checks if an email is already registered in Supabase Auth.
+   *
    * @param {string} email
    * @returns {Promise<boolean>}
    */

@@ -12,6 +12,7 @@ describe('SupabaseAuthService', () => {
           createUser: vi.fn(),
           listUsers: vi.fn(),
         },
+        signInWithPassword: vi.fn(),
         signUp: vi.fn(),
       },
     };
@@ -29,7 +30,7 @@ describe('SupabaseAuthService', () => {
       ).rejects.toThrow('Supabase client not initialized');
     });
 
-    it('should successfully register a user via admin.createUser', async () => {
+    it('should successfully register a user via admin.createUser and signInWithPassword for real JWT', async () => {
       mockClient.auth.admin.createUser.mockResolvedValue({
         data: {
           user: {
@@ -37,8 +38,15 @@ describe('SupabaseAuthService', () => {
             email: 'test@example.com',
             created_at: '2026-10-15T10:00:00.000Z',
           },
+        },
+        error: null,
+      });
+
+      mockClient.auth.signInWithPassword.mockResolvedValue({
+        data: {
           session: {
-            access_token: 'valid-jwt-token',
+            access_token: 'valid.real.jwt.token',
+            refresh_token: 'valid.refresh.token',
           },
         },
         error: null,
@@ -50,29 +58,44 @@ describe('SupabaseAuthService', () => {
         role: 'buyer',
       });
 
-      expect(result.id).toBe('usr-123');
-      expect(result.email).toBe('test@example.com');
-      expect(result.token).toBe('valid-jwt-token');
-      expect(result.created_at).toBe('2026-10-15T10:00:00.000Z');
-      expect(result.session.access_token).toBe('valid-jwt-token');
-    });
-
-    it('should fallback to mock token if session is absent in admin.createUser', async () => {
-      mockClient.auth.admin.createUser.mockResolvedValue({
-        data: {
-          user: { id: 'usr-123', email: 'test@example.com' },
-          session: null,
-        },
-        error: null,
-      });
-
-      const result = await authService.registerUser({
+      expect(mockClient.auth.admin.createUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'test@example.com',
+          password: 'Password123!',
+        })
+      );
+      expect(mockClient.auth.signInWithPassword).toHaveBeenCalledWith({
         email: 'test@example.com',
         password: 'Password123!',
       });
 
-      expect(result.token).toBeDefined();
-      expect(result.session.access_token).toBeDefined();
+      expect(result.id).toBe('usr-123');
+      expect(result.email).toBe('test@example.com');
+      expect(result.token).toBe('valid.real.jwt.token');
+      expect(result.refresh_token).toBe('valid.refresh.token');
+      expect(result.created_at).toBe('2026-10-15T10:00:00.000Z');
+      expect(result.session.access_token).toBe('valid.real.jwt.token');
+    });
+
+    it('should throw when signInWithPassword fails after admin.createUser', async () => {
+      mockClient.auth.admin.createUser.mockResolvedValue({
+        data: {
+          user: { id: 'usr-123', email: 'test@example.com' },
+        },
+        error: null,
+      });
+
+      mockClient.auth.signInWithPassword.mockResolvedValue({
+        data: { session: null },
+        error: { message: 'Invalid credentials' },
+      });
+
+      await expect(
+        authService.registerUser({
+          email: 'test@example.com',
+          password: 'Password123!',
+        })
+      ).rejects.toThrow('Failed to sign in newly created user: Invalid credentials');
     });
 
     it('should throw EMAIL_ALREADY_EXISTS when admin.createUser returns conflict or 422', async () => {
@@ -103,7 +126,7 @@ describe('SupabaseAuthService', () => {
       ).rejects.toThrow('Failed to create user in Supabase: Database connection failed');
     });
 
-    it('should register user via signUp when admin API is not present', async () => {
+    it('should register user via signUp and signInWithPassword when admin API is not present', async () => {
       const clientWithOnlySignUp = {
         auth: {
           signUp: vi.fn().mockResolvedValue({
@@ -113,7 +136,16 @@ describe('SupabaseAuthService', () => {
                 email: 'signup@example.com',
                 created_at: '2026-10-15T12:00:00.000Z',
               },
-              session: { access_token: 'signup-jwt' },
+              session: null,
+            },
+            error: null,
+          }),
+          signInWithPassword: vi.fn().mockResolvedValue({
+            data: {
+              session: {
+                access_token: 'signup-real-jwt',
+                refresh_token: 'signup-refresh',
+              },
             },
             error: null,
           }),
@@ -127,7 +159,7 @@ describe('SupabaseAuthService', () => {
       });
 
       expect(result.id).toBe('usr-signup-456');
-      expect(result.token).toBe('signup-jwt');
+      expect(result.token).toBe('signup-real-jwt');
     });
 
     it('should throw EMAIL_ALREADY_EXISTS when signUp returns conflict', async () => {
@@ -137,6 +169,7 @@ describe('SupabaseAuthService', () => {
             data: null,
             error: { message: 'User already registered', status: 409 },
           }),
+          signInWithPassword: vi.fn(),
         },
       };
 
@@ -156,6 +189,7 @@ describe('SupabaseAuthService', () => {
             data: null,
             error: { message: 'Network error', status: 500 },
           }),
+          signInWithPassword: vi.fn(),
         },
       };
 

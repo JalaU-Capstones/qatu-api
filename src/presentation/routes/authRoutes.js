@@ -9,7 +9,7 @@ import { registerSchema } from '../validators/registerSchema.js';
 
 export function createAuthRouter({
   authService = new SupabaseAuthService({ client: supabase }),
-  profileRepository = new ProfileRepository({ client: supabase }),
+  profileRepository = new ProfileRepository(),
   registerBuyerUseCase,
   authController,
 } = {}) {

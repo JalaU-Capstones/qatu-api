@@ -1,4 +1,5 @@
 import { ROLES, ROLE_DEFINITIONS } from '../../domain/constants/roles.js';
+import { Profile } from '../../domain/entities/Profile.js';
 import { Email } from '../../domain/value-objects/Email.js';
 import { FullName } from '../../domain/value-objects/FullName.js';
 import { Password } from '../../domain/value-objects/Password.js';
@@ -57,28 +58,22 @@ export class RegisterBuyerUseCase {
       created_at: isoNow,
     };
 
-    // The on_auth_user_created trigger (migration 019) automatically inserts into
-    // public.profiles and public.user_roles the moment auth.admin.createUser succeeds.
-    // Read back the trigger-created row instead of re-inserting (which would violate
-    // the profiles primary-key constraint and produce a 500).
-    const savedProfile = await this.profileRepository.findById(authResult.id);
-
-    // Fallback for unit-test / in-memory mode where the DB trigger does not fire.
-    const resolvedProfile = savedProfile || {
+    const profile = new Profile({
       id: authResult.id,
-      username: usernameVO.getValue(),
-      fullName: fullNameVO.getValue(),
+      username: usernameVO,
+      fullName: fullNameVO,
       full_name: fullNameVO.getValue(),
       email: emailVO.getValue(),
-      avatarPath: null,
+      avatar_path: null,
       bio: null,
       locale: 'en',
+      role: ROLES.BUYER,
+      roles: [buyerRole],
       createdAt: now,
       updatedAt: now,
-    };
+    });
 
-    const token =
-      authResult.token || authResult.session?.access_token || 'mock-jwt-token-placeholder';
+    const savedProfile = await this.profileRepository.create(profile);
 
     return new RegisterResponseDTO({
       user: {
@@ -87,18 +82,19 @@ export class RegisterBuyerUseCase {
         created_at: authResult.created_at || isoNow,
       },
       profile: {
-        id: resolvedProfile.id,
-        username: resolvedProfile.username,
-        full_name: resolvedProfile.fullName || resolvedProfile.full_name,
-        email: resolvedProfile.email || emailVO.getValue(),
-        avatar_path: resolvedProfile.avatarPath || null,
-        bio: resolvedProfile.bio || null,
-        locale: resolvedProfile.locale || 'en',
-        created_at: resolvedProfile.createdAt ? resolvedProfile.createdAt.toISOString() : isoNow,
-        updated_at: resolvedProfile.updatedAt ? resolvedProfile.updatedAt.toISOString() : isoNow,
+        id: savedProfile.id,
+        username: savedProfile.username,
+        full_name: savedProfile.fullName || savedProfile.full_name,
+        email: savedProfile.email || emailVO.getValue(),
+        avatar_path: savedProfile.avatarPath || null,
+        bio: savedProfile.bio || null,
+        locale: savedProfile.locale || 'en',
+        created_at: savedProfile.createdAt ? savedProfile.createdAt.toISOString() : isoNow,
+        updated_at: savedProfile.updatedAt ? savedProfile.updatedAt.toISOString() : isoNow,
       },
       roles: [buyerRole],
-      token,
+      token: authResult.token,
+      session: authResult.session,
       timestamp: isoNow,
     });
   }

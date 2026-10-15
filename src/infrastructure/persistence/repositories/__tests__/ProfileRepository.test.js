@@ -3,9 +3,8 @@ import { Profile } from '../../../../domain/entities/Profile.js';
 import { ProfileRepository } from '../ProfileRepository.js';
 
 describe('ProfileRepository', () => {
-  let mockClient;
-  let repositoryWithClient;
-  let repositoryInMemory;
+  let mockDb;
+  let repository;
 
   const sampleDbRow = {
     id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
@@ -24,19 +23,28 @@ describe('ProfileRepository', () => {
     username: sampleDbRow.username,
     fullName: sampleDbRow.full_name,
     email: sampleDbRow.email,
+    avatarPath: sampleDbRow.avatar_path,
+    bio: sampleDbRow.bio,
+    locale: sampleDbRow.locale,
   });
 
   beforeEach(() => {
-    mockClient = {
-      from: vi.fn(),
+    mockDb = {
+      query: vi.fn(),
     };
-    repositoryWithClient = new ProfileRepository({ client: mockClient });
-    repositoryInMemory = new ProfileRepository();
+    repository = new ProfileRepository({ db: mockDb });
   });
 
-  describe('mapRowToEntity', () => {
+  describe('constructor', () => {
+    it('should initialize with default sequelize instance when no db is passed', () => {
+      const repo = new ProfileRepository();
+      expect(repo.db).toBeDefined();
+    });
+  });
+
+  describe('toDomain / mapRowToEntity', () => {
     it('should map a database row to a Profile entity with full fields', () => {
-      const entity = repositoryWithClient.mapRowToEntity(sampleDbRow);
+      const entity = repository.toDomain(sampleDbRow);
 
       expect(entity).toBeInstanceOf(Profile);
       expect(entity.id).toBe(sampleDbRow.id);
@@ -50,124 +58,134 @@ describe('ProfileRepository', () => {
       expect(entity.updatedAt).toBeInstanceOf(Date);
     });
 
+    it('should map a minimal database row when optional fields are missing', () => {
+      const minimalRow = {
+        id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+        username: 'test_user',
+        full_name: 'Test User',
+      };
+      const entity = repository.toDomain(minimalRow);
+
+      expect(entity).toBeInstanceOf(Profile);
+      expect(entity.email).toBeNull();
+      expect(entity.avatarPath).toBeNull();
+      expect(entity.bio).toBeNull();
+      expect(entity.locale).toBe('en');
+    });
+
+    it('should support mapRowToEntity alias', () => {
+      const entity = repository.mapRowToEntity(sampleDbRow);
+      expect(entity).toBeInstanceOf(Profile);
+      expect(entity.id).toBe(sampleDbRow.id);
+    });
+
     it('should return null if row is null or undefined', () => {
-      expect(repositoryWithClient.mapRowToEntity(null)).toBeNull();
-      expect(repositoryWithClient.mapRowToEntity(undefined)).toBeNull();
+      expect(repository.toDomain(null)).toBeNull();
+      expect(repository.toDomain(undefined)).toBeNull();
+      expect(repository.mapRowToEntity(null)).toBeNull();
     });
   });
 
   describe('create', () => {
-    it('should insert into database and return mapped entity when client is present', async () => {
-      const singleMock = vi.fn().mockResolvedValue({
-        data: sampleDbRow,
-        error: null,
-      });
-      const selectMock = vi.fn().mockReturnValue({ single: singleMock });
-      const insertMock = vi.fn().mockReturnValue({ select: selectMock });
-      mockClient.from.mockReturnValue({ insert: insertMock });
+    it('should execute queries for shadow user, profile upsert, and role assignment, returning Profile', async () => {
+      mockDb.query
+        .mockResolvedValueOnce([[]]) // auth.users insert
+        .mockResolvedValueOnce([[sampleDbRow]]) // profiles upsert
+        .mockResolvedValueOnce([[]]); // user_roles insert
 
-      const result = await repositoryWithClient.create(sampleProfile);
+      const result = await repository.create(sampleProfile);
 
-      expect(mockClient.from).toHaveBeenCalledWith('profiles');
+      expect(mockDb.query).toHaveBeenCalledTimes(3);
+
+      const firstCallSql = mockDb.query.mock.calls[0][0];
+      expect(firstCallSql).toContain('INSERT INTO auth.users');
+
+      const secondCallSql = mockDb.query.mock.calls[1][0];
+      expect(secondCallSql).toContain('INSERT INTO profiles');
+      expect(secondCallSql).toContain('ON CONFLICT (id) DO UPDATE SET');
+
+      const thirdCallSql = mockDb.query.mock.calls[2][0];
+      expect(thirdCallSql).toContain('INSERT INTO user_roles');
+
       expect(result).toBeInstanceOf(Profile);
       expect(result.id).toBe(sampleProfile.id);
+      expect(result.username).toBe(sampleProfile.username);
     });
 
-    it('should throw an error when database insertion fails', async () => {
-      const singleMock = vi.fn().mockResolvedValue({
-        data: null,
-        error: { message: 'Database connection error' },
-      });
-      const selectMock = vi.fn().mockReturnValue({ single: singleMock });
-      const insertMock = vi.fn().mockReturnValue({ select: selectMock });
-      mockClient.from.mockReturnValue({ insert: insertMock });
+    it('should propagate error when database query fails during create', async () => {
+      mockDb.query.mockRejectedValueOnce(new Error('Connection terminated unexpectedly'));
 
-      await expect(repositoryWithClient.create(sampleProfile)).rejects.toThrow(
-        'Failed to create profile: Database connection error'
+      await expect(repository.create(sampleProfile)).rejects.toThrow(
+        'Connection terminated unexpectedly'
       );
-    });
-
-    it('should save to in-memory store when client is not provided', async () => {
-      const result = await repositoryInMemory.create(sampleProfile);
-      expect(result).toBe(sampleProfile);
-
-      const retrieved = await repositoryInMemory.findById(sampleProfile.id);
-      expect(retrieved).toBe(sampleProfile);
     });
   });
 
   describe('findById', () => {
-    it('should find profile by ID via client', async () => {
-      const singleMock = vi.fn().mockResolvedValue({
-        data: sampleDbRow,
-        error: null,
-      });
-      const eqMock = vi.fn().mockReturnValue({ single: singleMock });
-      const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
-      mockClient.from.mockReturnValue({ select: selectMock });
+    it('should find profile by ID and attach assigned roles', async () => {
+      mockDb.query
+        .mockResolvedValueOnce([[sampleDbRow]]) // profile SELECT
+        .mockResolvedValueOnce([
+          [
+            {
+              id: 1,
+              name: 'buyer',
+              created_at: '2026-10-15T12:00:00.000Z',
+            },
+            {
+              id: 2,
+              name: 'seller',
+              created_at: null,
+            },
+          ],
+        ]); // roles SELECT
 
-      const result = await repositoryWithClient.findById(sampleProfile.id);
+      const result = await repository.findById(sampleProfile.id);
 
+      expect(result).toBeInstanceOf(Profile);
+      expect(result.id).toBe(sampleProfile.id);
+      expect(result.roles).toHaveLength(2);
+      expect(result.roles[0].name).toBe('buyer');
+      expect(result.roles[1].name).toBe('seller');
+    });
+
+    it('should return profile without roles if no roles are assigned', async () => {
+      mockDb.query
+        .mockResolvedValueOnce([[sampleDbRow]]) // profile SELECT
+        .mockResolvedValueOnce([[]]); // empty roles SELECT
+
+      const result = await repository.findById(sampleProfile.id);
       expect(result).toBeInstanceOf(Profile);
       expect(result.id).toBe(sampleProfile.id);
     });
 
-    it('should return null when client does not find the profile', async () => {
-      const singleMock = vi.fn().mockResolvedValue({
-        data: null,
-        error: { message: 'Not found' },
-      });
-      const eqMock = vi.fn().mockReturnValue({ single: singleMock });
-      const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
-      mockClient.from.mockReturnValue({ select: selectMock });
+    it('should return null when profile is not found by ID', async () => {
+      mockDb.query.mockResolvedValueOnce([[]]); // empty rows
 
-      const result = await repositoryWithClient.findById('non-existent-id');
-      expect(result).toBeNull();
-    });
-
-    it('should return null when not found in in-memory store', async () => {
-      const result = await repositoryInMemory.findById('unknown-id');
+      const result = await repository.findById('non-existent-id');
       expect(result).toBeNull();
     });
   });
 
   describe('findByUsername', () => {
-    it('should find profile by username via client', async () => {
-      const singleMock = vi.fn().mockResolvedValue({
-        data: sampleDbRow,
-        error: null,
-      });
-      const ilikeMock = vi.fn().mockReturnValue({ single: singleMock });
-      const selectMock = vi.fn().mockReturnValue({ ilike: ilikeMock });
-      mockClient.from.mockReturnValue({ select: selectMock });
+    it('should find profile by username case-insensitively', async () => {
+      mockDb.query.mockResolvedValueOnce([[sampleDbRow]]);
 
-      const result = await repositoryWithClient.findByUsername('test_user');
+      const result = await repository.findByUsername('TEST_USER');
 
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.stringContaining('lower(username) = lower(:username)'),
+        expect.objectContaining({ replacements: { username: 'TEST_USER' } })
+      );
       expect(result).toBeInstanceOf(Profile);
       expect(result.username).toBe('test_user');
     });
 
-    it('should return null when client cannot find username', async () => {
-      const singleMock = vi.fn().mockResolvedValue({
-        data: null,
-        error: { message: 'Not found' },
-      });
-      const ilikeMock = vi.fn().mockReturnValue({ single: singleMock });
-      const selectMock = vi.fn().mockReturnValue({ ilike: ilikeMock });
-      mockClient.from.mockReturnValue({ select: selectMock });
+    it('should return null when username is not found', async () => {
+      mockDb.query.mockResolvedValueOnce([[]]);
 
-      const result = await repositoryWithClient.findByUsername('unknown_user');
+      const result = await repository.findByUsername('non_existing');
       expect(result).toBeNull();
-    });
-
-    it('should find profile case-insensitively in in-memory store', async () => {
-      await repositoryInMemory.create(sampleProfile);
-
-      const foundUpper = await repositoryInMemory.findByUsername('TEST_USER');
-      expect(foundUpper).toBe(sampleProfile);
-
-      const notFound = await repositoryInMemory.findByUsername('non_existing');
-      expect(notFound).toBeNull();
     });
   });
 });
