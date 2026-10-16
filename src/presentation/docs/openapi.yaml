@@ -1,0 +1,351 @@
+openapi: 3.1.0
+
+info:
+  title: Qatu Marketplace API
+  version: 1.0.0
+  description: |
+    RESTful API for Qatu Marketplace — an online digital marketplace where sellers offer products to buyers.
+
+    **Authentication:** Bearer JWT issued by Supabase Auth.
+    **Versioning:** URL-based (`/v1`).
+    **Rate limits:** See `Architecture/API-Design`.
+
+    Full documentation: see the Wiki at `Architecture/API-Design`.
+  contact:
+    name: Qatu Team — Group 2
+    url: https://gitlab.com/jala-university1/cohort-5/ES.CSSD-245.GA.T2.26.M2/SD/group-b/grupo-2
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000/v1
+    description: Local development
+  - url: https://api.qatu.example.com/v1
+    description: Production (placeholder)
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: auth
+    description: Registration, login, and current user.
+  - name: profiles
+    description: User profiles.
+  - name: seller-applications
+    description: Seller onboarding.
+  - name: categories
+    description: Product categories.
+  - name: products
+    description: Product catalog and seller product management.
+  - name: product-images
+    description: Product image uploads (Supabase Storage).
+  - name: cart
+    description: Shopping cart.
+  - name: orders
+    description: Order placement and management.
+  - name: payments
+    description: Payment records.
+  - name: ratings
+    description: Product and seller ratings.
+  - name: conversations
+    description: Buyer-seller conversations.
+  - name: messages
+    description: Messages within conversations.
+  - name: notifications
+    description: In-app notifications.
+  - name: admin
+    description: Administrative endpoints (seller approval, reports, categories).
+
+paths:
+  # ── Auth ────────────────────────────────────────────────────────────────────
+  /auth/register:
+    $ref: './paths/auth.yaml#/register'
+
+  /auth/login:
+    $ref: './paths/auth.yaml#/login'
+
+  /auth/logout:
+    $ref: './paths/auth.yaml#/logout'
+
+  /auth/me:
+    $ref: './paths/auth.yaml#/me'
+
+  # ── Profiles ─────────────────────────────────────────────────────────────────
+  /profiles/{id}:
+    $ref: './paths/profiles.yaml#/getById'
+
+  /profiles/me:
+    $ref: './paths/profiles.yaml#/updateMe'
+
+  # ── Seller Applications ───────────────────────────────────────────────────────
+  /seller-applications:
+    $ref: './paths/seller-applications.yaml#/create'
+
+  /seller-applications/me:
+    $ref: './paths/seller-applications.yaml#/getMine'
+
+  /admin/seller-applications:
+    $ref: './paths/seller-applications.yaml#/adminList'
+
+  /admin/seller-applications/{applicationId}:
+    $ref: './paths/seller-applications.yaml#/adminReview'
+
+  # ── Categories ────────────────────────────────────────────────────────────────
+  /categories:
+    $ref: './paths/categories.yaml#/list'
+
+  /admin/categories:
+    $ref: './paths/categories.yaml#/adminCreate'
+
+  /admin/categories/{categoryId}:
+    patch:
+      $ref: './paths/categories.yaml#/adminUpdate/patch'
+    delete:
+      $ref: './paths/categories.yaml#/adminDelete/delete'
+
+  # ── Products ─────────────────────────────────────────────────────────────────
+  /products:
+    get:
+      $ref: './paths/products.yaml#/list/get'
+    post:
+      $ref: './paths/products.yaml#/create/post'
+
+  /products/{productId}:
+    get:
+      $ref: './paths/products.yaml#/getById/get'
+    patch:
+      $ref: './paths/products.yaml#/update/patch'
+    delete:
+      $ref: './paths/products.yaml#/delete/delete'
+
+  /products/{productId}/publish:
+    $ref: './paths/products.yaml#/publish'
+
+  /products/{productId}/unpublish:
+    $ref: './paths/products.yaml#/unpublish'
+
+  /seller/products:
+    $ref: './paths/products.yaml#/sellerList'
+
+  # ── Product Images ────────────────────────────────────────────────────────────
+  /products/{productId}/images:
+    post:
+      $ref: './paths/product-images.yaml#/upload/post'
+    get:
+      $ref: './paths/product-images.yaml#/listByProduct/get'
+
+  /products/{productId}/images/{imageId}:
+    $ref: './paths/product-images.yaml#/deleteImage'
+
+  # ── Cart ──────────────────────────────────────────────────────────────────────
+  /cart:
+    get:
+      $ref: './paths/cart.yaml#/getOrClear/get'
+    delete:
+      $ref: './paths/cart.yaml#/getOrClear/delete'
+
+  /cart/items:
+    $ref: './paths/cart.yaml#/add'
+
+  /cart/items/{cartItemId}:
+    patch:
+      $ref: './paths/cart.yaml#/updateOrRemove/patch'
+    delete:
+      $ref: './paths/cart.yaml#/updateOrRemove/delete'
+
+  # ── Orders ────────────────────────────────────────────────────────────────────
+  /orders:
+    get:
+      $ref: './paths/orders.yaml#/listOrCreate/get'
+    post:
+      $ref: './paths/orders.yaml#/listOrCreate/post'
+
+  /orders/{orderId}:
+    $ref: './paths/orders.yaml#/getById'
+
+  /orders/{orderId}/status:
+    $ref: './paths/orders.yaml#/updateStatus'
+
+  # ── Payments ─────────────────────────────────────────────────────────────────
+  /orders/{orderId}/payment:
+    post:
+      $ref: './paths/payments.yaml#/createOrGet/post'
+    get:
+      $ref: './paths/payments.yaml#/createOrGet/get'
+
+  # ── Ratings ──────────────────────────────────────────────────────────────────
+  /ratings:
+    $ref: './paths/ratings.yaml#/create'
+
+  /products/{productId}/ratings:
+    $ref: './paths/ratings.yaml#/listByProduct'
+
+  /sellers/{sellerId}/ratings:
+    $ref: './paths/ratings.yaml#/listBySeller'
+
+  # ── Conversations ─────────────────────────────────────────────────────────────
+  /conversations:
+    get:
+      $ref: './paths/conversations.yaml#/listOrCreate/get'
+    post:
+      $ref: './paths/conversations.yaml#/listOrCreate/post'
+
+  # ── Messages ─────────────────────────────────────────────────────────────────
+  /conversations/{conversationId}/messages:
+    get:
+      $ref: './paths/messages.yaml#/listOrSend/get'
+    post:
+      $ref: './paths/messages.yaml#/listOrSend/post'
+
+  # ── Notifications ─────────────────────────────────────────────────────────────
+  /notifications:
+    $ref: './paths/notifications.yaml#/list'
+
+  /notifications/{notificationId}/read:
+    $ref: './paths/notifications.yaml#/markRead'
+
+  /notifications/read-all:
+    $ref: './paths/notifications.yaml#/markAllRead'
+
+  # ── Admin Reports ─────────────────────────────────────────────────────────────
+  /admin/reports/sales:
+    $ref: './paths/admin.yaml#/salesReport'
+
+  /admin/reports/users:
+    $ref: './paths/admin.yaml#/usersReport'
+
+  /admin/reports/products:
+    $ref: './paths/admin.yaml#/productsReport'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      $ref: './components/securitySchemes/bearerAuth.yaml'
+
+  schemas:
+    # Shared / primitives
+    Meta:
+      $ref: './components/schemas/shared.yaml#/Meta'
+    PaginationMeta:
+      $ref: './components/schemas/shared.yaml#/PaginationMeta'
+    ErrorDetail:
+      $ref: './components/schemas/shared.yaml#/ErrorDetail'
+
+    # Entities
+    User:
+      $ref: './components/schemas/User.yaml'
+    Profile:
+      $ref: './components/schemas/Profile.yaml'
+    Role:
+      $ref: './components/schemas/Role.yaml'
+    SellerApplication:
+      $ref: './components/schemas/SellerApplication.yaml'
+    Category:
+      $ref: './components/schemas/Category.yaml'
+    Product:
+      $ref: './components/schemas/Product.yaml'
+    ProductImage:
+      $ref: './components/schemas/ProductImage.yaml'
+    CartItem:
+      $ref: './components/schemas/CartItem.yaml'
+    Order:
+      $ref: './components/schemas/Order.yaml'
+    OrderItem:
+      $ref: './components/schemas/OrderItem.yaml'
+    Payment:
+      $ref: './components/schemas/Payment.yaml'
+    Rating:
+      $ref: './components/schemas/Rating.yaml'
+    Conversation:
+      $ref: './components/schemas/Conversation.yaml'
+    Message:
+      $ref: './components/schemas/Message.yaml'
+    Notification:
+      $ref: './components/schemas/Notification.yaml'
+
+    # Error / utility
+    ErrorResponse:
+      $ref: './components/schemas/Error.yaml'
+    Pagination:
+      $ref: './components/schemas/Pagination.yaml'
+
+  parameters:
+    page:
+      $ref: './components/parameters/pagination.yaml#/page'
+    limit:
+      $ref: './components/parameters/pagination.yaml#/limit'
+    search:
+      $ref: './components/parameters/filtering.yaml#/search'
+    minPrice:
+      $ref: './components/parameters/filtering.yaml#/minPrice'
+    maxPrice:
+      $ref: './components/parameters/filtering.yaml#/maxPrice'
+    sortBy:
+      $ref: './components/parameters/filtering.yaml#/sortBy'
+    sortOrder:
+      $ref: './components/parameters/filtering.yaml#/sortOrder'
+    id:
+      $ref: './components/parameters/path-ids.yaml#/id'
+    imageId:
+      $ref: './components/parameters/path-ids.yaml#/imageId'
+    productId:
+      $ref: './components/parameters/path-ids.yaml#/productId'
+    categoryId:
+      $ref: './components/parameters/path-ids.yaml#/categoryId'
+    applicationId:
+      $ref: './components/parameters/path-ids.yaml#/applicationId'
+    orderId:
+      $ref: './components/parameters/path-ids.yaml#/orderId'
+    cartItemId:
+      $ref: './components/parameters/path-ids.yaml#/cartItemId'
+    conversationId:
+      $ref: './components/parameters/path-ids.yaml#/conversationId'
+    notificationId:
+      $ref: './components/parameters/path-ids.yaml#/notificationId'
+    sellerId:
+      $ref: './components/parameters/path-ids.yaml#/sellerId'
+
+  responses:
+    BadRequest:
+      $ref: './components/responses/errors.yaml#/BadRequest'
+    Unauthorized:
+      $ref: './components/responses/errors.yaml#/Unauthorized'
+    Forbidden:
+      $ref: './components/responses/errors.yaml#/Forbidden'
+    NotFound:
+      $ref: './components/responses/errors.yaml#/NotFound'
+    Conflict:
+      $ref: './components/responses/errors.yaml#/Conflict'
+    UnprocessableEntity:
+      $ref: './components/responses/errors.yaml#/UnprocessableEntity'
+    TooManyRequests:
+      $ref: './components/responses/errors.yaml#/TooManyRequests'
+    InternalServerError:
+      $ref: './components/responses/errors.yaml#/InternalServerError'
+    NoContent:
+      $ref: './components/responses/success.yaml#/NoContent'
+
+  examples:
+    RegisterRequest:
+      $ref: './components/examples/auth.yaml#/RegisterRequest'
+    RegisterResponse:
+      $ref: './components/examples/auth.yaml#/RegisterResponse'
+    LoginRequest:
+      $ref: './components/examples/auth.yaml#/LoginRequest'
+    LoginResponse:
+      $ref: './components/examples/auth.yaml#/LoginResponse'
+    CurrentUserResponse:
+      $ref: './components/examples/auth.yaml#/CurrentUserResponse'
+    productList:
+      $ref: './components/examples/products.yaml#/productList'
+    productDetail:
+      $ref: './components/examples/products.yaml#/productDetail'
+    createProduct:
+      $ref: './components/examples/products.yaml#/createProduct'
+    orderList:
+      $ref: './components/examples/orders.yaml#/orderList'
+    orderDetail:
+      $ref: './components/examples/orders.yaml#/orderDetail'
+    createOrder:
+      $ref: './components/examples/orders.yaml#/createOrder'

@@ -1,0 +1,159 @@
+type: object
+description: Purchase order placed by a buyer on the marketplace.
+required:
+  - id
+  - order_number
+  - buyer_id
+  - status
+  - currency
+  - subtotal
+  - shipping_cost
+  - tax
+  - total
+  - created_at
+  - updated_at
+properties:
+  id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Unique identifier of the order.
+    examples:
+      - '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+  order_number:
+    type: string
+    pattern: "^ORD-\\d{8}$"
+    readOnly: true
+    description: Formatted human-readable order reference identifier.
+    examples:
+      - 'ORD-00100042'
+  buyer_id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Identifier of the buyer profile who placed this order.
+    examples:
+      - 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+  status:
+    type: string
+    enum:
+      - pending
+      - confirmed
+      - shipped
+      - delivered
+      - cancelled
+      - refunded
+    description: Current fulfillment status of the order.
+    examples:
+      - 'pending'
+  currency:
+    type: string
+    enum:
+      - USD
+      - EUR
+      - BOB
+      - PEN
+      - ARS
+      - COP
+      - MXN
+      - BRL
+    description: ISO 4217 currency code for the order amounts.
+    examples:
+      - 'USD'
+  subtotal:
+    type: number
+    format: double
+    minimum: 0
+    description: Aggregate cost of order items before shipping and taxes.
+    examples:
+      - 199.99
+  shipping_cost:
+    type: number
+    format: double
+    minimum: 0
+    description: Delivery fee applied to the order.
+    examples:
+      - 15.00
+  tax:
+    type: number
+    format: double
+    minimum: 0
+    description: Taxes applied to the order.
+    examples:
+      - 0.00
+  total:
+    type: number
+    format: double
+    minimum: 0
+    description: Total financial obligation for the order.
+    examples:
+      - 214.99
+  shipping_address:
+    type: [object, 'null']
+    additionalProperties: true
+    description: Structured shipping destination address.
+    examples:
+      - street: '123 Market Street, Apt 4B'
+        city: 'Cochabamba'
+        state: 'Cochabamba'
+        postal_code: '0000'
+        country: 'BO'
+  notes:
+    type: [string, 'null']
+    maxLength: 500
+    description: Instructions provided by the buyer during checkout.
+    examples:
+      - 'Please leave package at the front desk.'
+  cancellation_reason:
+    type: [string, 'null']
+    description: Explanation provided if the order was cancelled.
+    examples:
+      - null
+  confirmed_at:
+    type: [string, 'null']
+    format: date-time
+    readOnly: true
+    description: Timestamp when the order was confirmed by the seller.
+    examples:
+      - null
+  shipped_at:
+    type: [string, 'null']
+    format: date-time
+    readOnly: true
+    description: Timestamp when the order was marked as shipped.
+    examples:
+      - null
+  delivered_at:
+    type: [string, 'null']
+    format: date-time
+    readOnly: true
+    description: Timestamp when the order was marked as delivered.
+    examples:
+      - null
+  cancelled_at:
+    type: [string, 'null']
+    format: date-time
+    readOnly: true
+    description: Timestamp when the order was cancelled.
+    examples:
+      - null
+  items:
+    type: array
+    items:
+      $ref: './OrderItem.yaml'
+    description: List of items included in this order.
+  created_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Timestamp when the order was placed.
+    examples:
+      - '2026-10-14T11:00:00.000Z'
+  updated_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Timestamp when the order was last modified.
+    examples:
+      - '2026-10-14T11:00:00.000Z'
+additionalProperties: false

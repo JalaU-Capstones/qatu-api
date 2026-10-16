@@ -1,0 +1,129 @@
+upload:
+  post:
+    operationId: uploadProductImage
+    summary: Upload a product image
+    description: |
+      Uploads an image for a product using `multipart/form-data`.
+      The image is stored in Supabase Storage and a `ProductImage` record is created.
+      Only the owning seller may upload images. Maximum 5 images per product.
+    tags:
+      - product-images
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/productId'
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required:
+              - image
+            properties:
+              image:
+                type: string
+                format: binary
+                description: Image file (JPEG, PNG, WebP). Max 5 MB.
+              alt_text:
+                type: string
+                maxLength: 200
+                description: Accessible description of the image.
+                example: 'Front view of leather wallet showing card slots'
+              position:
+                type: integer
+                minimum: 0
+                description: Display position index. Defaults to next available position.
+                example: 0
+    responses:
+      '201':
+        description: Image uploaded successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/ProductImage.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              productImageResponse:
+                summary: Uploaded image record
+                value:
+                  data:
+                    id: '8f3c0b7d-2e3e-4c7f-9d4b-0e6a2f3b5c8d'
+                    product_id: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+                    path: 'product-images/7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c/8f3c0b7d.webp'
+                    alt_text: 'Front view of ergonomic chair'
+                    position: 0
+                    created_at: '2026-10-14T12:00:00.000Z'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '409':
+        $ref: '../components/responses/errors.yaml#/Conflict'
+      '422':
+        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+listByProduct:
+  get:
+    operationId: listProductImages
+    summary: List images for a product
+    description: Returns all images for a specific product. Public endpoint.
+    tags:
+      - product-images
+    security: []
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/productId'
+    responses:
+      '200':
+        description: List of product images.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/ProductImage.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+deleteImage:
+  delete:
+    operationId: deleteProductImage
+    summary: Delete a product image
+    description: |
+      Removes a product image by ID. Only the owning seller may delete images.
+      Also removes the file from Supabase Storage.
+    tags:
+      - product-images
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/productId'
+      - $ref: '../components/parameters/path-ids.yaml#/imageId'
+    responses:
+      '204':
+        description: Image deleted successfully.
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'

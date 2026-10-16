@@ -1,0 +1,220 @@
+register:
+  post:
+    operationId: registerUser
+    summary: Register a new user
+    description: |
+      Creates a new user account via Supabase Auth and initializes the user profile
+      with the `buyer` role. The JWT from Supabase is passed in the Authorization header.
+    tags:
+      - auth
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - email
+              - password
+              - username
+            properties:
+              email:
+                type: string
+                format: email
+                description: Primary email for the account.
+                examples:
+                  - 'buyer@example.com'
+              password:
+                type: string
+                format: password
+                minLength: 8
+                description: Secure password for authentication.
+                examples:
+                  - 'StrongPassword123!'
+              username:
+                type: string
+                minLength: 3
+                maxLength: 30
+                pattern: '^[a-zA-Z0-9_]{3,30}$'
+                description: Unique public username.
+                examples:
+                  - 'john_doe'
+              full_name:
+                type: string
+                description: Optional display full name.
+                examples:
+                  - 'John Doe'
+            additionalProperties: false
+          examples:
+            default:
+              $ref: '../components/examples/auth.yaml#/RegisterRequest'
+    responses:
+      '201':
+        description: User successfully registered and profile created.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  properties:
+                    user:
+                      $ref: '../components/schemas/User.yaml'
+                    profile:
+                      $ref: '../components/schemas/Profile.yaml'
+                    roles:
+                      type: array
+                      items:
+                        $ref: '../components/schemas/Role.yaml'
+                    token:
+                      type: string
+                      description: JWT access token.
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              default:
+                $ref: '../components/examples/auth.yaml#/RegisterResponse'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '409':
+        $ref: '../components/responses/errors.yaml#/Conflict'
+      '429':
+        $ref: '../components/responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+login:
+  post:
+    operationId: loginUser
+    summary: Authenticate and receive a JWT
+    description: |
+      Authenticates user credentials via Supabase Auth and returns a JWT along
+      with the user profile. Public endpoint.
+    tags:
+      - auth
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - email
+              - password
+            properties:
+              email:
+                type: string
+                format: email
+                description: Registered account email.
+                examples:
+                  - 'buyer@example.com'
+              password:
+                type: string
+                format: password
+                description: Account password.
+                examples:
+                  - 'StrongPassword123!'
+            additionalProperties: false
+          examples:
+            default:
+              $ref: '../components/examples/auth.yaml#/LoginRequest'
+    responses:
+      '200':
+        description: Login successful; JWT and profile returned.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  properties:
+                    user:
+                      $ref: '../components/schemas/User.yaml'
+                    profile:
+                      $ref: '../components/schemas/Profile.yaml'
+                    roles:
+                      type: array
+                      items:
+                        $ref: '../components/schemas/Role.yaml'
+                    token:
+                      type: string
+                      description: JWT access token.
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              default:
+                $ref: '../components/examples/auth.yaml#/LoginResponse'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '429':
+        $ref: '../components/responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+logout:
+  post:
+    operationId: logoutUser
+    summary: Logout current user
+    description: |
+      Invalidates the current session on the Supabase side. Clients must also
+      discard the JWT locally. Requires a valid bearer token.
+    tags:
+      - auth
+    responses:
+      '204':
+        description: Logout successful.
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '429':
+        $ref: '../components/responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+me:
+  get:
+    operationId: getCurrentUser
+    summary: Get current authenticated user
+    description: |
+      Returns the authenticated user's Supabase account, profile, and assigned roles.
+      Requires a valid bearer token.
+    tags:
+      - auth
+    responses:
+      '200':
+        description: Current user retrieved successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  properties:
+                    user:
+                      $ref: '../components/schemas/User.yaml'
+                    profile:
+                      $ref: '../components/schemas/Profile.yaml'
+                    roles:
+                      type: array
+                      items:
+                        $ref: '../components/schemas/Role.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              default:
+                $ref: '../components/examples/auth.yaml#/CurrentUserResponse'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '429':
+        $ref: '../components/responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'

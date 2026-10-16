@@ -1,0 +1,126 @@
+list:
+  get:
+    operationId: listNotifications
+    summary: List notifications
+    description: |
+      Returns a paginated list of in-app notifications for the authenticated user,
+      ordered by most recent. Includes both read and unread notifications.
+    tags:
+      - notifications
+    parameters:
+      - $ref: '../components/parameters/pagination.yaml#/page'
+      - $ref: '../components/parameters/pagination.yaml#/limit'
+      - name: unread_only
+        in: query
+        description: When `true`, returns only unread notifications.
+        schema:
+          type: boolean
+          default: false
+    responses:
+      '200':
+        description: Paginated list of notifications.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/Notification.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/PaginationMeta'
+            examples:
+              notificationList:
+                summary: List of notifications
+                value:
+                  data:
+                    - id: 'd4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a'
+                      profile_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+                      type: order_status_changed
+                      title: 'Order Confirmed'
+                      body: 'Your order ORD-00100042 has been confirmed.'
+                      action_url: '/orders/9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+                      payload:
+                        order_id: '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+                      read_at: null
+                      created_at: '2026-10-14T12:10:00.000Z'
+                  meta:
+                    page: 1
+                    per_page: 20
+                    total: 1
+                    total_pages: 1
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+markRead:
+  patch:
+    operationId: markNotificationRead
+    summary: Mark a notification as read
+    description: Marks a single notification as read. Only the notification's owner may mark it.
+    tags:
+      - notifications
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/notificationId'
+    responses:
+      '200':
+        description: Notification marked as read.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Notification.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+markAllRead:
+  patch:
+    operationId: markAllNotificationsRead
+    summary: Mark all notifications as read
+    description: Marks all unread notifications for the authenticated user as read.
+    tags:
+      - notifications
+    responses:
+      '200':
+        description: All notifications marked as read.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  properties:
+                    updated_count:
+                      type: integer
+                      description: Number of notifications updated.
+                      example: 5
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              markAllReadResponse:
+                summary: Updated count
+                value:
+                  data:
+                    updated_count: 5
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'

@@ -1,0 +1,143 @@
+BadRequest:
+  description: Bad Request — validation error or malformed request syntax.
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/Error.yaml'
+      examples:
+        validationError:
+          summary: Validation error
+          value:
+            error:
+              code: VALIDATION_ERROR
+              message: Invalid input data
+              details:
+                - field: email
+                  message: Email must be a valid email address
+            meta:
+              timestamp: '2026-10-14T12:00:00.000Z'
+
+Unauthorized:
+  description: Unauthorized — missing, invalid, or expired authentication token.
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/Error.yaml'
+      examples:
+        missingToken:
+          summary: Missing or invalid JWT
+          value:
+            error:
+              code: UNAUTHORIZED
+              message: Missing or invalid authentication token
+            meta:
+              timestamp: '2026-10-14T12:00:00.000Z'
+
+Forbidden:
+  description: Forbidden — authenticated user lacks required permissions or role.
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/Error.yaml'
+      examples:
+        insufficientRole:
+          summary: Insufficient role permissions
+          value:
+            error:
+              code: FORBIDDEN
+              message: You do not have permission to access this resource
+            meta:
+              timestamp: '2026-10-14T12:00:00.000Z'
+
+NotFound:
+  description: Not Found — the requested resource does not exist.
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/Error.yaml'
+      examples:
+        resourceNotFound:
+          summary: Resource not found
+          value:
+            error:
+              code: NOT_FOUND
+              message: The requested resource was not found
+            meta:
+              timestamp: '2026-10-14T12:00:00.000Z'
+
+Conflict:
+  description: Conflict — duplicate resource or incompatible state transition.
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/Error.yaml'
+      examples:
+        conflictError:
+          summary: State or uniqueness conflict
+          value:
+            error:
+              code: CONFLICT
+              message: A resource with these attributes already exists
+            meta:
+              timestamp: '2026-10-14T12:00:00.000Z'
+
+UnprocessableEntity:
+  description: Unprocessable Entity — semantic validation error or failed business condition.
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/Error.yaml'
+      examples:
+        outOfStock:
+          summary: Business rule violation
+          value:
+            error:
+              code: UNPROCESSABLE_ENTITY
+              message: Requested product quantity exceeds available inventory
+            meta:
+              timestamp: '2026-10-14T12:00:00.000Z'
+
+TooManyRequests:
+  description: Too Many Requests — client exceeded rate limit.
+  headers:
+    X-RateLimit-Limit:
+      schema:
+        type: integer
+      description: The maximum number of allowed requests in the current window.
+    X-RateLimit-Remaining:
+      schema:
+        type: integer
+      description: The number of remaining requests in the current window.
+    X-RateLimit-Reset:
+      schema:
+        type: integer
+      description: Epoch timestamp (seconds) when the current window resets.
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/Error.yaml'
+      examples:
+        rateLimitExceeded:
+          summary: Rate limit exceeded
+          value:
+            error:
+              code: TOO_MANY_REQUESTS
+              message: Rate limit exceeded. Please retry later.
+            meta:
+              timestamp: '2026-10-14T12:00:00.000Z'
+
+InternalServerError:
+  description: Internal Server Error — unexpected error occurred on the server.
+  content:
+    application/json:
+      schema:
+        $ref: '../schemas/Error.yaml'
+      examples:
+        internalError:
+          summary: Unexpected server error
+          value:
+            error:
+              code: INTERNAL_SERVER_ERROR
+              message: An unexpected server error occurred
+            meta:
+              timestamp: '2026-10-14T12:00:00.000Z'

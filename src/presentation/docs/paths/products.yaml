@@ -1,0 +1,356 @@
+list:
+  get:
+    operationId: listProducts
+    summary: List products (public catalog)
+    description: |
+      Returns a paginated list of published products. Public endpoint — no authentication required.
+      Supports filtering by category, price range, seller, and full-text search.
+    tags:
+      - products
+    security: []
+    parameters:
+      - $ref: '../components/parameters/pagination.yaml#/page'
+      - $ref: '../components/parameters/pagination.yaml#/limit'
+      - $ref: '../components/parameters/filtering.yaml#/search'
+      - $ref: '../components/parameters/filtering.yaml#/filterCategoryId'
+      - $ref: '../components/parameters/filtering.yaml#/minPrice'
+      - $ref: '../components/parameters/filtering.yaml#/maxPrice'
+      - $ref: '../components/parameters/filtering.yaml#/filterSellerId'
+      - $ref: '../components/parameters/filtering.yaml#/sortBy'
+      - $ref: '../components/parameters/filtering.yaml#/sortOrder'
+    responses:
+      '200':
+        description: Paginated list of published products.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/Product.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/PaginationMeta'
+            examples:
+              productList:
+                $ref: '../components/examples/products.yaml#/productList'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+getById:
+  get:
+    operationId: getProductById
+    summary: Get a product by ID (public)
+    description: Returns a single product by its UUID. Public endpoint.
+    tags:
+      - products
+    security: []
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/productId'
+    responses:
+      '200':
+        description: Product details.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Product.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              productDetail:
+                $ref: '../components/examples/products.yaml#/productDetail'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+create:
+  post:
+    operationId: createProduct
+    summary: Create a product
+    description: |
+      Creates a new product in draft status. Requires `seller` role.
+      The product is not publicly visible until published via `PATCH /products/:id/publish`.
+    tags:
+      - products
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - name
+              - price
+              - category_id
+            properties:
+              name:
+                type: string
+                minLength: 3
+                maxLength: 200
+                example: 'Ergonomic Office Chair'
+              slug:
+                type: string
+                pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+                example: 'ergonomic-office-chair'
+              description:
+                type: string
+                maxLength: 5000
+                example: 'High quality ergonomic mesh chair with adjustable lumbar support.'
+              price:
+                type: number
+                format: double
+                minimum: 0.01
+                example: 199.99
+              currency:
+                type: string
+                enum: [USD, EUR, BOB, PEN, ARS, COP, MXN, BRL]
+                default: USD
+                example: USD
+              stock:
+                type: integer
+                minimum: 0
+                default: 0
+                example: 25
+              category_id:
+                type: string
+                format: uuid
+                example: 'b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'
+          examples:
+            createProduct:
+              $ref: '../components/examples/products.yaml#/createProduct'
+    responses:
+      '201':
+        description: Product created successfully (draft).
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Product.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              productDetail:
+                $ref: '../components/examples/products.yaml#/productDetail'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '422':
+        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+update:
+  patch:
+    operationId: updateProduct
+    summary: Update a product
+    description: |
+      Updates a product by ID. Only the seller who owns the product may update it.
+      All fields are optional; supply only the fields to change.
+    tags:
+      - products
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/productId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            minProperties: 1
+            properties:
+              name:
+                type: string
+                minLength: 3
+                maxLength: 200
+                example: 'Ergonomic Office Chair V2'
+              description:
+                type: string
+                maxLength: 5000
+                example: 'Updated description with seasonal discount pricing.'
+              price:
+                type: number
+                format: double
+                minimum: 0.01
+                example: 179.99
+              stock:
+                type: integer
+                minimum: 0
+                example: 30
+              category_id:
+                type: string
+                format: uuid
+                example: 'b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'
+    responses:
+      '200':
+        description: Product updated successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Product.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+delete:
+  delete:
+    operationId: deleteProduct
+    summary: Delete a product
+    description: Deletes a product by ID. Only the owning seller may delete it.
+    tags:
+      - products
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/productId'
+    responses:
+      '204':
+        description: Product deleted successfully.
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+publish:
+  patch:
+    operationId: publishProduct
+    summary: Publish a product
+    description: |
+      Changes a product's status from `draft` to `published`, making it visible in the public catalog.
+      Only the owning seller may publish it. Requires at least one image to be uploaded.
+    tags:
+      - products
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/productId'
+    responses:
+      '200':
+        description: Product published successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Product.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '409':
+        $ref: '../components/responses/errors.yaml#/Conflict'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+unpublish:
+  patch:
+    operationId: unpublishProduct
+    summary: Unpublish a product
+    description: |
+      Changes a product's status from `published` back to `draft`, hiding it from the catalog.
+      Only the owning seller may unpublish it.
+    tags:
+      - products
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/productId'
+    responses:
+      '200':
+        description: Product unpublished successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Product.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '409':
+        $ref: '../components/responses/errors.yaml#/Conflict'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+sellerList:
+  get:
+    operationId: listSellerProducts
+    summary: List my products (seller)
+    description: |
+      Returns a paginated list of all products belonging to the authenticated seller,
+      including drafts. Requires `seller` role.
+    tags:
+      - products
+    parameters:
+      - $ref: '../components/parameters/pagination.yaml#/page'
+      - $ref: '../components/parameters/pagination.yaml#/limit'
+      - name: status
+        in: query
+        description: Filter by product status.
+        schema:
+          type: string
+          enum: [draft, published]
+    responses:
+      '200':
+        description: Paginated list of the seller's products.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/Product.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/PaginationMeta'
+            examples:
+              sellerProductList:
+                $ref: '../components/examples/products.yaml#/productList'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'

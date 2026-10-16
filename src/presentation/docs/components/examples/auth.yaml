@@ -1,0 +1,120 @@
+RegisterRequest:
+  summary: User registration request payload
+  description: Example payload containing user credentials and profile details.
+  value:
+    email: 'buyer@example.com'
+    password: 'StrongPassword123!'
+    username: 'john_doe'
+    full_name: 'John Doe'
+
+RegisterResponse:
+  summary: User registration response payload
+  description: Example response returned upon successful user registration and profile creation.
+  value:
+    data:
+      user:
+        id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+        email: 'buyer@example.com'
+        created_at: '2026-10-14T10:00:00.000Z'
+      profile:
+        id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+        username: 'john_doe'
+        full_name: 'John Doe'
+        email: 'buyer@example.com'
+        avatar_path: null
+        bio: null
+        locale: 'en'
+        created_at: '2026-10-14T10:00:00.000Z'
+        updated_at: '2026-10-14T10:00:00.000Z'
+      roles:
+        - id: 1
+          name: 'buyer'
+          created_at: '2026-10-01T00:00:00.000Z'
+      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhMGVlYmM5OS05YzBiLTRlZjgtYmI2ZC02YmI5YmQzODBhMTEiLCJlbWFpbCI6ImJ1eWVyQGV4YW1wbGUuY29tIiwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJleHAiOjE3NjA0ODY0MDB9.placeholder'
+    meta:
+      timestamp: '2026-10-14T10:00:00.000Z'
+
+LoginRequest:
+  summary: User login credentials
+  description: Example payload with registered email and password.
+  value:
+    email: 'buyer@example.com'
+    password: 'StrongPassword123!'
+
+LoginResponse:
+  summary: Successful login response
+  description: Example response containing access JWT and user profile information.
+  value:
+    data:
+      user:
+        id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+        email: 'buyer@example.com'
+        created_at: '2026-10-14T10:00:00.000Z'
+      profile:
+        id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+        username: 'john_doe'
+        full_name: 'John Doe'
+        email: 'buyer@example.com'
+        avatar_path: null
+        bio: null
+        locale: 'en'
+        created_at: '2026-10-14T10:00:00.000Z'
+        updated_at: '2026-10-14T10:00:00.000Z'
+      roles:
+        - id: 1
+          name: 'buyer'
+          created_at: '2026-10-01T00:00:00.000Z'
+      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhMGVlYmM5OS05YzBiLTRlZjgtYmI2ZC02YmI5YmQzODBhMTEiLCJlbWFpbCI6ImJ1eWVyQGV4YW1wbGUuY29tIiwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJleHAiOjE3NjA0ODY0MDB9.placeholder'
+    meta:
+      timestamp: '2026-10-14T10:00:00.000Z'
+
+CurrentUserResponse:
+  summary: Current user profile
+  description: Example response returned for GET /auth/me.
+  value:
+    data:
+      user:
+        id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+        email: 'buyer@example.com'
+        created_at: '2026-10-14T10:00:00.000Z'
+      profile:
+        id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+        username: 'john_doe'
+        full_name: 'John Doe'
+        email: 'buyer@example.com'
+        avatar_path: 'avatars/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/profile.jpg'
+        bio: 'Marketplace shopper and tech enthusiast.'
+        locale: 'en'
+        created_at: '2026-10-14T10:00:00.000Z'
+        updated_at: '2026-10-14T10:00:00.000Z'
+      roles:
+        - id: 1
+          name: 'buyer'
+          created_at: '2026-10-01T00:00:00.000Z'
+    meta:
+      timestamp: '2026-10-14T10:00:00.000Z'
+
+sellerApplicationCreate:
+  summary: Submit seller application
+  value:
+    business_name: 'Andean Artisan Crafts'
+    business_description: 'We produce hand-woven alpaca wool textiles and ceramic homeware sourced directly from local cooperatives.'
+
+sellerApplicationResponse:
+  summary: Seller application created
+  value:
+    data:
+      id: '4f3c2b1a-0e9d-8c7b-6a5f-4e3d2c1b0a9f'
+      profile_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+      business_name: 'Andean Artisan Crafts'
+      business_description: 'We produce hand-woven alpaca wool textiles and ceramic homeware sourced directly from local cooperatives.'
+      contact_phone: '+591 4 4123456'
+      contact_email: 'contact@andeanartisan.com'
+      status: pending
+      reviewed_by: null
+      reviewed_at: null
+      rejection_reason: null
+      created_at: '2026-10-14T10:30:00.000Z'
+      updated_at: '2026-10-14T10:30:00.000Z'
+    meta:
+      timestamp: '2026-10-14T10:30:00.000Z'

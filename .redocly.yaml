@@ -1,0 +1,24 @@
+extends:
+  - recommended
+
+apis:
+  qatu@v1:
+    root: ./src/presentation/docs/openapi.yaml
+
+rules:
+  no-unused-components: error
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-summary: error
+  operation-description: warn
+  operation-2xx-response: error
+  operation-4xx-response: warn
+  no-invalid-media-type-examples: error
+  no-example-value-and-externalValue: error
+  no-server-example.com: off
+  security-defined: error
+  tag-description: warn
+  no-ambiguous-paths: error
+  no-identical-paths: error
+
+telemetry: off
