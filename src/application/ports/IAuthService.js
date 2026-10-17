@@ -16,6 +16,17 @@ export class IAuthService {
   }
 
   /**
+   * Authenticates a user with email and password.
+   * @param {Object} params
+   * @param {string} params.email
+   * @param {string} params.password
+   * @returns {Promise<{ id: string, email: string, created_at: string, token: string, user_metadata?: Object }>}
+   */
+  async loginUser(params) {
+    throw new Error(`Method not implemented with ${params}`);
+  }
+
+  /**
    * Checks if an email is already registered.
    * @param {string} email
    * @returns {Promise<boolean>}

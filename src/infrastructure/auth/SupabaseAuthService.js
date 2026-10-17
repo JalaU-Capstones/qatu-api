@@ -114,6 +114,50 @@ export class SupabaseAuthService extends IAuthService {
   }
 
   /**
+   * Authenticates user credentials via Supabase Auth signInWithPassword.
+   * Never leaks internal Supabase error details or service keys to clients.
+   *
+   * @param {Object} params
+   * @param {string} params.email
+   * @param {string} params.password
+   * @returns {Promise<{ id: string, email: string, created_at: string, token: string, user_metadata: Object }>}
+   */
+  async loginUser({ email, password }) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data, error } = await this.client.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    });
+
+    if (error || !data?.session?.access_token || !data?.user) {
+      const rawMessage = error?.message?.toLowerCase() || '';
+      if (rawMessage.includes('email not confirmed') || rawMessage.includes('not confirmed')) {
+        const unconfirmedErr = new Error('Please confirm your email before logging in');
+        unconfirmedErr.code = 'EMAIL_NOT_CONFIRMED';
+        unconfirmedErr.statusCode = 401;
+        throw unconfirmedErr;
+      }
+
+      const authErr = new Error('Authentication failed');
+      authErr.code = 'UNAUTHORIZED';
+      authErr.statusCode = 401;
+      throw authErr;
+    }
+
+    return {
+      id: data.user.id,
+      email: data.user.email || normalizedEmail,
+      created_at: data.user.created_at || new Date().toISOString(),
+      token: data.session.access_token,
+      user_metadata: data.user.user_metadata || {},
+    };
+  }
+
+  /**
    * Checks if an email is already registered in Supabase Auth.
    *
    * @param {string} email
