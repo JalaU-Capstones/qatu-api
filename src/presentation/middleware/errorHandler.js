@@ -10,6 +10,20 @@
 export function errorHandler(err, req, res, next) {
   const timestamp = new Date().toISOString();
 
+  // Log every error for debugging. Never log sensitive data (passwords, tokens).
+  // eslint-disable-next-line no-console
+  console.error('[errorHandler]', {
+    timestamp,
+    name: err.name,
+    message: err.message,
+    code: err.code,
+    statusCode: err.statusCode,
+    stack: err.stack,
+    path: req.originalUrl,
+    method: req.method,
+    userId: req.user?.id || null,
+  });
+
   // AUTHENTICATION OR UNAUTHORIZED
   if (err.statusCode === 401 || err.code === 'UNAUTHORIZED' || err.code === 'EMAIL_NOT_CONFIRMED') {
     const message =

@@ -44,9 +44,8 @@ export function createApp({ authRoutes = authRouter } = {}) {
     res.json({ status: 'ok' });
   });
 
-  // API Routes (mounted on /v1/auth and /auth for compatibility)
+  // API Routes
   app.use('/v1/auth', authLimiter, authRoutes);
-  app.use('/auth', authLimiter, authRoutes);
 
   // Global Error Handler
   app.use(errorHandler);
