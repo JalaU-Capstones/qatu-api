@@ -1,0 +1,175 @@
+getOrClear:
+  get:
+    operationId: getCart
+    summary: Get current user's cart
+    description: Returns all items in the authenticated user's shopping cart.
+    tags:
+      - cart
+    responses:
+      '200':
+        description: Cart contents.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/CartItem.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              cartContents:
+                summary: Cart with one item
+                value:
+                  data:
+                    - id: '5b4a3c2d-1e0f-9a8b-7c6d-5e4f3a2b1c0d'
+                      profile_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+                      product_id: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+                      quantity: 2
+                      saved_for_later: false
+                      created_at: '2026-10-14T10:00:00.000Z'
+                      updated_at: '2026-10-14T10:00:00.000Z'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+  delete:
+    operationId: clearCart
+    summary: Clear the cart
+    description: Removes all items from the authenticated user's cart.
+    tags:
+      - cart
+    responses:
+      '204':
+        description: Cart cleared successfully.
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+add:
+  post:
+    operationId: addCartItem
+    summary: Add item to cart
+    description: |
+      Adds a product to the cart. If the product is already in the cart,
+      the quantity is incremented by the requested amount.
+    tags:
+      - cart
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - product_id
+              - quantity
+            properties:
+              product_id:
+                type: string
+                format: uuid
+                example: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+              quantity:
+                type: integer
+                minimum: 1
+                example: 2
+          examples:
+            addToCart:
+              summary: Add 2 units
+              value:
+                product_id: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+                quantity: 2
+    responses:
+      '201':
+        description: Item added to cart.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/CartItem.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+updateOrRemove:
+  patch:
+    operationId: updateCartItem
+    summary: Update cart item quantity
+    description: Updates the quantity of a specific item in the cart.
+    tags:
+      - cart
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/cartItemId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - quantity
+            properties:
+              quantity:
+                type: integer
+                minimum: 1
+                example: 3
+    responses:
+      '200':
+        description: Cart item updated successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/CartItem.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '422':
+        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+  delete:
+    operationId: removeCartItem
+    summary: Remove item from cart
+    description: Removes a specific item from the authenticated user's cart.
+    tags:
+      - cart
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/cartItemId'
+    responses:
+      '204':
+        description: Item removed from cart.
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'

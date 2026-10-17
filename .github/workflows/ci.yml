@@ -21,6 +21,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Lint
         run: pnpm lint && pnpm format:check
+      - name: Lint OpenAPI specification
+        run: pnpm openapi:bundle && pnpm openapi:lint && pnpm openapi:validate
 
   test:
     runs-on: ubuntu-latest
