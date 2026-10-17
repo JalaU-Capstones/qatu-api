@@ -142,7 +142,7 @@ export class ProfileRepository extends IProfileRepository {
     }
 
     const [roleRows] = await this.db.query(
-      `SELECT r.id, r.name, ur.created_at
+      `SELECT r.id, r.name, ur.assigned_at AS created_at
        FROM user_roles ur
        JOIN roles r ON r.id = ur.role_id
        WHERE ur.profile_id = :id`,

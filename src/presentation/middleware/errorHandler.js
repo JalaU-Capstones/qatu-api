@@ -10,7 +10,37 @@
 export function errorHandler(err, req, res, next) {
   const timestamp = new Date().toISOString();
 
-  // Conflict errors (e.g. duplicate email or resource)
+  // Log every error for debugging. Never log sensitive data (passwords, tokens).
+  // eslint-disable-next-line no-console
+  console.error('[errorHandler]', {
+    timestamp,
+    name: err.name,
+    message: err.message,
+    code: err.code,
+    statusCode: err.statusCode,
+    stack: err.stack,
+    path: req.originalUrl,
+    method: req.method,
+    userId: req.user?.id || null,
+  });
+
+  // AUTHENTICATION OR UNAUTHORIZED
+  if (err.statusCode === 401 || err.code === 'UNAUTHORIZED' || err.code === 'EMAIL_NOT_CONFIRMED') {
+    const message =
+      err.code === 'EMAIL_NOT_CONFIRMED'
+        ? 'Please confirm your email before logging in'
+        : 'Authentication failed';
+
+    return res.status(401).json({
+      error: {
+        code: err.code || 'UNAUTHORIZED',
+        message,
+      },
+      meta: { timestamp },
+    });
+  }
+
+  // CONFLICTS
   if (err.code === 'EMAIL_ALREADY_EXISTS' || err.statusCode === 409) {
     return res.status(409).json({
       error: {
@@ -21,7 +51,7 @@ export function errorHandler(err, req, res, next) {
     });
   }
 
-  // Domain Value Object validation errors
+  // DVO VALIDATIONS
   if (
     err.message?.includes('Password must be at least') ||
     err.message?.includes('Invalid email') ||
@@ -39,7 +69,7 @@ export function errorHandler(err, req, res, next) {
     });
   }
 
-  // Rate limiting errors
+  // RATE LIMITING
   if (err.statusCode === 429) {
     return res.status(429).json({
       error: {
@@ -50,7 +80,7 @@ export function errorHandler(err, req, res, next) {
     });
   }
 
-  // Generic internal server or unknown status errors
+  // GENERIC SERVER ERROR HANDLING
   const statusCode = err.statusCode || 500;
   const isServer = statusCode >= 500;
 
