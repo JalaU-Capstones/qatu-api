@@ -32,3 +32,9 @@
 - **Swagger UI 404 or outdated spec at `/api-docs`:**
   - Make sure `pnpm openapi:bundle` has been run so that `dist/openapi.bundle.yaml` exists.
   - In development mode, `src/server.js` dynamically bundles if the dist file is missing.
+
+## CI
+
+- **`Could not find a working container runtime strategy` (Testcontainers):** GitLab SaaS shared runners do not provide Docker. The integration test detects `TEST_DATABASE_URL` and connects to a service container instead. If you see this locally, ensure Docker Desktop is running.
+- **`TEST_DATABASE_URL` set but connection refused:** Verify the `services:` block in `.gitlab-ci.yml` (hostname must match `alias`). For GitHub Actions, ensure `ports: 5432:5432` is present and the health check is enabled.
+- **Integration test setup SQL fails:** The test creates a minimal schema in `SCHEMA_SQL`. If a column was added to the real migration, update the test's schema to match — otherwise the test will fail loudly, which is intentional.
