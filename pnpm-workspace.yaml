@@ -1,3 +1,10 @@
+onlyBuiltDependencies:
+  - '@scarf/scarf'
+  - cpu-features
+  - esbuild
+  - protobufjs
+  - ssh2
+
 allowBuilds:
   '@scarf/scarf': true
   cpu-features: true

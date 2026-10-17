@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.js'],
-    exclude: ['node_modules/', 'dist/', 'coverage/', '**/*.integration.test.js'],
+    exclude: ['node_modules/', 'dist/', 'coverage/'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
