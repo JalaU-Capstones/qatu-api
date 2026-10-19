@@ -1,6 +1,13 @@
-export function validateRequest(schema) {
+export function validateRequest(schema, { source = 'body' } = {}) {
   return (req, res, next) => {
-    const { error, value } = schema.validate(req.body, {
+    let data = req.body;
+    if (source === 'query') {
+      data = req.query;
+    } else if (source === 'params') {
+      data = req.params;
+    }
+
+    const { error, value } = schema.validate(data, {
       abortEarly: false,
       stripUnknown: true,
     });
@@ -23,7 +30,14 @@ export function validateRequest(schema) {
       });
     }
 
-    req.validatedBody = value;
+    if (source === 'query') {
+      req.validatedQuery = value;
+    } else if (source === 'params') {
+      req.validatedParams = value;
+    } else {
+      req.validatedBody = value;
+    }
+
     return next();
   };
 }
