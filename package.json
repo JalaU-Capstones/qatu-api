@@ -24,10 +24,10 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.117.3",
+    "@supabase/supabase-js": "^2.118.0",
     "amqplib": "^2.2.0",
     "cors": "^2.8.5",
-    "dotenv": "^18.0.7",
+    "dotenv": "^18.0.8",
     "express": "^5.3.0",
     "express-rate-limit": "^7.2.0",
     "helmet": "^8.3.0",
@@ -44,9 +44,9 @@
     "@commitlint/cli": "^19.2.1",
     "@commitlint/config-conventional": "^19.1.0",
     "@eslint/js": "^10.0.1",
-    "@testcontainers/postgresql": "^12.2.0",
-    "@testcontainers/rabbitmq": "^12.2.0",
-    "@vitest/coverage-v8": "^5.0.3",
+    "@testcontainers/postgresql": "^12.2.1",
+    "@testcontainers/rabbitmq": "^12.2.1",
+    "@vitest/coverage-v8": "^5.0.5",
     "eslint": "^9.1.1",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
@@ -55,11 +55,11 @@
     "husky": "^9.0.11",
     "lint-staged": "^17.6.0",
     "nodemon": "^3.1.0",
-    "prettier": "^3.2.5",
+    "prettier": "^3.9.10",
     "sequelize-cli": "^6.6.2",
-    "supabase": "^2.120.0",
+    "supabase": "^2.121.0",
     "supertest": "^7.3.1",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.5"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
