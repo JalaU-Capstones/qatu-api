@@ -154,13 +154,14 @@ if (process.env.NODE_ENV === 'production') {
 }
 ```
 
-The three seeders provided are:
+The seeders provided are:
 
-| #   | File                                | Data                                                 |
-| --- | ----------------------------------- | ---------------------------------------------------- |
-| 23  | `20261010000023-seed-roles.js`      | 3 roles: buyer, seller, admin                        |
-| 24  | `20261010000024-seed-categories.js` | 5 root categories                                    |
-| 25  | `20261010000025-seed-admin-user.js` | Admin user in `auth.users`, `profiles`, `user_roles` |
+| #   | File                                     | Data                                                          |
+| --- | ---------------------------------------- | ------------------------------------------------------------- |
+| 23  | `20261010000023-seed-roles.js`           | 3 roles: buyer, seller, admin                                 |
+| 24  | `20261010000024-seed-categories.js`      | 5 root categories                                             |
+| 25  | `20261010000025-seed-admin-user.js`      | Admin user in `auth.users`, `profiles`, `user_roles`          |
+| 26  | `20261010000026-seed-sample-products.js` | 1 sample seller user + 25 published products (5 per category) |
 
 ## Production Deployment
 

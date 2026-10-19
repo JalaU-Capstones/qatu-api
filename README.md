@@ -61,6 +61,16 @@ Qatu (Quechua word for "store") is an online digital marketplace where sellers c
    make dev
    ```
 
+### Verify the catalog endpoint
+
+After `make db:migrate && make db-seed && make dev`, run:
+
+```bash
+curl -s 'http://localhost:3000/v1/products?page=1&limit=20' | jq
+```
+
+Expected: `200` with `meta.total = 25` (from the sample seeder) and `meta.total_pages = 2`.
+
 ## Available Scripts
 
 Check the `Makefile` for available commands by running:
@@ -112,6 +122,12 @@ The REST API contract is defined using **OpenAPI 3.1.0** and served interactivel
 - **Swagger UI:** `http://localhost:3000/api-docs` (when development server is running)
 - **OpenAPI JSON:** `http://localhost:3000/api-docs/openapi.json`
 - **Developer Guide:** [OpenAPI Developer Guide](src/presentation/docs/README.md) and [Contract Overview](.docs/OPENAPI.md)
+
+### Catalog
+
+| Method | Endpoint       | Auth | Description                                                                                                                                                    |
+| ------ | -------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/v1/products` | None | Paginated list of published products. Supports filters (`search`, `category_id`, `min_price`, `max_price`, `seller_id`) and sorting (`sort_by`, `sort_order`). |
 
 ### OpenAPI Commands
 
