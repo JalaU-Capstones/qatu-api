@@ -1,7 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Product } from '../../../../domain/entities/Product.js';
 import { IProductRepository } from '../../../../domain/repositories/IProductRepository.js';
-import { ProductRepository } from '../ProductRepository.js';
+import { ProductRepository, escapeLikePattern } from '../ProductRepository.js';
+
+describe('escapeLikePattern', () => {
+  it('should escape percent, underscore and backslash', () => {
+    expect(escapeLikePattern('50%')).toBe('50\\%');
+    expect(escapeLikePattern('a_b')).toBe('a\\_b');
+    expect(escapeLikePattern('a\\b')).toBe('a\\\\b');
+  });
+
+  it('should leave regular text untouched', () => {
+    expect(escapeLikePattern('smartphone 5G')).toBe('smartphone 5G');
+  });
+});
 
 describe('ProductRepository (unit)', () => {
   let mockDb;
@@ -100,6 +112,58 @@ describe('ProductRepository (unit)', () => {
       const [sql, options] = mockDb.query.mock.calls[0];
       expect(sql).toContain("p.search_vector @@ plainto_tsquery('simple', :search)");
       expect(options.replacements.search).toBe('ergonomic chair');
+    });
+
+    it('should also match partial words on name and description with ILIKE', async () => {
+      mockDb.query.mockResolvedValueOnce([[sampleDbRow]]);
+
+      await repository.findAll({
+        filters: { search: '  phone ' },
+      });
+
+      const [sql, options] = mockDb.query.mock.calls[0];
+      expect(sql).toContain('p.name ILIKE :searchPattern');
+      expect(sql).toContain('p.description ILIKE :searchPattern');
+      expect(options.replacements.search).toBe('phone');
+      expect(options.replacements.searchPattern).toBe('%phone%');
+    });
+
+    it('should wrap the full-text and ILIKE conditions in parentheses so other filters still AND', async () => {
+      mockDb.query.mockResolvedValueOnce([[sampleDbRow]]);
+
+      await repository.findAll({
+        filters: { search: 'phone', categoryId: 'cat-uuid-1', minPrice: 100, maxPrice: 500 },
+      });
+
+      const [sql] = mockDb.query.mock.calls[0];
+      expect(sql).toMatch(
+        /\(p\.search_vector @@ plainto_tsquery\('simple', :search\) OR p\.name ILIKE :searchPattern OR p\.description ILIKE :searchPattern\)/
+      );
+      expect(sql).toContain('p.category_id = :categoryId');
+      expect(sql).toContain('p.price >= :minPrice');
+      expect(sql).toContain('p.price <= :maxPrice');
+    });
+
+    it('should escape LIKE wildcards so user input is matched literally', async () => {
+      mockDb.query.mockResolvedValueOnce([[sampleDbRow]]);
+
+      await repository.findAll({
+        filters: { search: '100%_off\\' },
+      });
+
+      const [, options] = mockDb.query.mock.calls[0];
+      expect(options.replacements.searchPattern).toBe('%100\\%\\_off\\\\%');
+    });
+
+    it('should skip the search conditions when the search term is blank', async () => {
+      mockDb.query.mockResolvedValueOnce([[sampleDbRow]]);
+
+      await repository.findAll({ filters: { search: '   ' } });
+
+      const [sql, options] = mockDb.query.mock.calls[0];
+      expect(sql).not.toContain('ILIKE');
+      expect(sql).not.toContain('plainto_tsquery');
+      expect(options.replacements.searchPattern).toBeUndefined();
     });
 
     it('should assert category_id, min_price, max_price, seller_id placeholders when provided', async () => {
