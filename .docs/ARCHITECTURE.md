@@ -11,14 +11,14 @@ For architectural decisions, please refer to [ADR-005 (Backend Architecture)](#)
 ### Domain Layer
 
 - **Purpose:** Contains the core business logic, entities, and rules of the application. It is the heart of the system.
-- **Components:** Entities, Value Objects, Domain Events, and Repository Interfaces.
+- **Components:** Entities (e.g., `Product`, `Profile`), Value Objects, Domain Events, and Repository Interfaces (e.g., `IProductRepository`, `IProfileRepository`).
 - **Dependencies:** None. It does not depend on any outer layers.
 - **What does NOT belong here:** Express.js code, database queries, ORM models, or infrastructure concerns.
 
 ### Application Layer
 
 - **Purpose:** Orchestrates business use cases. It directs the flow of data to and from the domain layer.
-- **Components:** Use Cases (Interactors), DTOs (Data Transfer Objects), and Application Interfaces.
+- **Components:** Use Cases (Interactors, e.g., `ListProductsUseCase`, `RegisterBuyerUseCase`, `LoginUseCase`), DTOs (Data Transfer Objects), and Application Interfaces.
 - **Dependencies:** Depends ONLY on the Domain layer.
 - **What does NOT belong here:** HTTP routing, API requests, database implementations.
 
@@ -28,6 +28,12 @@ For architectural decisions, please refer to [ADR-005 (Backend Architecture)](#)
 - **Components:** Database Implementations (Sequelize), Message Brokers (RabbitMQ), External APIs, Authentication mechanisms (Supabase Auth).
 - **Dependencies:** Depends on the Application and Domain layers.
 - **What does NOT belong here:** Core business rules.
+
+#### Persistence
+
+- **Repositories:** `ProfileRepository`, `ProductRepository`.
+
+> **Note:** `ProductRepository.findAll` explicitly filters `state = 'published' AND deleted_at IS NULL` in SQL. It does **not** rely on the RLS policy `"Published products are publicly readable"` because the backend connects with the `qatu` DB user, which is the table owner and bypasses RLS by default. RLS remains active for end-user access via Supabase.
 
 ### Presentation Layer
 

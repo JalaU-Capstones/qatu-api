@@ -5,8 +5,9 @@ import { registerApiDocs } from './presentation/docs/swagger.js';
 import { corsMiddleware } from './presentation/middleware/corsMiddleware.js';
 import { errorHandler } from './presentation/middleware/errorHandler.js';
 import { authRouter } from './presentation/routes/authRoutes.js';
+import { productRouter } from './presentation/routes/productRoutes.js';
 
-export function createApp({ authRoutes = authRouter } = {}) {
+export function createApp({ authRoutes = authRouter, productRoutes = productRouter } = {}) {
   const app = express();
 
   // Security Headers
@@ -39,6 +40,23 @@ export function createApp({ authRoutes = authRouter } = {}) {
     legacyHeaders: false,
   });
 
+  // Rate Limiting on Public Endpoints
+  const publicLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 100, // Limit each IP to 100 requests per window
+    message: {
+      error: {
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Too many requests from this IP. Please try again after 1 minute.',
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   // Health Endpoint
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
@@ -46,6 +64,7 @@ export function createApp({ authRoutes = authRouter } = {}) {
 
   // API Routes
   app.use('/v1/auth', authLimiter, authRoutes);
+  app.use('/v1/products', publicLimiter, productRoutes);
 
   // Global Error Handler
   app.use(errorHandler);
