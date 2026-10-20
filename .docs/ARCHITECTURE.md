@@ -31,9 +31,20 @@ For architectural decisions, please refer to [ADR-005 (Backend Architecture)](#)
 
 #### Persistence
 
-- **Repositories:** `ProfileRepository`, `ProductRepository`.
+- **Repositories:** `ProfileRepository`, `ProductRepository`, `CategoryRepository`.
 
 > **Note:** `ProductRepository.findAll` explicitly filters `state = 'published' AND deleted_at IS NULL` in SQL. It does **not** rely on the RLS policy `"Published products are publicly readable"` because the backend connects with the `qatu` DB user, which is the table owner and bypasses RLS by default. RLS remains active for end-user access via Supabase.
+
+#### Catalog search and filters (US-05 / US-06)
+
+`GET /v1/products` accepts `search`, `category_id`, `min_price`, `max_price`, `seller_id`, `sort_by`, `sort_order`, `page` and `limit`. All filters are combined with `AND` and every value is passed as a bound parameter (never concatenated), except the `ORDER BY` column, which comes from a fixed whitelist.
+
+- **Keyword search** matches the product `name` and `description` and is case-insensitive. It combines two strategies inside one parenthesised condition:
+  - Full-text (`search_vector @@ plainto_tsquery('simple', ...)`) for multi-word terms in any order.
+  - `ILIKE '%term%'` for partial words, so `phone` finds "Smartphone" and "Headphones". The term is escaped with `escapeLikePattern`, so `%`, `_` and `\` are matched literally.
+- **Indexes:** the full-text GIN index (`idx_products_search`) and the trigram GIN indexes created by migration 27 (`idx_products_name_trgm`, `idx_products_description_trgm`) let PostgreSQL resolve the whole `OR` with a `BitmapOr` instead of scanning the table. `category_id` and `price` already have their own indexes.
+- **Validation:** `max_price` must be greater than or equal to `min_price` (otherwise `400 VALIDATION_ERROR` on `max_price`). An empty result is a normal `200` with `data: []`, `meta.total: 0` and `meta.total_pages: 0`.
+- **Categories:** `GET /v1/categories` lists active categories ordered by `position` and `name` so clients can build the category filter. The total is counted in a separate query, so it stays correct for out-of-range pages.
 
 ### Presentation Layer
 

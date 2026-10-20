@@ -133,6 +133,23 @@ Triggers depend on their source and target tables. The migration order ensures t
 > [!WARNING]
 > Never create a trigger before the table it fires on. Never create a trigger function that references a table that does not yet exist.
 
+## Search Indexes
+
+Migration 27 (`20261010000027-add-product-search-indexes.js`) supports the catalog keyword search (US-06):
+
+| Object                          | Definition                                                                                   |
+| ------------------------------- | -------------------------------------------------------------------------------------------- |
+| `pg_trgm` extension             | `create extension if not exists pg_trgm` (trusted extension, available on Supabase)          |
+| `idx_products_name_trgm`        | GIN `gin_trgm_ops` on `products.name`, partial: `state = 'published' and deleted_at is null` |
+| `idx_products_description_trgm` | GIN `gin_trgm_ops` on `products.description`, same partial predicate                         |
+
+They serve the `name ILIKE '%term%'` and `description ILIKE '%term%'` conditions of `ProductRepository.findAll`, which find partial words that full-text search cannot (`phone` in "Headphones"). The partial predicate matches the one the repository always applies, so PostgreSQL can use the indexes.
+
+The `down` step drops only the two indexes. The `pg_trgm` extension is kept on purpose because other objects may depend on it.
+
+> [!NOTE]
+> Benchmark on 50,000 published products with the exact repository query: about 3 ms with the trigram indexes versus about 100 ms (sequential scan) without them, for an uncommon term.
+
 ## Seeder Guidelines
 
 Seeders live in `src/infrastructure/persistence/seeders/` and follow the same timestamp naming convention.
@@ -196,6 +213,10 @@ Ensure the source and target tables exist before creating the trigger. Check mig
 ### Generated column not supported
 
 `search_vector` requires PostgreSQL 12+. Supabase uses PostgreSQL 17. Your local Docker image must use the same major version. Update `docker-compose.yml` to use `postgres:17-alpine`.
+
+### `extension "pg_trgm" is not available`
+
+Migration 27 needs the PostgreSQL `contrib` modules. The official `postgres` Docker images (including `-alpine`) and Supabase include them. If you use a minimal system install, add the contrib package (for example `postgresql-contrib` on Debian/Ubuntu) and run `pnpm db:migrate` again.
 
 ### Rollback fails
 
