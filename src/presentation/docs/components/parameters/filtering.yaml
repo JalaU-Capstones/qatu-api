@@ -1,14 +1,22 @@
 search:
   name: search
   in: query
-  description: Full-text search term applied to name and description fields.
+  description: |
+    Keyword search applied to the product name and description. Matching is
+    case-insensitive and accepts partial words (`phone` matches "Smartphone" and
+    "Headphones"). Multi-word terms also match in any order. Leading and trailing
+    whitespace is ignored and `%` / `_` are matched literally.
   required: false
   schema:
     type: string
+    maxLength: 200
   examples:
     searchExample:
       summary: Search query
       value: 'ergonomic chair'
+    partialWord:
+      summary: Partial word
+      value: 'phone'
 
 categoryId:
   name: category_id
@@ -53,7 +61,7 @@ minPrice:
 maxPrice:
   name: max_price
   in: query
-  description: Maximum price filter (inclusive).
+  description: Maximum price filter (inclusive). Must be greater than or equal to `min_price` when both are provided.
   required: false
   schema:
     type: number
@@ -155,7 +163,7 @@ sortBy:
   required: false
   schema:
     type: string
-    enum: [price, created_at, title, rating]
+    enum: [created_at, price, name, average_rating]
     default: created_at
   examples:
     sortByPrice:
@@ -165,12 +173,12 @@ sortBy:
 sortOrder:
   name: sort_order
   in: query
-  description: Sort direction.
+  description: Sort direction (case-insensitive). Newest or highest values come first by default.
   required: false
   schema:
     type: string
     enum: [asc, desc]
-    default: asc
+    default: desc
   examples:
     ascending:
       summary: Ascending

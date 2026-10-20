@@ -3,7 +3,9 @@ list:
     operationId: listCategories
     summary: List all categories
     description: |
-      Returns all active product categories. This is a public endpoint — no authentication required.
+      Returns all active product categories ordered by `position` and then by `name`.
+      This is a public endpoint — no authentication required. Use the `id` of a category
+      as the `category_id` filter of `GET /products` to browse a single category.
     tags:
       - categories
     security: []
