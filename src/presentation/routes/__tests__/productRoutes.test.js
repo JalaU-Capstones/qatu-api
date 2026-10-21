@@ -94,6 +94,27 @@ describe('Product Routes Integration - GET /v1/products', () => {
       expect(dto.max_price).toBe(100);
     });
 
+    it('should combine search, category and price range in a single request (US-06)', async () => {
+      const categoryId = '550e8400-e29b-41d4-a716-446655440000';
+
+      const response = await request(app).get('/v1/products').query({
+        search: ' phone ',
+        category_id: categoryId,
+        min_price: 100,
+        max_price: 500,
+      });
+
+      expect(response.status).toBe(200);
+      const dto = mockListProductsUseCase.execute.mock.calls[0][0];
+      expect(dto.toRepositoryParams().filters).toEqual({
+        search: 'phone',
+        categoryId,
+        minPrice: 100,
+        maxPrice: 500,
+        sellerId: undefined,
+      });
+    });
+
     it('should return empty data array with meta when no products', async () => {
       mockListProductsUseCase.execute.mockResolvedValue({
         data: [],
@@ -202,6 +223,24 @@ describe('Product Routes Integration - GET /v1/products', () => {
           }),
         ])
       );
+    });
+
+    it('should return 400 when max_price is lower than min_price', async () => {
+      const response = await request(app)
+        .get('/v1/products')
+        .query({ min_price: 500, max_price: 100 });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      expect(response.body.error.details).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: 'max_price',
+            message: 'max_price must be greater than or equal to min_price',
+          }),
+        ])
+      );
+      expect(mockListProductsUseCase.execute).not.toHaveBeenCalled();
     });
 
     it('should return 400 for invalid sort_by', async () => {

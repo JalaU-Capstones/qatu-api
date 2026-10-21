@@ -5,9 +5,14 @@ import { registerApiDocs } from './presentation/docs/swagger.js';
 import { corsMiddleware } from './presentation/middleware/corsMiddleware.js';
 import { errorHandler } from './presentation/middleware/errorHandler.js';
 import { authRouter } from './presentation/routes/authRoutes.js';
+import { categoryRouter } from './presentation/routes/categoryRoutes.js';
 import { productRouter } from './presentation/routes/productRoutes.js';
 
-export function createApp({ authRoutes = authRouter, productRoutes = productRouter } = {}) {
+export function createApp({
+  authRoutes = authRouter,
+  productRoutes = productRouter,
+  categoryRoutes = categoryRouter,
+} = {}) {
   const app = express();
 
   // Security Headers
@@ -65,6 +70,7 @@ export function createApp({ authRoutes = authRouter, productRoutes = productRout
   // API Routes
   app.use('/v1/auth', authLimiter, authRoutes);
   app.use('/v1/products', publicLimiter, productRoutes);
+  app.use('/v1/categories', publicLimiter, categoryRoutes);
 
   // Global Error Handler
   app.use(errorHandler);

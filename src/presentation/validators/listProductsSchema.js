@@ -20,10 +20,19 @@ export const listProductsSchema = Joi.object({
     'number.base': 'min_price must be a number',
     'number.min': 'min_price must be at least 0',
   }),
-  max_price: Joi.number().min(0).optional().messages({
-    'number.base': 'max_price must be a number',
-    'number.min': 'max_price must be at least 0',
-  }),
+  max_price: Joi.number()
+    .min(0)
+    .when('min_price', {
+      is: Joi.exist(),
+      then: Joi.number()
+        .min(Joi.ref('min_price'))
+        .messages({ 'number.min': 'max_price must be greater than or equal to min_price' }),
+    })
+    .optional()
+    .messages({
+      'number.base': 'max_price must be a number',
+      'number.min': 'max_price must be at least 0',
+    }),
   seller_id: Joi.string().uuid().optional().messages({
     'string.guid': 'seller_id must be a valid UUID',
   }),

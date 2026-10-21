@@ -4,7 +4,10 @@ list:
     summary: List products (public catalog)
     description: |
       Returns a paginated list of published products. Public endpoint — no authentication required.
-      Supports filtering by category, price range, seller, and full-text search.
+      Supports keyword search (name and description, partial words accepted), filtering by
+      category, price range, and seller, and sorting. All filters can be combined and are
+      applied with `AND`. When nothing matches, the response is `200` with `data: []` and
+      `meta.total: 0`.
     tags:
       - products
     security: []

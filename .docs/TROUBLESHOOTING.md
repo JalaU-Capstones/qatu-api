@@ -12,7 +12,9 @@
 - **RLS blocking access:** Verify the current user context. In the SQL editor, `auth.uid()` returns null unless you impersonate a user.
 - **Trigger creation fails:** Ensure the source and target tables exist before creating the trigger.
 - **Generated column not supported:** `search_vector` requires PostgreSQL 12+. Supabase uses PostgreSQL 17. Local Docker must use the same major version.
+- **`extension "pg_trgm" is not available`:** Migration 27 (search indexes) needs the PostgreSQL `contrib` modules. Official Docker images and Supabase include them; on a bare system install add `postgresql-contrib`.
 - **Rollback fails:** Ensure `down` uses `IF EXISTS` for all `DROP` statements.
+- **`password authentication failed for user "qatu"` on `make db-migrate` / `make db-seed`:** Another PostgreSQL (for example the system service) is listening on port 5432 instead of the Docker container. Stop it (`sudo service postgresql stop`) or change the host port in `docker-compose.yml` and `DATABASE_URL`, then run `make docker-up`.
 - **Seeder runs in production:** The admin user seeder checks `NODE_ENV`. Verify the environment variable is set to `production` in the deployment.
 - **`module is not defined in ES module scope`:** Do not remove `src/infrastructure/persistence/migrations/package.json` which sets `"type": "commonjs"`.
 

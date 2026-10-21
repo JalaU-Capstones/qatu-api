@@ -1,8 +1,11 @@
 import { URL } from 'node:url';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { Sequelize } from 'sequelize';
+import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { createApp } from '../../../../app.js';
 import { Product } from '../../../../domain/entities/Product.js';
+import { createProductRouter } from '../../../../presentation/routes/productRoutes.js';
 import { ProductRepository } from '../ProductRepository.js';
 
 const SCHEMA_SQL = `
@@ -82,6 +85,13 @@ const SCHEMA_SQL = `
     unique (seller_id, slug)
   );
   create index if not exists idx_products_search on public.products using gin (search_vector);
+  create extension if not exists pg_trgm;
+  create index if not exists idx_products_name_trgm
+    on public.products using gin (name gin_trgm_ops)
+    where state = 'published' and deleted_at is null;
+  create index if not exists idx_products_description_trgm
+    on public.products using gin (description gin_trgm_ops)
+    where state = 'published' and deleted_at is null;
 `;
 
 const CLEAN_SQL = `
@@ -345,5 +355,199 @@ describe('ProductRepository (integration)', () => {
     });
 
     expect(result).toEqual({ items: [], total: 0 });
+  });
+
+  describe('US-06 search and filters', () => {
+    const idsOf = (result) => result.items.map((p) => p.id).sort();
+
+    it('Scenario: search by keyword matches partial words in the name ("phone" -> Headphones)', async () => {
+      const result = await repository.findAll({ filters: { search: 'phone' } });
+
+      expect(result.total).toBe(1);
+      expect(idsOf(result)).toEqual([PRODUCT_1_ID]);
+    });
+
+    it('matches partial words in the description ("cancell" -> "cancelling")', async () => {
+      const result = await repository.findAll({ filters: { search: 'cancell' } });
+
+      expect(idsOf(result)).toEqual([PRODUCT_1_ID]);
+    });
+
+    it('is case-insensitive', async () => {
+      const upper = await repository.findAll({ filters: { search: 'HEADPHONES' } });
+      const mixed = await repository.findAll({ filters: { search: 'mEcHaNiCaL' } });
+
+      expect(idsOf(upper)).toEqual([PRODUCT_1_ID]);
+      expect(idsOf(mixed)).toEqual([PRODUCT_3_ID]);
+    });
+
+    it('matches multi-word queries regardless of word order', async () => {
+      const result = await repository.findAll({ filters: { search: 'keyboard mechanical' } });
+
+      expect(idsOf(result)).toEqual([PRODUCT_3_ID]);
+    });
+
+    it('never returns draft or soft-deleted products, even when they match', async () => {
+      const draft = await repository.findAll({ filters: { search: 'standing desk' } });
+      const deleted = await repository.findAll({ filters: { search: 'webcam' } });
+
+      expect(draft).toEqual({ items: [], total: 0 });
+      expect(deleted).toEqual({ items: [], total: 0 });
+    });
+
+    it('treats LIKE wildcards in the search term as literal characters', async () => {
+      const percent = await repository.findAll({ filters: { search: '%' } });
+      const underscore = await repository.findAll({ filters: { search: '_' } });
+      const backslash = await repository.findAll({ filters: { search: '\\' } });
+
+      expect(percent.total).toBe(0);
+      expect(underscore.total).toBe(0);
+      expect(backslash.total).toBe(0);
+    });
+
+    it('is not vulnerable to SQL injection through the search term', async () => {
+      const result = await repository.findAll({
+        filters: { search: "'; DROP TABLE products; --" },
+      });
+
+      expect(result).toEqual({ items: [], total: 0 });
+      const all = await repository.findAll({});
+      expect(all.total).toBe(3);
+    });
+
+    it('Scenario: filter by category returns only that category', async () => {
+      const electronics = await repository.findAll({ filters: { categoryId: CATEGORY_1_ID } });
+      const books = await repository.findAll({ filters: { categoryId: CATEGORY_2_ID } });
+
+      expect(idsOf(electronics)).toEqual([PRODUCT_1_ID, PRODUCT_3_ID].sort());
+      expect(idsOf(books)).toEqual([PRODUCT_2_ID]);
+    });
+
+    it('Scenario: filter by price range is inclusive on both ends', async () => {
+      const range = await repository.findAll({ filters: { minPrice: 50, maxPrice: 120 } });
+      const exact = await repository.findAll({ filters: { minPrice: 99.99, maxPrice: 99.99 } });
+
+      expect(idsOf(range)).toEqual([PRODUCT_1_ID]);
+      expect(idsOf(exact)).toEqual([PRODUCT_1_ID]);
+    });
+
+    it('supports only min_price or only max_price', async () => {
+      const onlyMin = await repository.findAll({ filters: { minPrice: 100 } });
+      const onlyMax = await repository.findAll({ filters: { maxPrice: 60 } });
+
+      expect(idsOf(onlyMin)).toEqual([PRODUCT_3_ID]);
+      expect(idsOf(onlyMax)).toEqual([PRODUCT_2_ID]);
+    });
+
+    it('Scenario: combined search, category and price range match all criteria', async () => {
+      const match = await repository.findAll({
+        filters: { search: 'phone', categoryId: CATEGORY_1_ID, minPrice: 50, maxPrice: 120 },
+      });
+      const wrongCategory = await repository.findAll({
+        filters: { search: 'phone', categoryId: CATEGORY_2_ID, minPrice: 50, maxPrice: 120 },
+      });
+      const wrongPrice = await repository.findAll({
+        filters: { search: 'phone', categoryId: CATEGORY_1_ID, minPrice: 100, maxPrice: 500 },
+      });
+
+      expect(idsOf(match)).toEqual([PRODUCT_1_ID]);
+      expect(wrongCategory.total).toBe(0);
+      expect(wrongPrice.total).toBe(0);
+    });
+
+    it('keeps total consistent with the filters when paginating search results', async () => {
+      const page1 = await repository.findAll({
+        page: 1,
+        limit: 1,
+        filters: { categoryId: CATEGORY_1_ID },
+        sort: { field: 'price', order: 'asc' },
+      });
+      const page2 = await repository.findAll({
+        page: 2,
+        limit: 1,
+        filters: { categoryId: CATEGORY_1_ID },
+        sort: { field: 'price', order: 'asc' },
+      });
+
+      expect(page1.total).toBe(2);
+      expect(page2.total).toBe(2);
+      expect(page1.items[0].id).toBe(PRODUCT_1_ID);
+      expect(page2.items[0].id).toBe(PRODUCT_3_ID);
+    });
+
+    it('Scenario: no results returns an empty page', async () => {
+      const result = await repository.findAll({ filters: { search: 'zzzzzz-no-match' } });
+
+      expect(result).toEqual({ items: [], total: 0 });
+    });
+  });
+
+  describe('US-06 GET /v1/products through the full HTTP stack', () => {
+    let app;
+
+    beforeEach(() => {
+      app = createApp({
+        productRoutes: createProductRouter({ productRepository: repository }),
+      });
+    });
+
+    it('Scenario: search by keyword', async () => {
+      const response = await request(app).get('/v1/products').query({ search: 'phone' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.map((p) => p.id)).toEqual([PRODUCT_1_ID]);
+      expect(response.body.meta).toEqual({ page: 1, per_page: 20, total: 1, total_pages: 1 });
+    });
+
+    it('Scenario: filter by category', async () => {
+      const response = await request(app).get('/v1/products').query({ category_id: CATEGORY_2_ID });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.map((p) => p.id)).toEqual([PRODUCT_2_ID]);
+      expect(response.body.data[0].category_id).toBe(CATEGORY_2_ID);
+    });
+
+    it('Scenario: filter by price range', async () => {
+      const response = await request(app)
+        .get('/v1/products')
+        .query({ min_price: 100, max_price: 500 });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.map((p) => p.id)).toEqual([PRODUCT_3_ID]);
+      for (const product of response.body.data) {
+        expect(product.price).toBeGreaterThanOrEqual(100);
+        expect(product.price).toBeLessThanOrEqual(500);
+      }
+    });
+
+    it('Scenario: combined search and filters', async () => {
+      const response = await request(app).get('/v1/products').query({
+        search: 'phone',
+        category_id: CATEGORY_1_ID,
+        min_price: 50,
+        max_price: 120,
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.map((p) => p.id)).toEqual([PRODUCT_1_ID]);
+      expect(response.body.meta.total).toBe(1);
+    });
+
+    it('Scenario: no results returns an empty list with total_pages 0', async () => {
+      const response = await request(app).get('/v1/products').query({ search: 'zzzzzz-no-match' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toEqual([]);
+      expect(response.body.meta).toEqual({ page: 1, per_page: 20, total: 0, total_pages: 0 });
+    });
+
+    it('rejects an inverted price range with 400', async () => {
+      const response = await request(app)
+        .get('/v1/products')
+        .query({ min_price: 500, max_price: 100 });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    });
   });
 });

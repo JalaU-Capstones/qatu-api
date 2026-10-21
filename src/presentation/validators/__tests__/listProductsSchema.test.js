@@ -133,6 +133,34 @@ describe('listProductsSchema', () => {
       expect(error).toBeDefined();
       expect(error.details[0].message).toBe('min_price must be a number');
     });
+
+    it('should accept max_price equal to min_price', () => {
+      const { error, value } = listProductsSchema.validate({ min_price: 100, max_price: 100 });
+      expect(error).toBeUndefined();
+      expect(value.min_price).toBe(100);
+      expect(value.max_price).toBe(100);
+    });
+
+    it('should accept max_price without min_price', () => {
+      const { error, value } = listProductsSchema.validate({ max_price: 500 });
+      expect(error).toBeUndefined();
+      expect(value.max_price).toBe(500);
+    });
+
+    it('should reject max_price lower than min_price', () => {
+      const { error } = listProductsSchema.validate({ min_price: 500, max_price: 100 });
+      expect(error).toBeDefined();
+      expect(error.details[0].path).toEqual(['max_price']);
+      expect(error.details[0].message).toBe('max_price must be greater than or equal to min_price');
+    });
+
+    it('should compare prices numerically when they arrive as query strings', () => {
+      const ok = listProductsSchema.validate({ min_price: '9', max_price: '10' });
+      expect(ok.error).toBeUndefined();
+
+      const bad = listProductsSchema.validate({ min_price: '10', max_price: '9' });
+      expect(bad.error).toBeDefined();
+    });
   });
 
   describe('seller_id', () => {

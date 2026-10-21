@@ -71,6 +71,28 @@ curl -s 'http://localhost:3000/v1/products?page=1&limit=20' | jq
 
 Expected: `200` with `meta.total = 25` (from the sample seeder) and `meta.total_pages = 2`.
 
+### Verify search and filters
+
+With the same seeded data you can try the US-06 scenarios:
+
+```bash
+# Keyword search (partial words work: "phone" finds "Headphones")
+curl -s 'http://localhost:3000/v1/products?search=phone' | jq '{total: .meta.total, names: [.data[].name]}'
+
+# Filter by category (take the id from GET /v1/categories)
+curl -s 'http://localhost:3000/v1/categories' | jq '.data[] | {id, name}'
+curl -s "http://localhost:3000/v1/products?category_id=<CATEGORY_ID>" | jq '.meta'
+
+# Price range and combined filters
+curl -s 'http://localhost:3000/v1/products?min_price=100&max_price=500' | jq '.meta'
+curl -s "http://localhost:3000/v1/products?search=phone&category_id=<CATEGORY_ID>&min_price=100&max_price=500" | jq '.meta'
+
+# No results: 200 with an empty list
+curl -s 'http://localhost:3000/v1/products?search=zzzzzz' | jq '{data, meta}'
+```
+
+An inverted range (`min_price=500&max_price=100`) returns `400 VALIDATION_ERROR`.
+
 ## Available Scripts
 
 Check the `Makefile` for available commands by running:
@@ -125,9 +147,10 @@ The REST API contract is defined using **OpenAPI 3.1.0** and served interactivel
 
 ### Catalog
 
-| Method | Endpoint       | Auth | Description                                                                                                                                                    |
-| ------ | -------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/v1/products` | None | Paginated list of published products. Supports filters (`search`, `category_id`, `min_price`, `max_price`, `seller_id`) and sorting (`sort_by`, `sort_order`). |
+| Method | Endpoint         | Auth | Description                                                                                                                                                    |
+| ------ | ---------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/v1/products`   | None | Paginated list of published products. Supports filters (`search`, `category_id`, `min_price`, `max_price`, `seller_id`) and sorting (`sort_by`, `sort_order`). |
+| GET    | `/v1/categories` | None | Paginated list of active categories, ordered by `position`. Use a category `id` as `category_id` to filter products.                                           |
 
 ### OpenAPI Commands
 

@@ -9,6 +9,17 @@ const SORT_COLUMNS = new Map([
   ['average_rating', 'p.average_rating'],
 ]);
 
+/**
+ * Escapes the LIKE/ILIKE wildcards so user input is always matched literally
+ * PostgreSQL uses backslash as the default escape character.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+export function escapeLikePattern(value) {
+  return String(value).replace(/[\\%_]/g, (char) => `\\${char}`);
+}
+
 export class ProductRepository extends IProductRepository {
   /**
    * @param {Object} [options]
@@ -91,8 +102,13 @@ export class ProductRepository extends IProductRepository {
 
     const search = filters?.search;
     if (typeof search === 'string' && search.trim() !== '') {
-      whereClauses.push("p.search_vector @@ plainto_tsquery('simple', :search)");
-      replacements.search = search.trim();
+      const term = search.trim();
+      whereClauses.push(
+        "(p.search_vector @@ plainto_tsquery('simple', :search)" +
+          ' OR p.name ILIKE :searchPattern OR p.description ILIKE :searchPattern)'
+      );
+      replacements.search = term;
+      replacements.searchPattern = `%${escapeLikePattern(term)}%`;
     }
 
     const categoryId = filters?.categoryId ?? filters?.category_id;
