@@ -112,6 +112,28 @@ describe('ProfileRepository', () => {
       expect(result.username).toBe(sampleProfile.username);
     });
 
+    it('should bind a SQL-like full name as a replacement and not interpolate it', async () => {
+      const payload = "Robert'); DROP TABLE profiles;--";
+      const profile = new Profile({
+        id: sampleDbRow.id,
+        username: sampleDbRow.username,
+        fullName: payload,
+        email: sampleDbRow.email,
+      });
+
+      mockDb.query
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[{ ...sampleDbRow, full_name: payload }]])
+        .mockResolvedValueOnce([[]]);
+
+      await repository.create(profile);
+
+      const [sql, options] = mockDb.query.mock.calls[1];
+      expect(sql).toContain(':full_name');
+      expect(sql).not.toContain('DROP TABLE');
+      expect(options.replacements.full_name).toBe(payload);
+    });
+
     it('should propagate error when database query fails during create', async () => {
       mockDb.query.mockRejectedValueOnce(new Error('Connection terminated unexpectedly'));
 
