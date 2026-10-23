@@ -29,7 +29,10 @@ register:
                 type: string
                 format: password
                 minLength: 8
-                description: Secure password for authentication.
+                pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$'
+                description: |
+                  At least 8 characters, with one uppercase letter, one lowercase letter,
+                  one number, and one special character.
                 examples:
                   - 'StrongPassword123!'
               username:
@@ -42,7 +45,10 @@ register:
                   - 'john_doe'
               full_name:
                 type: string
-                description: Optional display full name.
+                maxLength: 100
+                description: |
+                  Optional display name. Empty is allowed. When non-empty, length is 2 to 100.
+                  The value is stored as data and is not executed as SQL.
                 examples:
                   - 'John Doe'
             additionalProperties: false
@@ -115,7 +121,8 @@ login:
               password:
                 type: string
                 format: password
-                description: Account password.
+                minLength: 1
+                description: Account password. Required and non-empty. It is not parsed as SQL.
                 examples:
                   - 'StrongPassword123!'
             additionalProperties: false
