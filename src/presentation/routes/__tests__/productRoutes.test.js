@@ -137,6 +137,15 @@ describe('Product Routes Integration - GET /v1/products', () => {
       const dto = mockListProductsUseCase.execute.mock.calls[0][0];
       expect(dto.unknown_field).toBeUndefined();
     });
+
+    it('should treat a SQL-looking search as data and still return 200 (US-24)', async () => {
+      const payload = "'; DROP TABLE products;--";
+      const response = await request(app).get('/v1/products').query({ search: payload });
+
+      expect(response.status).toBe(200);
+      const dto = mockListProductsUseCase.execute.mock.calls[0][0];
+      expect(dto.search).toBe(payload);
+    });
   });
 
   describe('Validation errors (400)', () => {
@@ -243,6 +252,24 @@ describe('Product Routes Integration - GET /v1/products', () => {
       expect(mockListProductsUseCase.execute).not.toHaveBeenCalled();
     });
 
+    it('should return 400 when search is longer than 200 characters', async () => {
+      const response = await request(app)
+        .get('/v1/products')
+        .query({ search: 'a'.repeat(201) });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      expect(response.body.error.details).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: 'search',
+            message: 'search must be at most 200 characters',
+          }),
+        ])
+      );
+      expect(mockListProductsUseCase.execute).not.toHaveBeenCalled();
+    });
+
     it('should return 400 for invalid sort_by', async () => {
       const response = await request(app).get('/v1/products').query({ sort_by: 'invalid_column' });
 
@@ -254,6 +281,24 @@ describe('Product Routes Integration - GET /v1/products', () => {
           }),
         ])
       );
+    });
+
+    it('should reject a SQL-looking sort_by with a field error and not query (US-24)', async () => {
+      const response = await request(app)
+        .get('/v1/products')
+        .query({ sort_by: 'price; DROP TABLE products' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      expect(response.body.error.details).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            field: 'sort_by',
+            message: 'sort_by must be one of created_at, price, name, average_rating',
+          }),
+        ])
+      );
+      expect(mockListProductsUseCase.execute).not.toHaveBeenCalled();
     });
 
     it('should return 400 for invalid sort_order', async () => {
