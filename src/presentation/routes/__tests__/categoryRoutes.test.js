@@ -81,6 +81,24 @@ describe('Category Routes Integration - GET /v1/categories', () => {
     expect(mockListCategoriesUseCase.execute).not.toHaveBeenCalled();
   });
 
+  it('should return 400 when page looks like SQL and not call the use case (US-24)', async () => {
+    const response = await request(app)
+      .get('/v1/categories')
+      .query({ page: '1; DROP TABLE categories' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(response.body.error.details).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          field: 'page',
+          message: 'page must be a number',
+        }),
+      ])
+    );
+    expect(mockListCategoriesUseCase.execute).not.toHaveBeenCalled();
+  });
+
   it('should return 500 with the standard error envelope when the use case fails', async () => {
     mockListCategoriesUseCase.execute.mockRejectedValue(new Error('db down'));
 
