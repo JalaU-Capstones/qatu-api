@@ -12,7 +12,9 @@ export const listProductsSchema = Joi.object({
     'number.min': 'limit must be at least 1',
     'number.max': 'limit must be at most 100',
   }),
-  search: Joi.string().trim().max(200).allow('', null).optional(),
+  search: Joi.string().trim().max(200).allow('', null).optional().messages({
+    'string.max': 'search must be at most 200 characters',
+  }),
   category_id: Joi.string().uuid().optional().messages({
     'string.guid': 'category_id must be a valid UUID',
   }),

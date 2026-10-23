@@ -101,7 +101,7 @@ Files use PascalCase for classes (e.g., `PlaceOrderUseCase.js`, `UserRepository.
 
 - **Authentication:** Handled via Supabase Auth in the Infrastructure layer. A custom middleware in the Presentation layer verifies the JWT token.
 - **Authorization:** Enforced at the database level using PostgreSQL Row Level Security (RLS). Policies are established in migrations.
-- **Validation:** Conducted in the Presentation layer using Joi schemas before requests reach the Application layer.
+- **Validation (US-24):** Every route that accepts a body, query, or path value runs `validateRequest` with a Joi schema before the use case. Invalid input returns `400` with `error.code = VALIDATION_ERROR` and `error.details[]` (`field`, `message`). Unknown fields are stripped. Repositories send user values only through Sequelize `replacements` (`:name` placeholders). `sort_by` is an allow-list, and `LIKE` wildcards in search are escaped. A payload such as `'; DROP TABLE products;--` is stored or searched as text.
 - **API Specification:** Modular OpenAPI 3.1.0 contract maintained in `src/presentation/docs/` as the single source of truth; served via Swagger UI at `/api-docs`.
 - **Logging:** Centralized using Pino across all layers for consistent and performant logging.
 - **Messaging:** Treated as an infrastructure concern using RabbitMQ. Publishers and consumers live in the Infrastructure layer.

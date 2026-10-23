@@ -87,6 +87,14 @@ describe('listProductsSchema', () => {
     it('should reject search longer than 200 characters', () => {
       const { error } = listProductsSchema.validate({ search: 'a'.repeat(201) });
       expect(error).toBeDefined();
+      expect(error.details[0].message).toBe('search must be at most 200 characters');
+    });
+
+    it('should keep a SQL-looking search string as data', () => {
+      const payload = "'; DROP TABLE products;--";
+      const { error, value } = listProductsSchema.validate({ search: payload });
+      expect(error).toBeUndefined();
+      expect(value.search).toBe(payload);
     });
   });
 

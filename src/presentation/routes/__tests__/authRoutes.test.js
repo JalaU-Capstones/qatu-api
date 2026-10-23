@@ -138,6 +138,52 @@ describe('Auth Routes Integration - POST /v1/auth/register', () => {
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
   });
 
+  it('Scenario: SQL-looking email is rejected with a field error (US-24)', async () => {
+    const response = await request(app)
+      .post('/v1/auth/register')
+      .send({
+        ...validRegistrationPayload,
+        email: "'; DROP TABLE users;--",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(response.body.error.details).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'email' })])
+    );
+    expect(mockAuthService.registerUser).not.toHaveBeenCalled();
+  });
+
+  it('Scenario: SQL-looking username is rejected with a field error (US-24)', async () => {
+    const response = await request(app)
+      .post('/v1/auth/register')
+      .send({
+        ...validRegistrationPayload,
+        username: "admin'; DROP TABLE users;--",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.details).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'username' })])
+    );
+    expect(mockAuthService.registerUser).not.toHaveBeenCalled();
+  });
+
+  it('Scenario: SQL-looking full name is stored as data (US-24)', async () => {
+    const payload = "Robert'); DROP TABLE profiles;--";
+    const response = await request(app)
+      .post('/v1/auth/register')
+      .send({
+        ...validRegistrationPayload,
+        full_name: payload,
+      });
+
+    expect(response.status).toBe(201);
+    const savedProfile = mockProfileRepository.create.mock.calls[0][0];
+    expect(savedProfile.full_name).toBe(payload);
+    expect(mockAuthService.registerUser.mock.calls[0][0].metadata.full_name).toBe(payload);
+  });
+
   it('Scenario: Missing required fields (400)', async () => {
     const response = await request(app).post('/v1/auth/register').send({
       email: 'user@example.com',

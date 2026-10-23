@@ -93,6 +93,19 @@ curl -s 'http://localhost:3000/v1/products?search=zzzzzz' | jq '{data, meta}'
 
 An inverted range (`min_price=500&max_price=100`) returns `400 VALIDATION_ERROR`.
 
+### Verify input validation
+
+```bash
+# Malformed query: 400 and the field name
+curl -s 'http://localhost:3000/v1/products?page=abc' | jq '.error'
+
+# SQL text in search is data: 200, the statement is not executed
+curl -sG 'http://localhost:3000/v1/products' --data-urlencode "search='; DROP TABLE products;--" | jq '.meta'
+
+# sort_by outside the allow-list: 400
+curl -s 'http://localhost:3000/v1/products?sort_by=price;DROP' | jq '.error.details'
+```
+
 ## Available Scripts
 
 Check the `Makefile` for available commands by running:

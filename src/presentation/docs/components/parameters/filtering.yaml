@@ -5,7 +5,9 @@ search:
     Keyword search applied to the product name and description. Matching is
     case-insensitive and accepts partial words (`phone` matches "Smartphone" and
     "Headphones"). Multi-word terms also match in any order. Leading and trailing
-    whitespace is ignored and `%` / `_` are matched literally.
+    whitespace is ignored and `%` / `_` are matched literally. The value is bound
+    as a SQL parameter. Quotes, comments, and statements such as `DROP TABLE`
+    are searched as text and are never executed. Maximum length is 200 characters.
   required: false
   schema:
     type: string

@@ -144,6 +144,20 @@ describe('ProductRepository (unit)', () => {
       expect(sql).toContain('p.price <= :maxPrice');
     });
 
+    it('should bind a SQL injection attempt as data and never interpolate it into the query', async () => {
+      const payload = "'; DROP TABLE products;--";
+      mockDb.query.mockResolvedValueOnce([[sampleDbRow]]);
+
+      await repository.findAll({ filters: { search: payload } });
+
+      const [sql, options] = mockDb.query.mock.calls[0];
+      expect(sql).not.toContain('DROP TABLE');
+      expect(sql).toContain(':search');
+      expect(sql).toContain(':searchPattern');
+      expect(options.replacements.search).toBe(payload);
+      expect(options.replacements.searchPattern).toBe(`%${escapeLikePattern(payload)}%`);
+    });
+
     it('should escape LIKE wildcards so user input is matched literally', async () => {
       mockDb.query.mockResolvedValueOnce([[sampleDbRow]]);
 

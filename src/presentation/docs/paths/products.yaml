@@ -7,7 +7,10 @@ list:
       Supports keyword search (name and description, partial words accepted), filtering by
       category, price range, and seller, and sorting. All filters can be combined and are
       applied with `AND`. When nothing matches, the response is `200` with `data: []` and
-      `meta.total: 0`.
+      `meta.total: 0`. Query values are validated with Joi before they reach the
+      database. Free-text `search` is a bound parameter. `sort_by` accepts only
+      `created_at`, `price`, `name`, and `average_rating`. Invalid values return
+      `400` with `error.details[]` naming each field.
     tags:
       - products
     security: []
