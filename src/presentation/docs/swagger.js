@@ -38,18 +38,36 @@ export function registerApiDocs(app) {
     return;
   }
 
-  const swaggerUiHandler = swaggerUi.setup(activeSpec, {
+  const options = {
     customSiteTitle: 'Qatu Marketplace API',
+    customCssUrl: 'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui.min.css',
+    customJs: [
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui-bundle.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui-standalone-preset.js',
+    ],
     swaggerOptions: {
+      url: '/api-docs/openapi.json',
       persistAuthorization: true,
       displayRequestDuration: true,
       filter: true,
       tryItOutEnabled: true,
     },
-  });
+  };
 
-  app.get('/api-docs', swaggerUiHandler);
-  app.use('/api-docs', swaggerUi.serve, swaggerUiHandler);
+  const swaggerUiHandler = swaggerUi.setup(null, options);
 
   app.get('/api-docs/openapi.json', (req, res) => res.json(activeSpec));
+
+  app.use(
+    '/api-docs',
+    (req, res, next) => {
+      res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline'; img-src 'self' data: https:;"
+      );
+      next();
+    },
+    swaggerUi.serve,
+    swaggerUiHandler
+  );
 }
