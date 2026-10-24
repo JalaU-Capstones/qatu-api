@@ -46,33 +46,35 @@ export class AddToCartResponseDTO {
   /**
    * @param {Object} params
    * @param {CartItem} params.item - Cart item entity
-   * @param {number} params.itemCount - Total number of cart items for the user
    */
-  constructor({ item, itemCount }) {
+  constructor({ item } = {}) {
+    if (!item) {
+      throw new Error('item is required');
+    }
     this.item = item;
-    this.itemCount = Number(itemCount ?? 0);
 
     Object.freeze(this);
   }
 
   /**
-   * Returns a snake_case JSON representation for the API response.
+   * Returns a snake_case JSON representation for the API response matching CartItem schema.
    *
-   * @returns {{ item: { id: string|null, product_id: string, quantity: number, created_at: string|null, updated_at: string|null }, cart: { item_count: number } }}
+   * @returns {{ id: string|null, user_id: string, product_id: string, quantity: number, created_at: string|null, updated_at: string|null }}
    */
   toJSON() {
-    const item = this.item;
     return {
-      item: {
-        id: item.id,
-        product_id: item.productId,
-        quantity: item.quantity,
-        created_at: item.createdAt instanceof Date ? item.createdAt.toISOString() : item.createdAt,
-        updated_at: item.updatedAt instanceof Date ? item.updatedAt.toISOString() : item.updatedAt,
-      },
-      cart: {
-        item_count: this.itemCount,
-      },
+      id: this.item.id,
+      user_id: this.item.userId,
+      product_id: this.item.productId,
+      quantity: this.item.quantity,
+      created_at:
+        this.item.createdAt instanceof Date
+          ? this.item.createdAt.toISOString()
+          : this.item.createdAt,
+      updated_at:
+        this.item.updatedAt instanceof Date
+          ? this.item.updatedAt.toISOString()
+          : this.item.updatedAt,
     };
   }
 }

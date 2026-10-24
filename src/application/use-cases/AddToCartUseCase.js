@@ -64,8 +64,7 @@ export class AddToCartUseCase {
     }
 
     const updatedItem = await this.cartRepository.incrementQuantity({ userId, productId, delta });
-    const itemCount = await this.cartRepository.countByUser(userId);
 
-    return new AddToCartResponseDTO({ item: updatedItem, itemCount });
+    return new AddToCartResponseDTO({ item: updatedItem });
   }
 }
