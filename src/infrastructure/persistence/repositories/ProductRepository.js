@@ -70,6 +70,42 @@ export class ProductRepository extends IProductRepository {
   }
 
   /**
+   * Find a single, non-deleted product by its UUID.
+   * Does NOT filter by `state` — the caller decides whether unpublished products are acceptable.
+   *
+   * @param {string} productId
+   * @returns {Promise<Product|null>}
+   */
+  async findById(productId) {
+    const sql = `
+  SELECT
+    p.id, p.seller_id, p.category_id, p.name, p.slug, p.description,
+    p.price, p.currency, p.stock, p.attributes, p.primary_image_path,
+    p.state, p.average_rating, p.ratings_count, p.published_at,
+    p.created_at, p.updated_at
+  FROM public.products p
+  WHERE p.id = :productId AND p.deleted_at IS NULL
+  LIMIT 1
+`;
+
+    const queryResult = await this.db.query(sql, {
+      replacements: { productId },
+    });
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    return this.toDomain(rows[0]);
+  }
+
+  /**
    * @param {Object} params
    * @param {number} [params.page=1]
    * @param {number} [params.limit=20]

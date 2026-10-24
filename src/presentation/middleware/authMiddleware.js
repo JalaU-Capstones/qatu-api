@@ -1,73 +1,42 @@
-import jwt from 'jsonwebtoken';
-import { env } from '../../infrastructure/config/env.js';
+import { supabase } from '../../infrastructure/config/supabase.js';
 
 /**
- * Express middleware to verify Supabase JWTs and enforce expiration.
+ * Express middleware that verifies Supabase JWTs via the Supabase Auth API.
+ * Supabase v2 signs JWTs with ES256 (asymmetric). Verifying locally with a
+ * shared secret (jsonwebtoken + HS256) does not work and must not be reintroduced.
  *
  * @param {import('express').Request} req
  * @param {import('express').Response} res
  * @param {import('express').NextFunction} next
  */
-export function authMiddleware(req, res, next) {
+export async function authMiddleware(req, res, next) {
   const timestamp = new Date().toISOString();
   const authHeader = req.headers?.authorization;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
-      error: {
-        code: 'UNAUTHORIZED',
-        message: 'Authentication failed',
-      },
+  const unauthorized = () =>
+    res.status(401).json({
+      error: { code: 'UNAUTHORIZED', message: 'Authentication failed' },
       meta: { timestamp },
     });
-  }
 
-  const token = authHeader.split(' ')[1]?.trim();
-
-  if (!token) {
-    return res.status(401).json({
-      error: {
-        code: 'UNAUTHORIZED',
-        message: 'Authentication failed',
-      },
-      meta: { timestamp },
-    });
-  }
-
-  const secret = process.env.JWT_SECRET || env.JWT_SECRET;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return unauthorized();
+  const token = authHeader.slice('Bearer '.length).trim();
+  if (!token) return unauthorized();
 
   try {
-    const decoded = jwt.verify(token, secret, {
-      algorithms: ['HS256'],
-      ignoreExpiration: true,
-    });
-
-    const nowSeconds = Math.floor(Date.now() / 1000);
-    if (!decoded || typeof decoded.exp !== 'number' || decoded.exp <= nowSeconds) {
-      return res.status(401).json({
-        error: {
-          code: 'UNAUTHORIZED',
-          message: 'Authentication failed',
-        },
-        meta: { timestamp },
-      });
-    }
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data?.user?.id) return unauthorized();
 
     req.user = {
-      id: decoded.sub,
-      role: decoded.role,
-      email: decoded.email,
+      id: data.user.id,
+      // App role lives in user_metadata; fall back to Supabase's "authenticated" role.
+      role: data.user.user_metadata?.role ?? data.user.role ?? null,
+      email: data.user.email ?? null,
     };
 
     return next();
   } catch {
-    return res.status(401).json({
-      error: {
-        code: 'UNAUTHORIZED',
-        message: 'Authentication failed',
-      },
-      meta: { timestamp },
-    });
+    return unauthorized();
   }
 }
 

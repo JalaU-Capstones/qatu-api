@@ -2,10 +2,9 @@ type: object
 description: An item in a buyer's shopping cart.
 required:
   - id
-  - profile_id
+  - user_id
   - product_id
   - quantity
-  - saved_for_later
   - created_at
   - updated_at
 properties:
@@ -16,11 +15,11 @@ properties:
     description: Unique identifier of the cart item.
     examples:
       - '5b4a3c2d-1e0f-9a8b-7c6d-5e4f3a2b1c0d'
-  profile_id:
+  user_id:
     type: string
     format: uuid
     readOnly: true
-    description: Profile identifier of the buyer who owns the cart item.
+    description: Unique identifier of the user who owns the cart item.
     examples:
       - 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
   product_id:
@@ -36,12 +35,6 @@ properties:
     description: Desired purchase quantity for this product.
     examples:
       - 2
-  saved_for_later:
-    type: boolean
-    default: false
-    description: Indicates whether this item is stored for future consideration rather than active checkout.
-    examples:
-      - false
   product:
     $ref: './Product.yaml'
     description: Optional populated product details.

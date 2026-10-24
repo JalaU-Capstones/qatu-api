@@ -1,15 +1,22 @@
-import jwt from 'jsonwebtoken';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { supabase } from '../../../infrastructure/config/supabase.js';
 import { authMiddleware, requireAuth } from '../authMiddleware.js';
 
+vi.mock('../../../infrastructure/config/supabase.js', () => ({
+  supabase: {
+    auth: {
+      getUser: vi.fn(),
+    },
+  },
+}));
+
 describe('authMiddleware', () => {
-  const secret = 'test-secret-key';
   let req;
   let res;
   let next;
 
   beforeEach(() => {
-    process.env.JWT_SECRET = secret;
+    vi.clearAllMocks();
     req = { headers: {} };
     res = {
       status: vi.fn().mockReturnThis(),
@@ -22,9 +29,71 @@ describe('authMiddleware', () => {
     expect(requireAuth).toBe(authMiddleware);
   });
 
-  it('returns 401 with generic message when Authorization header is missing', () => {
-    authMiddleware(req, res, next);
+  it('returns 401 with generic message when Authorization header is missing', async () => {
+    await authMiddleware(req, res, next);
 
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication failed',
+        },
+        meta: expect.objectContaining({ timestamp: expect.any(String) }),
+      })
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(supabase.auth.getUser).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when Authorization header does not start with Bearer', async () => {
+    req.headers.authorization = 'Basic some-credentials';
+
+    await authMiddleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication failed',
+        },
+        meta: expect.objectContaining({ timestamp: expect.any(String) }),
+      })
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(supabase.auth.getUser).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when Bearer token is empty', async () => {
+    req.headers.authorization = 'Bearer    ';
+
+    await authMiddleware(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication failed',
+        },
+        meta: expect.objectContaining({ timestamp: expect.any(String) }),
+      })
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(supabase.auth.getUser).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when supabase.auth.getUser returns an error', async () => {
+    supabase.auth.getUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: { message: 'invalid' },
+    });
+    req.headers.authorization = 'Bearer invalid-token';
+
+    await authMiddleware(req, res, next);
+
+    expect(supabase.auth.getUser).toHaveBeenCalledWith('invalid-token');
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -38,62 +107,71 @@ describe('authMiddleware', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('returns 401 when Bearer token is empty', () => {
-    req.headers.authorization = 'Bearer    ';
+  it('returns 401 when supabase.auth.getUser throws an error', async () => {
+    supabase.auth.getUser.mockRejectedValueOnce(new Error('Network error'));
+    req.headers.authorization = 'Bearer throw-token';
 
-    authMiddleware(req, res, next);
+    await authMiddleware(req, res, next);
 
+    expect(supabase.auth.getUser).toHaveBeenCalledWith('throw-token');
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(next).not.toHaveBeenCalled();
-  });
-
-  it('returns 401 when token signature is invalid', () => {
-    const wrongToken = jwt.sign({ sub: 'user-123' }, 'wrong-secret', { expiresIn: '1h' });
-    req.headers.authorization = `Bearer ${wrongToken}`;
-
-    authMiddleware(req, res, next);
-
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(next).not.toHaveBeenCalled();
-  });
-
-  it('returns 401 when token is expired (exp <= now)', () => {
-    const expiredToken = jwt.sign(
-      {
-        sub: 'user-123',
-        email: 'buyer@example.com',
-        role: 'authenticated',
-        exp: Math.floor(Date.now() / 1000) - 60,
-      },
-      secret,
-      { algorithm: 'HS256' }
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication failed',
+        },
+        meta: expect.objectContaining({ timestamp: expect.any(String) }),
+      })
     );
-    req.headers.authorization = `Bearer ${expiredToken}`;
-
-    authMiddleware(req, res, next);
-
-    expect(res.status).toHaveBeenCalledWith(401);
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('attaches req.user and calls next() when token is valid and not expired', () => {
-    const validToken = jwt.sign(
-      {
-        sub: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-        email: 'buyer@example.com',
-        role: 'authenticated',
+  it('attaches req.user and calls next() when token is valid with user_metadata.role', async () => {
+    supabase.auth.getUser.mockResolvedValueOnce({
+      data: {
+        user: {
+          id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+          email: 'buyer@example.com',
+          role: 'authenticated',
+          user_metadata: { role: 'buyer' },
+        },
       },
-      secret,
-      { algorithm: 'HS256', expiresIn: '1h' }
-    );
-    req.headers.authorization = `Bearer ${validToken}`;
+      error: null,
+    });
+    req.headers.authorization = 'Bearer valid-supabase-token';
 
-    authMiddleware(req, res, next);
+    await authMiddleware(req, res, next);
 
+    expect(supabase.auth.getUser).toHaveBeenCalledWith('valid-supabase-token');
     expect(next).toHaveBeenCalledOnce();
     expect(req.user).toEqual({
       id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
       email: 'buyer@example.com',
+      role: 'buyer',
+    });
+  });
+
+  it('attaches req.user and falls back to user.role when user_metadata.role is missing', async () => {
+    supabase.auth.getUser.mockResolvedValueOnce({
+      data: {
+        user: {
+          id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+          email: 'user@example.com',
+          role: 'authenticated',
+          user_metadata: {},
+        },
+      },
+      error: null,
+    });
+    req.headers.authorization = 'Bearer valid-supabase-token-fallback';
+
+    await authMiddleware(req, res, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(req.user).toEqual({
+      id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+      email: 'user@example.com',
       role: 'authenticated',
     });
   });
