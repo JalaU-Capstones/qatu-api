@@ -5,6 +5,7 @@ import { registerApiDocs } from './presentation/docs/swagger.js';
 import { corsMiddleware } from './presentation/middleware/corsMiddleware.js';
 import { errorHandler } from './presentation/middleware/errorHandler.js';
 import { authRouter } from './presentation/routes/authRoutes.js';
+import { cartRouter } from './presentation/routes/cartRoutes.js';
 import { categoryRouter } from './presentation/routes/categoryRoutes.js';
 import { productRouter } from './presentation/routes/productRoutes.js';
 
@@ -12,6 +13,7 @@ export function createApp({
   authRoutes = authRouter,
   productRoutes = productRouter,
   categoryRoutes = categoryRouter,
+  cartRoutes = cartRouter,
 } = {}) {
   const app = express();
 
@@ -62,6 +64,23 @@ export function createApp({
     legacyHeaders: false,
   });
 
+  // Rate Limiting on authenticated cart endpoints
+  const cartLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 60, // Limit each IP to 60 requests per window
+    message: {
+      error: {
+        code: 'TOO_MANY_REQUESTS',
+        message: 'Too many cart requests from this IP. Please try again after 1 minute.',
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   // Health Endpoint
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
@@ -71,6 +90,7 @@ export function createApp({
   app.use('/v1/auth', authLimiter, authRoutes);
   app.use('/v1/products', publicLimiter, productRoutes);
   app.use('/v1/categories', publicLimiter, categoryRoutes);
+  app.use('/v1/cart', cartLimiter, cartRoutes);
 
   // Global Error Handler
   app.use(errorHandler);
