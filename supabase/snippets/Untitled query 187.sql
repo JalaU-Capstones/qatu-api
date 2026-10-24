@@ -1,1 +1,0 @@
-DELETE FROM public.profiles WHERE email = 'agustinmounier4@gmail.com' OR username = 'zzz';
