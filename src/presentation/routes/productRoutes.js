@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { GetProductByIdUseCase } from '../../application/use-cases/GetProductByIdUseCase.js';
 import { ListProductsUseCase } from '../../application/use-cases/ListProductsUseCase.js';
 import { ProductRepository } from '../../infrastructure/persistence/repositories/ProductRepository.js';
 import { ProductController } from '../controllers/ProductController.js';
@@ -8,6 +9,7 @@ import { listProductsSchema } from '../validators/listProductsSchema.js';
 export function createProductRouter({
   productRepository = new ProductRepository(),
   listProductsUseCase,
+  getProductByIdUseCase,
   productController,
 } = {}) {
   const router = Router();
@@ -18,15 +20,24 @@ export function createProductRouter({
       productRepository,
     });
 
+  const getByIdUC =
+    getProductByIdUseCase ||
+    new GetProductByIdUseCase({
+      productRepository,
+    });
+
   const controller =
     productController ||
     new ProductController({
       listProductsUseCase: listUC,
+      getProductByIdUseCase: getByIdUC,
     });
 
   router.get('/', validateRequest(listProductsSchema, { source: 'query' }), (req, res, next) =>
     controller.list(req, res, next)
   );
+
+  router.get('/:id', (req, res, next) => controller.getById(req, res, next));
 
   return router;
 }

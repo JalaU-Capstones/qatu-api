@@ -354,4 +354,60 @@ describe('Product Routes Integration - GET /v1/products', () => {
       expect(response.body).toEqual({ status: 'ok' });
     });
   });
+
+  describe('GET /v1/products/:id', () => {
+    let mockGetProductByIdUseCase;
+
+    beforeEach(() => {
+      mockGetProductByIdUseCase = {
+        execute: vi.fn().mockResolvedValue({
+          data: sampleProduct,
+          meta: { timestamp: '2026-10-15T10:00:00.000Z' },
+        }),
+      };
+
+      const customRouter = createProductRouter({
+        listProductsUseCase: mockListProductsUseCase,
+        getProductByIdUseCase: mockGetProductByIdUseCase,
+      });
+
+      app = createApp({ productRoutes: customRouter });
+    });
+
+    it('should return 200 with product details and meta.timestamp when published product exists', async () => {
+      const response = await request(app).get(`/v1/products/${sampleProduct.id}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.data).toEqual(sampleProduct);
+      expect(response.body.meta).toEqual({
+        timestamp: '2026-10-15T10:00:00.000Z',
+      });
+      expect(mockGetProductByIdUseCase.execute).toHaveBeenCalledWith(sampleProduct.id);
+    });
+
+    it('should return 404 when product does not exist or is unpublished', async () => {
+      const err = new Error('Product not found');
+      err.code = 'PRODUCT_NOT_FOUND';
+      err.statusCode = 404;
+      mockGetProductByIdUseCase.execute.mockRejectedValue(err);
+
+      const response = await request(app).get('/v1/products/00000000-0000-4000-8000-000000000000');
+
+      expect(response.status).toBe(404);
+      expect(response.body.error).toEqual({
+        code: 'PRODUCT_NOT_FOUND',
+        message: 'Product not found',
+      });
+      expect(response.body.meta?.timestamp).toBeDefined();
+    });
+
+    it('should return 500 when use case throws an unexpected error', async () => {
+      mockGetProductByIdUseCase.execute.mockRejectedValue(new Error('DB connection error'));
+
+      const response = await request(app).get(`/v1/products/${sampleProduct.id}`);
+
+      expect(response.status).toBe(500);
+      expect(response.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+    });
+  });
 });
