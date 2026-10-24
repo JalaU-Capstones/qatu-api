@@ -1,9 +1,17 @@
-import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../../app.js';
+import { supabase } from '../../../infrastructure/config/supabase.js';
 import { CartRepository } from '../../../infrastructure/persistence/repositories/CartRepository.js';
 import { createCartRouter } from '../cartRoutes.js';
+
+vi.mock('../../../infrastructure/config/supabase.js', () => ({
+  supabase: {
+    auth: {
+      getUser: vi.fn(),
+    },
+  },
+}));
 
 describe('Cart Routes Integration - POST /v1/cart/items', () => {
   let app;
@@ -11,28 +19,9 @@ describe('Cart Routes Integration - POST /v1/cart/items', () => {
 
   const userId = '00000000-0000-0000-0000-000000000002';
   const productId = '10000000-0000-0000-0000-000000000001';
-  const jwtSecret = process.env.JWT_SECRET || 'default-jwt-secret-for-dev';
 
-  const validToken = jwt.sign(
-    {
-      sub: userId,
-      role: 'buyer',
-      email: 'buyer@example.com',
-    },
-    jwtSecret,
-    { algorithm: 'HS256', expiresIn: '1h' }
-  );
-
-  const expiredToken = jwt.sign(
-    {
-      sub: userId,
-      role: 'buyer',
-      email: 'buyer@example.com',
-      exp: Math.floor(Date.now() / 1000) - 60,
-    },
-    jwtSecret,
-    { algorithm: 'HS256' }
-  );
+  const validToken = 'fake-valid-supabase-token';
+  const invalidToken = 'fake-invalid-supabase-token';
 
   const cleanDb = async () => {
     try {
@@ -47,7 +36,29 @@ describe('Cart Routes Integration - POST /v1/cart/items', () => {
   };
 
   beforeEach(async () => {
+    vi.clearAllMocks();
     await cleanDb();
+
+    supabase.auth.getUser.mockImplementation(async (token) => {
+      // eslint-disable-next-line security/detect-possible-timing-attacks
+      if (token === validToken) {
+        return {
+          data: {
+            user: {
+              id: userId,
+              email: 'buyer@example.com',
+              role: 'authenticated',
+              user_metadata: { role: 'buyer' },
+            },
+          },
+          error: null,
+        };
+      }
+      return {
+        data: { user: null },
+        error: { message: 'invalid' },
+      };
+    });
 
     mockAddToCartUseCase = {
       execute: vi.fn(),
@@ -152,7 +163,7 @@ describe('Cart Routes Integration - POST /v1/cart/items', () => {
   it('Scenario 4: Expired JWT -> 401, body.error.code === UNAUTHORIZED', async () => {
     const response = await request(app)
       .post('/v1/cart/items')
-      .set('Authorization', `Bearer ${expiredToken}`)
+      .set('Authorization', `Bearer ${invalidToken}`)
       .send({ product_id: productId, quantity: 1 });
 
     expect(response.status).toBe(401);
