@@ -3,6 +3,19 @@
  */
 export class IProductRepository {
   /**
+   * Find a single, non-deleted product by its UUID.
+   * Does NOT filter by `state` — the caller decides whether unpublished products are acceptable
+   * (e.g. `AddToCartUseCase` returns 404 for unknown, 422 for "exists but not published").
+   *
+   * @param {string} productId
+   * @returns {Promise<import('../entities/Product.js').Product | null>}
+   */
+  // eslint-disable-next-line no-unused-vars
+  async findById(productId) {
+    throw new Error('Method not implemented: findById');
+  }
+
+  /**
    * @param {Object} params
    * @param {number} params.page
    * @param {number} params.limit
