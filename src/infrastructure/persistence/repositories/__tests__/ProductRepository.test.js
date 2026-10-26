@@ -82,6 +82,59 @@ describe('ProductRepository (unit)', () => {
     });
   });
 
+  describe('findByIdWithDetails', () => {
+    const productId = '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c';
+
+    it('should execute relational query with LEFT JOINs and parse stringified JSON fields', async () => {
+      const detailedDbRow = {
+        ...sampleDbRow,
+        attributes: '{"color":"black"}',
+        seller:
+          '{"id":"c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f","username":"john_seller","full_name":"John Seller"}',
+        category:
+          '{"id":"b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e","name":"Furniture","slug":"furniture"}',
+        images: '[{"id":"img-1","image_path":"product-images/chair-front.webp","position":0}]',
+      };
+
+      mockDb.query.mockResolvedValueOnce([[detailedDbRow]]);
+
+      const result = await repository.findByIdWithDetails(productId);
+
+      expect(mockDb.query).toHaveBeenCalledTimes(1);
+      const [sql, options] = mockDb.query.mock.calls[0];
+
+      expect(sql).toContain('LEFT JOIN public.profiles prof');
+      expect(sql).toContain('LEFT JOIN public.categories c');
+      expect(sql).toContain('public.product_images img');
+      expect(sql).toContain('p.id = :productId AND p.deleted_at IS NULL');
+      expect(options.replacements).toEqual({ productId });
+
+      expect(result).toEqual({
+        ...detailedDbRow,
+        attributes: { color: 'black' },
+        seller: {
+          id: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f',
+          username: 'john_seller',
+          full_name: 'John Seller',
+        },
+        category: {
+          id: 'b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
+          name: 'Furniture',
+          slug: 'furniture',
+        },
+        images: [{ id: 'img-1', image_path: 'product-images/chair-front.webp', position: 0 }],
+      });
+    });
+
+    it('should return null when no product is found for the given ID', async () => {
+      mockDb.query.mockResolvedValueOnce([[]]);
+
+      const result = await repository.findByIdWithDetails(productId);
+
+      expect(result).toBeNull();
+    });
+  });
+
   describe('findAll', () => {
     it('should generate SQL with mandatory conditions and default pagination', async () => {
       mockDb.query.mockResolvedValueOnce([[sampleDbRow]]);
@@ -290,6 +343,11 @@ describe('ProductRepository (unit)', () => {
   });
 
   describe('IProductRepository Interface', () => {
+    it('should throw Method not implemented when calling findByIdWithDetails', async () => {
+      const iRepo = new IProductRepository();
+      await expect(iRepo.findByIdWithDetails('123')).rejects.toThrow('Method not implemented');
+    });
+
     it('should throw Method not implemented when calling findAll', async () => {
       const iRepo = new IProductRepository();
       await expect(iRepo.findAll({})).rejects.toThrow('Method not implemented');

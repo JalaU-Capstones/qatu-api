@@ -3,13 +3,20 @@ import { ProductController } from '../ProductController.js';
 
 describe('ProductController', () => {
   let useCaseMock;
+  let getByIdUseCaseMock;
   let controller;
 
   beforeEach(() => {
     useCaseMock = {
       execute: vi.fn(),
     };
-    controller = new ProductController({ listProductsUseCase: useCaseMock });
+    getByIdUseCaseMock = {
+      execute: vi.fn(),
+    };
+    controller = new ProductController({
+      listProductsUseCase: useCaseMock,
+      getProductByIdUseCase: getByIdUseCaseMock,
+    });
   });
 
   it('should throw if listProductsUseCase dependency is missing in constructor', () => {
@@ -77,6 +84,81 @@ describe('ProductController', () => {
       await controller.list(req, res, next);
 
       expect(next).toHaveBeenCalledWith(error);
+    });
+  });
+
+  describe('getById', () => {
+    const productId = '550e8400-e29b-41d4-a716-446655440000';
+
+    it('should respond with 200 and product detail response for public request', async () => {
+      const mockResult = {
+        data: { id: productId, name: 'Product 1', price: 9.99, state: 'published' },
+        meta: { timestamp: '2026-10-24T12:00:00.000Z' },
+      };
+      getByIdUseCaseMock.execute.mockResolvedValue(mockResult);
+
+      const req = { params: { id: productId }, user: null };
+      const json = vi.fn();
+      const status = vi.fn().mockReturnValue({ json });
+      const res = { status };
+      const next = vi.fn();
+
+      await controller.getById(req, res, next);
+
+      expect(status).toHaveBeenCalledWith(200);
+      expect(json).toHaveBeenCalledWith(mockResult);
+      expect(getByIdUseCaseMock.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ productId, currentUserId: null })
+      );
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should pass req.user.id to the use case when request is authenticated', async () => {
+      const mockResult = { data: { id: productId }, meta: {} };
+      getByIdUseCaseMock.execute.mockResolvedValue(mockResult);
+
+      const req = {
+        params: { id: productId },
+        user: { id: 'seller-123' },
+      };
+      const res = { status: vi.fn().mockReturnValue({ json: vi.fn() }) };
+
+      await controller.getById(req, res, vi.fn());
+
+      expect(getByIdUseCaseMock.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ productId, currentUserId: 'seller-123' })
+      );
+    });
+
+    it('should call next with 404 error when product is not found or unpublished', async () => {
+      const notFoundError = new Error('Product not found');
+      notFoundError.code = 'PRODUCT_NOT_FOUND';
+      notFoundError.statusCode = 404;
+      getByIdUseCaseMock.execute.mockRejectedValue(notFoundError);
+
+      const req = { params: { id: productId } };
+      const res = {};
+      const next = vi.fn();
+
+      await controller.getById(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(notFoundError);
+    });
+
+    it('should call next with error if getProductByIdUseCase was not provided', async () => {
+      const controllerWithoutGetById = new ProductController({
+        listProductsUseCase: useCaseMock,
+      });
+
+      const req = { params: { id: productId } };
+      const res = {};
+      const next = vi.fn();
+
+      await controllerWithoutGetById.getById(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'getProductByIdUseCase is required' })
+      );
     });
   });
 });

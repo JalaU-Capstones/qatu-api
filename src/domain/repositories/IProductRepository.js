@@ -35,4 +35,15 @@ export class IProductRepository {
       `Method not implemented with ${JSON.stringify({ page, limit, filters, sort })}`
     );
   }
+
+  /**
+   * Find a single, non-deleted product with full relational details.
+   *
+   * @param {string} productId
+   * @returns {Promise<Object|null>}
+   */
+  // eslint-disable-next-line no-unused-vars
+  async findByIdWithDetails(productId) {
+    throw new Error('Method not implemented: findByIdWithDetails');
+  }
 }
