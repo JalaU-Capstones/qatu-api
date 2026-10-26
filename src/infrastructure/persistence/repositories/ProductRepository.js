@@ -210,4 +210,110 @@ export class ProductRepository extends IProductRepository {
 
     return { items, total };
   }
+
+  /**
+   * Find a single product with full relational details (seller, category, images).
+   *
+   * @param {string} productId
+   * @returns {Promise<Object|null>}
+   */
+  async findByIdWithDetails(productId) {
+    const sql = `
+      SELECT
+        p.id, p.seller_id, p.category_id, p.name, p.slug, p.description,
+        p.price, p.currency, p.stock, p.attributes, p.primary_image_path,
+        p.state, p.average_rating, p.ratings_count, p.published_at,
+        p.created_at, p.updated_at,
+        json_build_object(
+          'id', prof.id,
+          'username', prof.username,
+          'full_name', prof.full_name,
+          'avatar_path', prof.avatar_path
+        ) AS seller,
+        CASE WHEN c.id IS NOT NULL THEN
+          json_build_object(
+            'id', c.id,
+            'name', c.name,
+            'slug', c.slug
+          )
+        ELSE NULL END AS category,
+        COALESCE(
+          (
+            SELECT json_agg(
+              json_build_object(
+                'id', img.id,
+                'image_path', img.image_path,
+                'position', img.position
+              ) ORDER BY img.position ASC
+            )
+            FROM public.product_images img
+            WHERE img.product_id = p.id
+          ), '[]'::json
+        ) AS images
+      FROM public.products p
+      LEFT JOIN public.profiles prof ON prof.id = p.seller_id
+      LEFT JOIN public.categories c ON c.id = p.category_id
+      WHERE p.id = :productId AND p.deleted_at IS NULL
+      LIMIT 1
+    `;
+
+    const queryResult = await this.db.query(sql, { replacements: { productId } });
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    const row = rows[0];
+
+    // Parse stringified JSON fields if necessary
+    let attributes = row.attributes;
+    if (typeof attributes === 'string') {
+      try {
+        attributes = JSON.parse(attributes);
+      } catch {
+        attributes = {};
+      }
+    }
+
+    let seller = row.seller;
+    if (typeof seller === 'string') {
+      try {
+        seller = JSON.parse(seller);
+      } catch {
+        seller = null;
+      }
+    }
+
+    let category = row.category;
+    if (typeof category === 'string') {
+      try {
+        category = JSON.parse(category);
+      } catch {
+        category = null;
+      }
+    }
+
+    let images = row.images;
+    if (typeof images === 'string') {
+      try {
+        images = JSON.parse(images);
+      } catch {
+        images = [];
+      }
+    }
+
+    return {
+      ...row,
+      attributes: attributes || {},
+      seller,
+      category,
+      images: images || [],
+    };
+  }
 }

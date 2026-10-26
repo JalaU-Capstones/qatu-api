@@ -358,10 +358,17 @@ describe('Product Routes Integration - GET /v1/products', () => {
   describe('GET /v1/products/:id', () => {
     let mockGetProductByIdUseCase;
 
+    const sampleDetailedProduct = {
+      ...sampleProduct,
+      seller: { id: sampleProduct.seller_id, username: 'test_seller' },
+      category: { id: sampleProduct.category_id, name: 'Category' },
+      images: [{ id: 'img-1', image_path: sampleProduct.primary_image_path, position: 0 }],
+    };
+
     beforeEach(() => {
       mockGetProductByIdUseCase = {
         execute: vi.fn().mockResolvedValue({
-          data: sampleProduct,
+          data: sampleDetailedProduct,
           meta: { timestamp: '2026-10-15T10:00:00.000Z' },
         }),
       };
@@ -374,18 +381,36 @@ describe('Product Routes Integration - GET /v1/products', () => {
       app = createApp({ productRoutes: customRouter });
     });
 
-    it('should return 200 with product details and meta.timestamp when published product exists', async () => {
+    it('should return 200 with full product details and meta.timestamp when published product exists', async () => {
       const response = await request(app).get(`/v1/products/${sampleProduct.id}`);
 
       expect(response.status).toBe(200);
-      expect(response.body.data).toEqual(sampleProduct);
+      expect(response.body.data).toEqual(sampleDetailedProduct);
       expect(response.body.meta).toEqual({
         timestamp: '2026-10-15T10:00:00.000Z',
       });
-      expect(mockGetProductByIdUseCase.execute).toHaveBeenCalledWith(sampleProduct.id);
+      expect(mockGetProductByIdUseCase.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          productId: sampleProduct.id,
+          currentUserId: null,
+        })
+      );
     });
 
-    it('should return 404 when product does not exist or is unpublished', async () => {
+    it('should pass authenticated user id to the use case when authorization token is provided', async () => {
+      const response = await request(app)
+        .get(`/v1/products/${sampleProduct.id}`)
+        .set('Authorization', 'Bearer mock-valid-token');
+
+      expect(response.status).toBe(200);
+      expect(mockGetProductByIdUseCase.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          productId: sampleProduct.id,
+        })
+      );
+    });
+
+    it('should return 404 when product does not exist or is unpublished publicly', async () => {
       const err = new Error('Product not found');
       err.code = 'PRODUCT_NOT_FOUND';
       err.statusCode = 404;

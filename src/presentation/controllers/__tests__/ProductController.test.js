@@ -90,14 +90,14 @@ describe('ProductController', () => {
   describe('getById', () => {
     const productId = '550e8400-e29b-41d4-a716-446655440000';
 
-    it('should respond with 200 and product detail on success', async () => {
+    it('should respond with 200 and product detail response for public request', async () => {
       const mockResult = {
         data: { id: productId, name: 'Product 1', price: 9.99, state: 'published' },
         meta: { timestamp: '2026-10-24T12:00:00.000Z' },
       };
       getByIdUseCaseMock.execute.mockResolvedValue(mockResult);
 
-      const req = { params: { id: productId } };
+      const req = { params: { id: productId }, user: null };
       const json = vi.fn();
       const status = vi.fn().mockReturnValue({ json });
       const res = { status };
@@ -107,8 +107,27 @@ describe('ProductController', () => {
 
       expect(status).toHaveBeenCalledWith(200);
       expect(json).toHaveBeenCalledWith(mockResult);
-      expect(getByIdUseCaseMock.execute).toHaveBeenCalledWith(productId);
+      expect(getByIdUseCaseMock.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ productId, currentUserId: null })
+      );
       expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should pass req.user.id to the use case when request is authenticated', async () => {
+      const mockResult = { data: { id: productId }, meta: {} };
+      getByIdUseCaseMock.execute.mockResolvedValue(mockResult);
+
+      const req = {
+        params: { id: productId },
+        user: { id: 'seller-123' },
+      };
+      const res = { status: vi.fn().mockReturnValue({ json: vi.fn() }) };
+
+      await controller.getById(req, res, vi.fn());
+
+      expect(getByIdUseCaseMock.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ productId, currentUserId: 'seller-123' })
+      );
     });
 
     it('should call next with 404 error when product is not found or unpublished', async () => {
