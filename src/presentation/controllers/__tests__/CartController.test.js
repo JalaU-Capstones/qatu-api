@@ -13,6 +13,7 @@ describe('CartController', () => {
 
   const userId = '00000000-0000-0000-0000-000000000002';
   const productId = '10000000-0000-0000-0000-000000000001';
+  const cartItemId = 'c4b3a2d1-0000-0000-0000-000000000001';
 
   beforeEach(() => {
     mockAddToCartUseCase = { execute: vi.fn() };
@@ -31,6 +32,7 @@ describe('CartController', () => {
       user: { id: userId },
       params: {},
       body: {},
+      validatedBody: {},
     };
 
     res = {
@@ -44,11 +46,11 @@ describe('CartController', () => {
 
   describe('updateItem', () => {
     it('Scenario 1: Valid request -> 200 OK with formatted JSON', async () => {
-      req.params = { productId };
+      req.params = { id: cartItemId };
       req.validatedBody = { quantity: 3 };
 
       const mockItem = {
-        toJSON: () => ({ id: 'item-1', productId, quantity: 3 }),
+        toJSON: () => ({ id: cartItemId, productId, quantity: 3 }),
       };
       mockUpdateCartItemUseCase.execute.mockResolvedValue(mockItem);
 
@@ -56,7 +58,7 @@ describe('CartController', () => {
 
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
-        data: { id: 'item-1', productId, quantity: 3 },
+        data: { id: cartItemId, productId, quantity: 3 },
         meta: expect.objectContaining({ timestamp: expect.any(String) }),
       });
     });
@@ -77,7 +79,7 @@ describe('CartController', () => {
 
   describe('removeItem', () => {
     it('Scenario 1: Valid request -> 204 No Content', async () => {
-      req.params = { productId };
+      req.params = { id: cartItemId };
       mockRemoveCartItemUseCase.execute.mockResolvedValue();
 
       await controller.removeItem(req, res, next);

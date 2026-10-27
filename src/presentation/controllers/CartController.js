@@ -55,6 +55,12 @@ export class CartController {
     }
   }
 
+  /**
+   * Handles PATCH /v1/cart/items/:id
+   * Invokes UpdateCartItemUseCase to validate ownership, product availability,
+   * and apply the quantity update.
+   * @returns 200 OK with the updated CartItem schema.
+   */
   async updateItem(req, res, next) {
     try {
       const userId = req.user?.id;
@@ -65,12 +71,12 @@ export class CartController {
         throw err;
       }
 
-      const { productId } = req.params;
+      const { id: cartItemId } = req.params;
       const body = req.validatedBody || req.body;
 
       const item = await this.updateCartItemUseCase.execute({
         userId,
-        productId,
+        cartItemId,
         quantity: body.quantity,
       });
 
@@ -83,6 +89,11 @@ export class CartController {
     }
   }
 
+  /**
+   * Handles DELETE /v1/cart/items/:id
+   * Invokes RemoveCartItemUseCase to verify item ownership and remove it from the cart.
+   * @returns 204 No Content.
+   */
   async removeItem(req, res, next) {
     try {
       const userId = req.user?.id;
@@ -93,8 +104,8 @@ export class CartController {
         throw err;
       }
 
-      const { productId } = req.params;
-      await this.removeCartItemUseCase.execute({ userId, productId });
+      const { id: cartItemId } = req.params;
+      await this.removeCartItemUseCase.execute({ userId, cartItemId });
 
       return res.status(204).send();
     } catch (error) {

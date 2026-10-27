@@ -33,6 +33,31 @@ export class CartRepository extends ICartRepository {
   }
 
   /**
+   * Returns the cart item for the given identifier, or null if it does not exist.
+   *
+   * @param {string} id - Cart Item identifier
+   * @returns {Promise<CartItem|null>}
+   */
+  async findById(id) {
+    const rows = await this.db.query(
+      `SELECT id, user_id, product_id, quantity, created_at, updated_at
+       FROM public.cart_items
+       WHERE id = :id
+       LIMIT 1`,
+      {
+        replacements: { id },
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    return this.toDomain(rows[0]);
+  }
+
+  /**
    * Returns the cart item for the given user/product pair, or null if it does not exist.
    *
    * @param {Object} params
@@ -88,14 +113,14 @@ RETURNING id, user_id, product_id, quantity, created_at, updated_at`,
     return this.toDomain(rows[0]);
   }
 
-  async updateQuantity({ userId, productId, quantity }) {
+  async updateQuantity({ id, quantity }) {
     const rows = await this.db.query(
       `UPDATE public.cart_items
        SET quantity = :quantity, updated_at = NOW()
-       WHERE user_id = :userId AND product_id = :productId
+       WHERE id = :id
        RETURNING id, user_id, product_id, quantity, created_at, updated_at`,
       {
-        replacements: { userId, productId, quantity },
+        replacements: { id, quantity },
         type: QueryTypes.SELECT,
       }
     );
@@ -104,12 +129,12 @@ RETURNING id, user_id, product_id, quantity, created_at, updated_at`,
     return this.toDomain(rows[0]);
   }
 
-  async removeItem({ userId, productId }) {
+  async removeItem(id) {
     await this.db.query(
       `DELETE FROM public.cart_items
-       WHERE user_id = :userId AND product_id = :productId`,
+       WHERE id = :id`,
       {
-        replacements: { userId, productId },
+        replacements: { id },
         type: QueryTypes.DELETE,
       }
     );

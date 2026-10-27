@@ -1,21 +1,36 @@
 export class UpdateCartItemUseCase {
-  constructor({ cartRepository, productRepository } = {}) {
-    if (!cartRepository) throw new Error('cartRepository is required');
-    if (!productRepository) throw new Error('productRepository is required');
+  constructor({ cartRepository, productRepository }) {
     this.cartRepository = cartRepository;
     this.productRepository = productRepository;
   }
 
-  async execute({ userId, productId, quantity }) {
+  /**
+   * Executes the update cart item use case.
+   *
+   * @param {Object} params
+   * @param {string} params.userId - The ID of the authenticated user.
+   * @param {string} params.cartItemId - The ID of the cart item to update.
+   * @param {number} params.quantity - The new quantity to set.
+   */
+  async execute({ userId, cartItemId, quantity }) {
+    const cartItem = await this.cartRepository.findById(cartItemId);
+
+    if (!cartItem || cartItem.userId !== userId) {
+      const err = new Error('Cart item not found');
+      err.code = 'NOT_FOUND';
+      err.statusCode = 404;
+      throw err;
+    }
+
     if (quantity === 0) {
-      await this.cartRepository.removeItem({ userId, productId });
+      await this.cartRepository.removeItem(cartItemId);
       return null;
     }
 
-    const product = await this.productRepository.findById(productId);
+    const product = await this.productRepository.findById(cartItem.productId);
     if (!product) {
-      const err = new Error('Product not found');
-      err.code = 'PRODUCT_NOT_FOUND';
+      const err = new Error('Product no longer available');
+      err.code = 'NOT_FOUND';
       err.statusCode = 404;
       throw err;
     }
@@ -27,14 +42,6 @@ export class UpdateCartItemUseCase {
       throw err;
     }
 
-    const updatedItem = await this.cartRepository.updateQuantity({ userId, productId, quantity });
-    if (!updatedItem) {
-      const err = new Error('Cart item not found');
-      err.code = 'CART_ITEM_NOT_FOUND';
-      err.statusCode = 404;
-      throw err;
-    }
-
-    return updatedItem;
+    return this.cartRepository.updateQuantity({ id: cartItemId, quantity });
   }
 }

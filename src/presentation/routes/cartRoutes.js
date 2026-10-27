@@ -45,13 +45,13 @@ export function createCartRouter({
   );
 
   router.patch(
-    '/items/:productId',
+    '/items/:id',
     authMiddleware,
     validateRequest(updateCartItemSchema, { source: 'body' }),
     (req, res, next) => controller.updateItem(req, res, next)
   );
 
-  router.delete('/items/:productId', authMiddleware, (req, res, next) =>
+  router.delete('/items/:id', authMiddleware, (req, res, next) =>
     controller.removeItem(req, res, next)
   );
 

@@ -86,4 +86,14 @@ export class ICartRepository {
   async countByUser(userId) {
     throw new Error('Method not implemented: countByUser');
   }
+
+  /**
+   * Returns the cart item for the given identifier, or null if it does not exist.
+   * @param {string} id - Cart Item identifier
+   * @returns {Promise<CartItem|null>}
+   */
+  // eslint-disable-next-line no-unused-vars
+  async findById(id) {
+    throw new Error('Method not implemented.');
+  }
 }
