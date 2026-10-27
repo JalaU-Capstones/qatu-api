@@ -30,7 +30,6 @@ RegisterResponse:
         - id: 1
           name: 'buyer'
           created_at: '2026-10-01T00:00:00.000Z'
-      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhMGVlYmM5OS05YzBiLTRlZjgtYmI2ZC02YmI5YmQzODBhMTEiLCJlbWFpbCI6ImJ1eWVyQGV4YW1wbGUuY29tIiwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJleHAiOjE3NjA0ODY0MDB9.placeholder'
     meta:
       timestamp: '2026-10-14T10:00:00.000Z'
 
@@ -64,7 +63,6 @@ LoginResponse:
         - id: 1
           name: 'buyer'
           created_at: '2026-10-01T00:00:00.000Z'
-      token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhMGVlYmM5OS05YzBiLTRlZjgtYmI2ZC02YmI5YmQzODBhMTEiLCJlbWFpbCI6ImJ1eWVyQGV4YW1wbGUuY29tIiwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJleHAiOjE3NjA0ODY0MDB9.placeholder'
     meta:
       timestamp: '2026-10-14T10:00:00.000Z'
 
@@ -118,3 +116,28 @@ sellerApplicationResponse:
       updated_at: '2026-10-14T10:30:00.000Z'
     meta:
       timestamp: '2026-10-14T10:30:00.000Z'
+
+RefreshResponse:
+  summary: Successful refresh response
+  value:
+    data:
+      user:
+        id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+        email: 'buyer@example.com'
+        created_at: '2026-10-14T10:00:00.000Z'
+      profile:
+        id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+        username: 'john_doe'
+        full_name: 'John Doe'
+        email: 'buyer@example.com'
+        avatar_path: null
+        bio: null
+        locale: 'en'
+        created_at: '2026-10-14T10:00:00.000Z'
+        updated_at: '2026-10-14T10:00:00.000Z'
+      roles:
+        - id: 1
+          name: 'buyer'
+          created_at: '2026-10-01T00:00:00.000Z'
+    meta:
+      timestamp: '2026-10-14T12:00:00.000Z'

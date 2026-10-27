@@ -4,7 +4,18 @@ register:
     summary: Register a new user
     description: |
       Creates a new user account via Supabase Auth and initializes the user profile
-      with the `buyer` role. The JWT from Supabase is passed in the Authorization header.
+      with the `buyer` role.
+
+      On success, the backend sets three cookies via `Set-Cookie` response headers:
+      - `access_token` — HttpOnly, Secure, SameSite=Strict (Supabase JWT)
+      - `refresh_token` — HttpOnly, Secure, SameSite=Strict (long-lived)
+      - `csrf_token` — SameSite=Strict, **NOT** HttpOnly (frontend must read it)
+
+      The JSON body returns only the user, profile, and roles — **no token**.
+      Subsequent authenticated requests rely on the cookie; no `Authorization`
+      header is required from the client.
+
+      See ADR-012 (wiki) for the full migration rationale.
     tags:
       - auth
     security: []
@@ -48,7 +59,6 @@ register:
                 maxLength: 100
                 description: |
                   Optional display name. Empty is allowed. When non-empty, length is 2 to 100.
-                  The value is stored as data and is not executed as SQL.
                 examples:
                   - 'John Doe'
             additionalProperties: false
@@ -57,7 +67,16 @@ register:
               $ref: '../components/examples/auth.yaml#/RegisterRequest'
     responses:
       '201':
-        description: User successfully registered and profile created.
+        description: User registered successfully; cookies set; no token in body.
+        headers:
+          Set-Cookie:
+            description: |
+              Three cookies set: `access_token` (HttpOnly), `refresh_token` (HttpOnly),
+              `csrf_token` (readable). Backend enforces HttpOnly + Secure + SameSite=Strict
+              on the two token cookies.
+            schema:
+              type: string
+              example: 'access_token=eyJhbGciOi...; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600'
         content:
           application/json:
             schema:
@@ -75,9 +94,6 @@ register:
                       type: array
                       items:
                         $ref: '../components/schemas/Role.yaml'
-                    token:
-                      type: string
-                      description: JWT access token.
                 meta:
                   $ref: '../components/schemas/shared.yaml#/Meta'
             examples:
@@ -95,10 +111,11 @@ register:
 login:
   post:
     operationId: loginUser
-    summary: Authenticate and receive a JWT
+    summary: Authenticate and receive session cookies
     description: |
-      Authenticates user credentials via Supabase Auth and returns a JWT along
-      with the user profile. Public endpoint.
+      Authenticates user credentials via Supabase Auth. On success, sets the same
+      three cookies as `POST /v1/auth/register`. Returns the user, profile, and
+      roles in the body — no token. Public endpoint.
     tags:
       - auth
     security: []
@@ -131,7 +148,15 @@ login:
               $ref: '../components/examples/auth.yaml#/LoginRequest'
     responses:
       '200':
-        description: Login successful; JWT and profile returned.
+        description: Login successful; cookies set; no token in body.
+        headers:
+          Set-Cookie:
+            description: |
+              Three cookies set: `access_token` (HttpOnly), `refresh_token` (HttpOnly),
+              `csrf_token` (readable). Same flags as register.
+            schema:
+              type: string
+              example: 'access_token=eyJhbGciOi...; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600'
         content:
           application/json:
             schema:
@@ -149,9 +174,6 @@ login:
                       type: array
                       items:
                         $ref: '../components/schemas/Role.yaml'
-                    token:
-                      type: string
-                      description: JWT access token.
                 meta:
                   $ref: '../components/schemas/shared.yaml#/Meta'
             examples:
@@ -166,18 +188,95 @@ login:
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 
+refresh:
+  post:
+    operationId: refreshSession
+    summary: Refresh the access token using the refresh_token cookie
+    description: |
+      Reads the `refresh_token` cookie, calls `supabase.auth.refreshSession()`,
+      and sets fresh `access_token` + `refresh_token` cookies (rotated by Supabase).
+
+      **When the frontend should call this:** when an authenticated request
+      returns `401` with `error.code: 'REFRESH_REQUIRED'`, the frontend calls
+      this endpoint once, then retries the original request. If this endpoint
+      also fails (`401`), the frontend clears state and redirects to `/login`.
+
+      Public endpoint (no auth required) — the refresh token IS the auth.
+    tags:
+      - auth
+    security: []
+    responses:
+      '200':
+        description: New session cookies set.
+        headers:
+          Set-Cookie:
+            description: |
+              Fresh `access_token` and `refresh_token` (rotated). `csrf_token` is
+              re-issued as well to stay in sync.
+            schema:
+              type: string
+              example: 'access_token=eyJhbGciOi...; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600'
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  properties:
+                    user:
+                      $ref: '../components/schemas/User.yaml'
+                    profile:
+                      $ref: '../components/schemas/Profile.yaml'
+                    roles:
+                      type: array
+                      items:
+                        $ref: '../components/schemas/Role.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '401':
+        description: |
+          Refresh failed. The refresh token is expired, revoked, or missing.
+          Frontend must clear local state and redirect to `/login`.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+      '429':
+        $ref: '../components/responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
 logout:
   post:
     operationId: logoutUser
-    summary: Logout current user
+    summary: Logout current user and clear session cookies
     description: |
-      Invalidates the current session on the Supabase side. Clients must also
-      discard the JWT locally. Requires a valid bearer token.
+      Invalidates the current session on Supabase (calls `supabase.auth.signOut()`)
+      and clears all three cookies (`access_token`, `refresh_token`, `csrf_token`)
+      with `Set-Cookie: <name>=; Max-Age=0`. Returns `204 No Content`.
+
+      **Transitional dual authentication:** during the migration window, this
+      endpoint accepts either the `access_token` cookie OR the legacy
+      `Authorization: Bearer <token>` header. Bearer support is deprecated and
+      will be removed in Sprint 5.
     tags:
       - auth
+    security:
+      - cookieAuth: []
+      - bearerAuth: []
     responses:
       '204':
-        description: Logout successful.
+        description: Logout successful; all session cookies cleared.
+        headers:
+          Set-Cookie:
+            description: |
+              Three cookies cleared (access_token, refresh_token, csrf_token)
+              via `Set-Cookie: <name>=; Max-Age=0; Path=/; HttpOnly`.
+            schema:
+              type: string
+              example: 'access_token=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict'
       '401':
         $ref: '../components/responses/errors.yaml#/Unauthorized'
       '429':
@@ -188,12 +287,23 @@ logout:
 me:
   get:
     operationId: getCurrentUser
-    summary: Get current authenticated user
+    summary: Get current authenticated user (from session cookie)
     description: |
-      Returns the authenticated user's Supabase account, profile, and assigned roles.
-      Requires a valid bearer token.
+      Returns the authenticated user's Supabase account, profile, and roles,
+      extracted from the `access_token` cookie by the backend `authMiddleware`.
+      **No token is returned in the response body** — the session lives only
+      in the cookie.
+
+      Frontend calls this on application boot to restore user context.
+
+      **Transitional dual authentication:** during the migration window, this
+      endpoint accepts either the `access_token` cookie OR the legacy
+      `Authorization: Bearer <token>` header.
     tags:
       - auth
+    security:
+      - cookieAuth: []
+      - bearerAuth: []
     responses:
       '200':
         description: Current user retrieved successfully.
@@ -220,7 +330,15 @@ me:
               default:
                 $ref: '../components/examples/auth.yaml#/CurrentUserResponse'
       '401':
-        $ref: '../components/responses/errors.yaml#/Unauthorized'
+        description: |
+          No valid session. Cases:
+          - Missing `access_token` cookie (and no Bearer fallback) → `error.code: 'UNAUTHORIZED'`
+          - Expired access_token + valid refresh_token → `error.code: 'REFRESH_REQUIRED'` (frontend should call `/auth/refresh` once then retry)
+          - Invalid/revoked token → `error.code: 'UNAUTHORIZED'`
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
       '429':
         $ref: '../components/responses/errors.yaml#/TooManyRequests'
       '500':
