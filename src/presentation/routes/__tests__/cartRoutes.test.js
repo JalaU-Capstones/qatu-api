@@ -13,9 +13,12 @@ vi.mock('../../../infrastructure/config/supabase.js', () => ({
   },
 }));
 
-describe('Cart Routes Integration - POST /v1/cart/items', () => {
+describe('Cart Routes Integration', () => {
   let app;
   let mockAddToCartUseCase;
+  let mockUpdateCartItemUseCase;
+  let mockRemoveCartItemUseCase;
+  let mockClearCartUseCase;
 
   const userId = '00000000-0000-0000-0000-000000000002';
   const productId = '10000000-0000-0000-0000-000000000001';
@@ -63,9 +66,21 @@ describe('Cart Routes Integration - POST /v1/cart/items', () => {
     mockAddToCartUseCase = {
       execute: vi.fn(),
     };
+    mockUpdateCartItemUseCase = {
+      execute: vi.fn(),
+    };
+    mockRemoveCartItemUseCase = {
+      execute: vi.fn(),
+    };
+    mockClearCartUseCase = {
+      execute: vi.fn(),
+    };
 
     const customRouter = createCartRouter({
       addToCartUseCase: mockAddToCartUseCase,
+      updateCartItemUseCase: mockUpdateCartItemUseCase,
+      removeCartItemUseCase: mockRemoveCartItemUseCase,
+      clearCartUseCase: mockClearCartUseCase,
     });
 
     app = createApp({ cartRoutes: customRouter });
@@ -221,5 +236,98 @@ describe('Cart Routes Integration - POST /v1/cart/items', () => {
     expect(response.status).toBe(422);
     expect(response.body.error.code).toBe('INSUFFICIENT_STOCK');
     expect(response.body.error.message).toContain('Insufficient stock');
+  });
+
+  it('Scenario 8: PATCH /v1/cart/items/:productId with valid body + valid JWT -> 200 with CartItem', async () => {
+    const mockItem = {
+      id: 'c4b3a2d1-0000-0000-0000-000000000001',
+      user_id: userId,
+      product_id: productId,
+      quantity: 5,
+      created_at: '2026-10-23T20:00:00.000Z',
+      updated_at: '2026-10-23T20:10:00.000Z',
+    };
+
+    mockUpdateCartItemUseCase.execute.mockResolvedValueOnce({
+      toJSON: () => mockItem,
+    });
+
+    const response = await request(app)
+      .patch(`/v1/cart/items/${productId}`)
+      .set('Authorization', `Bearer ${validToken}`)
+      .send({ quantity: 5 });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.quantity).toBe(5);
+    expect(response.body.meta.timestamp).toBeDefined();
+    expect(mockUpdateCartItemUseCase.execute).toHaveBeenCalledWith({
+      userId,
+      productId,
+      quantity: 5,
+    });
+  });
+
+  it('Scenario 9: PATCH /v1/cart/items/:productId with negative quantity -> 400, body.error.code === VALIDATION_ERROR', async () => {
+    const response = await request(app)
+      .patch(`/v1/cart/items/${productId}`)
+      .set('Authorization', `Bearer ${validToken}`)
+      .send({ quantity: -1 });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(mockUpdateCartItemUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it('Scenario 10: PATCH /v1/cart/items/:productId with no Authorization header -> 401, body.error.code === UNAUTHORIZED', async () => {
+    const response = await request(app).patch(`/v1/cart/items/${productId}`).send({ quantity: 2 });
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe('UNAUTHORIZED');
+    expect(mockUpdateCartItemUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it('Scenario 11: DELETE /v1/cart/items/:productId with valid JWT -> 204 No Content', async () => {
+    mockRemoveCartItemUseCase.execute.mockResolvedValueOnce();
+
+    const response = await request(app)
+      .delete(`/v1/cart/items/${productId}`)
+      .set('Authorization', `Bearer ${validToken}`);
+
+    expect(response.status).toBe(204);
+    expect(response.text).toBe('');
+    expect(mockRemoveCartItemUseCase.execute).toHaveBeenCalledWith({
+      userId,
+      productId,
+    });
+  });
+
+  it('Scenario 12: DELETE /v1/cart/items/:productId with no Authorization header -> 401, body.error.code === UNAUTHORIZED', async () => {
+    const response = await request(app).delete(`/v1/cart/items/${productId}`);
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe('UNAUTHORIZED');
+    expect(mockRemoveCartItemUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it('Scenario 13: DELETE /v1/cart with valid JWT -> 204 No Content', async () => {
+    mockClearCartUseCase.execute.mockResolvedValueOnce();
+
+    const response = await request(app)
+      .delete('/v1/cart')
+      .set('Authorization', `Bearer ${validToken}`);
+
+    expect(response.status).toBe(204);
+    expect(response.text).toBe('');
+    expect(mockClearCartUseCase.execute).toHaveBeenCalledWith({
+      userId,
+    });
+  });
+
+  it('Scenario 14: DELETE /v1/cart with no Authorization header -> 401, body.error.code === UNAUTHORIZED', async () => {
+    const response = await request(app).delete('/v1/cart');
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe('UNAUTHORIZED');
+    expect(mockClearCartUseCase.execute).not.toHaveBeenCalled();
   });
 });

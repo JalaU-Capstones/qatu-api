@@ -88,6 +88,44 @@ RETURNING id, user_id, product_id, quantity, created_at, updated_at`,
     return this.toDomain(rows[0]);
   }
 
+  async updateQuantity({ userId, productId, quantity }) {
+    const rows = await this.db.query(
+      `UPDATE public.cart_items
+       SET quantity = :quantity, updated_at = NOW()
+       WHERE user_id = :userId AND product_id = :productId
+       RETURNING id, user_id, product_id, quantity, created_at, updated_at`,
+      {
+        replacements: { userId, productId, quantity },
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    if (!rows || rows.length === 0) return null;
+    return this.toDomain(rows[0]);
+  }
+
+  async removeItem({ userId, productId }) {
+    await this.db.query(
+      `DELETE FROM public.cart_items
+       WHERE user_id = :userId AND product_id = :productId`,
+      {
+        replacements: { userId, productId },
+        type: QueryTypes.DELETE,
+      }
+    );
+  }
+
+  async clearCart(userId) {
+    await this.db.query(
+      `DELETE FROM public.cart_items
+       WHERE user_id = :userId`,
+      {
+        replacements: { userId },
+        type: QueryTypes.DELETE,
+      }
+    );
+  }
+
   /**
    * Returns the total number of distinct cart item rows for the given user.
    *
