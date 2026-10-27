@@ -9,6 +9,7 @@ createOrGet:
       - payments
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/orderId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:

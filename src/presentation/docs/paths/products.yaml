@@ -87,6 +87,8 @@ create:
       The product is not publicly visible until published via `PATCH /products/:id/publish`.
     tags:
       - products
+    parameters:
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:
@@ -171,6 +173,7 @@ update:
       - products
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/productId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:
@@ -236,6 +239,7 @@ delete:
       - products
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/productId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     responses:
       '204':
         description: Product deleted successfully.
@@ -259,6 +263,7 @@ publish:
       - products
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/productId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     responses:
       '200':
         description: Product published successfully.
@@ -294,6 +299,7 @@ unpublish:
       - products
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/productId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     responses:
       '200':
         description: Product unpublished successfully.

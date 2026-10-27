@@ -7,6 +7,8 @@ create:
       A buyer may only rate a product once per order. Ratings affect the product's and seller's average scores.
     tags:
       - ratings
+    parameters:
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:

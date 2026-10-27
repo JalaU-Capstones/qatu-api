@@ -54,6 +54,8 @@ updateMe:
       Only the fields provided in the request body are updated.
     tags:
       - profiles
+    parameters:
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:

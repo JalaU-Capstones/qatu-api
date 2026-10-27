@@ -7,6 +7,8 @@ create:
       A user may only have one pending or active application at a time.
     tags:
       - seller-applications
+    parameters:
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:
@@ -137,6 +139,7 @@ adminReview:
       - admin
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/applicationId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:

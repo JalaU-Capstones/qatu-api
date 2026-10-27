@@ -44,6 +44,8 @@ getOrClear:
     description: Removes all items from the authenticated user's cart.
     tags:
       - cart
+    parameters:
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     responses:
       '204':
         description: Cart cleared successfully.
@@ -62,6 +64,8 @@ add:
       If `quantity` is omitted, it defaults to 1. The operation is idempotent in shape but not in effect: calling it twice with `quantity: 1` results in `quantity: 2` (upsert semantics).
     tags:
       - cart
+    parameters:
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:
@@ -119,6 +123,7 @@ updateOrRemove:
       - cart
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/cartItemId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:
@@ -164,6 +169,7 @@ updateOrRemove:
       - cart
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/cartItemId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     responses:
       '204':
         description: Item removed from cart.

@@ -65,6 +65,7 @@ markRead:
       - notifications
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/notificationId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     responses:
       '200':
         description: Notification marked as read.
@@ -94,6 +95,8 @@ markAllRead:
     description: Marks all unread notifications for the authenticated user as read.
     tags:
       - notifications
+    parameters:
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     responses:
       '200':
         description: All notifications marked as read.

@@ -173,6 +173,51 @@ Preview the documentation visually to confirm proper rendering:
 
 ---
 
+## Authentication Flow (HttpOnly Cookies)
+
+Per **ADR-012**, the API uses HttpOnly cookies as the primary session mechanism. Bearer tokens are deprecated but supported during the Sprint 4 migration window.
+
+### Login / Register / Refresh
+
+`POST /v1/auth/login`, `POST /v1/auth/register`, and `POST /v1/auth/refresh` respond with three `Set-Cookie` headers:
+
+| Cookie          | Flags                                       | Purpose                                                                     |
+| --------------- | ------------------------------------------- | --------------------------------------------------------------------------- |
+| `access_token`  | `HttpOnly; Secure; SameSite=Strict; Path=/` | Supabase JWT — sent automatically on every authenticated request            |
+| `refresh_token` | `HttpOnly; Secure; SameSite=Strict; Path=/` | Long-lived, rotated on each `/refresh`                                      |
+| `csrf_token`    | `SameSite=Strict; Path=/` (NOT HttpOnly)    | Double-submit CSRF defense — frontend reads it and echoes in `X-CSRF-Token` |
+
+The response body returns `{ data: { user, profile, roles }, meta }` — **no token**.
+
+### Authenticated Requests
+
+The browser includes the `access_token` cookie automatically (same-origin or `credentials: 'include'` for CORS). Frontend **MUST NOT** read the token from JavaScript (it can't — it's HttpOnly).
+
+### CSRF Protection
+
+All state-changing requests (`POST`, `PATCH`, `DELETE`) MUST include the `X-CSRF-Token` header matching the `csrf_token` cookie value. Backend rejects mismatches with `403 { error: { code: 'INVALID_CSRF_TOKEN' } }`.
+
+**Exempt endpoints** (documented in `components/parameters/csrf-token.yaml`):
+
+- `POST /v1/auth/login`
+- `POST /v1/auth/register`
+- `POST /v1/auth/refresh`
+- `POST /v1/auth/logout`
+
+### Access Token Refresh
+
+When an authenticated request returns `401` with `error.code: 'REFRESH_REQUIRED'` (access token expired, refresh token still valid), the frontend calls `POST /v1/auth/refresh` once, then retries the original request. If `/refresh` also returns `401`, the frontend clears state and redirects to `/login`.
+
+### Logout
+
+`POST /v1/auth/logout` invalidates the session on Supabase and clears all three cookies with `Set-Cookie: <name>=; Max-Age=0`.
+
+### Migration Note (Sprint 4 → Sprint 5)
+
+During the transition, the backend `authMiddleware` accepts **both** the `access_token` cookie (preferred) and the legacy `Authorization: Bearer <token>` header. The `bearerAuth` scheme in the OpenAPI spec is marked **deprecated**. Clients MUST migrate to cookies. The Bearer fallback will be removed in Sprint 5.
+
+---
+
 ## Definition of Done (DoD) for API Contract
 
 A change to the API contract is considered complete when:
