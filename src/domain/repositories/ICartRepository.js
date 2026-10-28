@@ -41,6 +41,41 @@ export class ICartRepository {
   }
 
   /**
+   * Updates exact quantity of a cart item.
+   * @param {Object} params
+   * @param {string} params.userId
+   * @param {string} params.productId
+   * @param {number} params.quantity
+   * @returns {Promise<CartItem|null>}
+   */
+  // eslint-disable-next-line no-unused-vars
+  async updateQuantity({ userId, productId, quantity }) {
+    throw new Error('Method not implemented: updateQuantity');
+  }
+
+  /**
+   * Removes a single product item from the user's cart.
+   * @param {Object} params
+   * @param {string} params.userId
+   * @param {string} params.productId
+   * @returns {Promise<void>}
+   */
+  // eslint-disable-next-line no-unused-vars
+  async removeItem({ userId, productId }) {
+    throw new Error('Method not implemented: removeItem');
+  }
+
+  /**
+   * Clears all items in the user's cart.
+   * @param {string} userId
+   * @returns {Promise<void>}
+   */
+  // eslint-disable-next-line no-unused-vars
+  async clearCart(userId) {
+    throw new Error('Method not implemented: clearCart');
+  }
+
+  /**
    * Returns the total number of rows in the user's cart.
    * Used by the frontend to render the cart indicator badge.
    *
@@ -50,5 +85,15 @@ export class ICartRepository {
   // eslint-disable-next-line no-unused-vars
   async countByUser(userId) {
     throw new Error('Method not implemented: countByUser');
+  }
+
+  /**
+   * Returns the cart item for the given identifier, or null if it does not exist.
+   * @param {string} id - Cart Item identifier
+   * @returns {Promise<CartItem|null>}
+   */
+  // eslint-disable-next-line no-unused-vars
+  async findById(id) {
+    throw new Error('Method not implemented.');
   }
 }
