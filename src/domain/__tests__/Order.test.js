@@ -93,4 +93,3 @@ describe('Order Domain Entity', () => {
     expect(json.items[0].product_name).toBe('Poncho');
   });
 });
-

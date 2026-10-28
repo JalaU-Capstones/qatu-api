@@ -37,4 +37,3 @@ export class IOrderRepository {
     throw new Error('Method not implemented: findById');
   }
 }
-

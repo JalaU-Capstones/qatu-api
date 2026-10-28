@@ -86,4 +86,3 @@ describe('GetOrderByIdUseCase', () => {
     expect(result.data.id).toBe(orderId);
   });
 });
-
