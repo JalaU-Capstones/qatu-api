@@ -42,8 +42,7 @@ export class RefreshSessionUseCase {
       throw err;
     }
 
-    const user = authResult.user || authResult.session?.user || { id: authResult.userId };
-    const userId = user.id || authResult.userId;
+    const userId = authResult.userId;
     const profile = await this.profileRepository.findById(userId);
     if (!profile) {
       const err = new Error('User profile not found');
@@ -55,12 +54,10 @@ export class RefreshSessionUseCase {
     const response = new LoginResponseDTO({
       user: {
         id: userId,
-        email: user.email || profile.email,
-        created_at:
-          user.created_at ||
-          (profile.createdAt
-            ? new Date(profile.createdAt).toISOString()
-            : new Date().toISOString()),
+        email: profile.email,
+        created_at: profile.createdAt
+          ? new Date(profile.createdAt).toISOString()
+          : new Date().toISOString(),
       },
       profile,
       roles: profile.roles || [],
@@ -69,8 +66,8 @@ export class RefreshSessionUseCase {
     return {
       response,
       session: {
-        accessToken: authResult.accessToken || authResult.session?.access_token,
-        refreshToken: authResult.refreshToken || authResult.session?.refresh_token,
+        accessToken: authResult.accessToken,
+        refreshToken: authResult.refreshToken,
       },
     };
   }

@@ -12,6 +12,8 @@ vi.mock('../../../infrastructure/config/supabase.js', () => ({
       signUp: vi.fn(),
       refreshSession: vi.fn(),
       admin: {
+        createUser: vi.fn(),
+        listUsers: vi.fn(),
         signOut: vi.fn(),
       },
     },
@@ -310,6 +312,12 @@ describe('Auth Routes Integration', () => {
 
   describe('POST /v1/auth/refresh', () => {
     it('returns 200 and rotates cookies when refresh_token cookie is provided', async () => {
+      mockAuthService.refreshSession.mockResolvedValueOnce({
+        userId: 'user-uuid-999',
+        accessToken: 'new.jwt.token',
+        refreshToken: 'new.refresh.token',
+      });
+
       const response = await request(app)
         .post('/v1/auth/refresh')
         .set('Cookie', ['refresh_token=valid.refresh.token']);
@@ -320,21 +328,11 @@ describe('Auth Routes Integration', () => {
       expect(response.headers['set-cookie'].length).toBe(3);
     });
 
-    it('returns 200 when refresh_token is provided in request body', async () => {
-      const response = await request(app)
-        .post('/v1/auth/refresh')
-        .send({ refresh_token: 'valid.refresh.token' });
-
-      expect(response.status).toBe(200);
-      expect(response.body.data.user.id).toBe('user-uuid-999');
-      expect(response.headers['set-cookie']).toBeDefined();
-    });
-
-    it('returns 401 when refresh_token is missing', async () => {
+    it('returns 401 when refresh_token cookie is missing', async () => {
       const response = await request(app).post('/v1/auth/refresh').send({});
 
       expect(response.status).toBe(401);
-      expect(response.body.error.code).toBe('REFRESH_TOKEN_REQUIRED');
+      expect(response.body.error.code).toBe('UNAUTHORIZED');
     });
   });
 
@@ -359,6 +357,218 @@ describe('Auth Routes Integration', () => {
       const response = await request(app).get('/health');
       expect(response.status).toBe(200);
       expect(response.body).toEqual({ status: 'ok' });
+    });
+  });
+
+  describe('Full cookie-auth cycle (E2E)', () => {
+    const e2eUserId = '70bad968-8a66-4490-badf-3cc12438c053';
+    const cycleUserId = '63156ff9-3909-4ec1-a6bc-978c51d2d16c';
+
+    it('register sets access_token, refresh_token, csrf_token; body has no token', async () => {
+      supabase.auth.admin.createUser.mockResolvedValueOnce({
+        data: {
+          user: { id: e2eUserId, email: 'e2e@example.com', created_at: '2026-10-01T00:00:00Z' },
+        },
+        error: null,
+      });
+      supabase.auth.admin.listUsers.mockResolvedValueOnce({
+        data: { users: [] },
+        error: null,
+      });
+      supabase.auth.signInWithPassword.mockResolvedValueOnce({
+        data: {
+          session: { access_token: 'atk-1', refresh_token: 'rtk-1' },
+          user: { id: e2eUserId, email: 'e2e@example.com', user_metadata: {} },
+        },
+        error: null,
+      });
+
+      const agent = request.agent(createApp());
+      const res = await agent.post('/v1/auth/register').send({
+        email: 'e2e@example.com',
+        password: 'StrongPassword123!',
+        username: 'e2e_user',
+        full_name: 'E2E User',
+      });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data).toHaveProperty('user');
+      expect(res.body.data).toHaveProperty('profile');
+      expect(res.body.data).toHaveProperty('roles');
+      expect(res.body.data.token).toBeUndefined();
+      expect(res.body.data.session).toBeUndefined();
+
+      const cookies = res.headers['set-cookie'];
+      expect(cookies).toBeDefined();
+      const cookieNames = cookies.map((c) => c.split('=')[0]);
+      expect(cookieNames).toContain('access_token');
+      expect(cookieNames).toContain('refresh_token');
+      expect(cookieNames).toContain('csrf_token');
+
+      // Verify flags
+      const accessCookie = cookies.find((c) => c.startsWith('access_token='));
+      expect(accessCookie).toMatch(/HttpOnly/i);
+      expect(accessCookie).toMatch(/SameSite=Strict/i);
+
+      const csrfCookie = cookies.find((c) => c.startsWith('csrf_token='));
+      expect(csrfCookie).not.toMatch(/HttpOnly/i);
+      expect(csrfCookie).toMatch(/SameSite=Strict/i);
+    });
+
+    it('GET /me returns user+profile+roles (no token) when cookie-authenticated', async () => {
+      supabase.auth.getUser.mockResolvedValueOnce({
+        data: {
+          user: {
+            id: e2eUserId,
+            email: 'e2e@example.com',
+            role: 'authenticated',
+            user_metadata: { role: 'buyer' },
+          },
+        },
+        error: null,
+      });
+
+      const agent = request.agent(createApp());
+      // Inject cookies manually (mock session from register)
+      agent.jar.setCookie('access_token=atk-1; Path=/; HttpOnly');
+
+      const res = await agent.get('/v1/auth/me');
+      expect(res.status).toBe(200);
+      expect(res.body.data.user.id).toBe(e2eUserId);
+      expect(res.body.data.token).toBeUndefined();
+    });
+
+    it('GET /me returns 401 when no session cookie is present', async () => {
+      const agent = request.agent(createApp());
+      const res = await agent.get('/v1/auth/me');
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe('UNAUTHORIZED');
+    });
+
+    it('POST /refresh rotates cookies WITHOUT needing X-CSRF-Token (auth-exempt)', async () => {
+      supabase.auth.refreshSession.mockResolvedValueOnce({
+        data: {
+          session: {
+            access_token: 'atk-2',
+            refresh_token: 'rtk-2',
+            user: { id: e2eUserId },
+          },
+          user: { id: e2eUserId },
+        },
+        error: null,
+      });
+
+      const agent = request.agent(createApp());
+      agent.jar.setCookie('refresh_token=rtk-1; Path=/; HttpOnly');
+
+      const res = await agent.post('/v1/auth/refresh');
+      expect(res.status).toBe(200);
+      expect(res.body.data.token).toBeUndefined();
+
+      const cookies = res.headers['set-cookie'];
+      expect(cookies.map((c) => c.split('=')[0])).toEqual(
+        expect.arrayContaining(['access_token', 'refresh_token', 'csrf_token'])
+      );
+
+      // CRITICAL: no X-CSRF-Token header was sent — this proves /refresh is CSRF-exempt
+    });
+
+    it('POST /logout clears all cookies and returns 204 (without X-CSRF-Token needed)', async () => {
+      supabase.auth.admin.signOut.mockResolvedValueOnce({ error: null });
+
+      const agent = request.agent(createApp());
+      agent.jar.setCookie('access_token=atk-1; Path=/; HttpOnly');
+      agent.jar.setCookie('refresh_token=rtk-1; Path=/; HttpOnly');
+
+      const res = await agent.post('/v1/auth/logout');
+      expect(res.status).toBe(204);
+
+      const cookies = res.headers['set-cookie'];
+      const clearedCookies = cookies.filter((c) => /Max-Age=0|Expires=Thu, 01 Jan 1970/i.test(c));
+      expect(clearedCookies.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('full cycle: register → me → refresh → logout → me returns 401', async () => {
+      // Register mocks
+      supabase.auth.admin.createUser.mockResolvedValueOnce({
+        data: {
+          user: {
+            id: cycleUserId,
+            email: 'cycle@example.com',
+            created_at: '2026-10-01T00:00:00Z',
+          },
+        },
+        error: null,
+      });
+      supabase.auth.admin.listUsers.mockResolvedValueOnce({ data: { users: [] }, error: null });
+      supabase.auth.signInWithPassword.mockResolvedValueOnce({
+        data: {
+          session: { access_token: 'atk-initial', refresh_token: 'rtk-initial' },
+          user: { id: cycleUserId, email: 'cycle@example.com', user_metadata: {} },
+        },
+        error: null,
+      });
+
+      // Me mock (2 calls — after register, and after logout which should fail)
+      supabase.auth.getUser
+        .mockResolvedValueOnce({
+          data: {
+            user: {
+              id: cycleUserId,
+              email: 'cycle@example.com',
+              role: 'authenticated',
+              user_metadata: { role: 'buyer' },
+            },
+          },
+          error: null,
+        })
+        .mockResolvedValueOnce({ data: { user: null }, error: { message: 'invalid' } });
+
+      // Refresh mock
+      supabase.auth.refreshSession.mockResolvedValueOnce({
+        data: {
+          session: {
+            access_token: 'atk-rotated',
+            refresh_token: 'rtk-rotated',
+            user: { id: cycleUserId },
+          },
+          user: { id: cycleUserId },
+        },
+        error: null,
+      });
+
+      // SignOut mock
+      supabase.auth.admin.signOut.mockResolvedValueOnce({ error: null });
+
+      const agent = request.agent(createApp());
+
+      // 1. Register
+      const r1 = await agent.post('/v1/auth/register').send({
+        email: 'cycle@example.com',
+        password: 'StrongPassword123!',
+        username: 'cycle_user',
+        full_name: 'Cycle User',
+      });
+      expect(r1.status).toBe(201);
+
+      // 2. Me works
+      const r2 = await agent.get('/v1/auth/me');
+      expect(r2.status).toBe(200);
+      expect(r2.body.data.user.id).toBe(cycleUserId);
+
+      // 3. Refresh rotates cookies
+      const r3 = await agent.post('/v1/auth/refresh');
+      expect(r3.status).toBe(200);
+      const rotatedCookies = r3.headers['set-cookie'].find((c) => c.startsWith('access_token='));
+      expect(rotatedCookies).toContain('atk-rotated');
+
+      // 4. Logout clears
+      const r4 = await agent.post('/v1/auth/logout');
+      expect(r4.status).toBe(204);
+
+      // 5. Me fails after logout
+      const r5 = await agent.get('/v1/auth/me');
+      expect(r5.status).toBe(401);
     });
   });
 });

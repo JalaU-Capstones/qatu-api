@@ -124,21 +124,17 @@ export class AuthController {
         throw new Error('refreshSessionUseCase is not configured');
       }
 
-      const refreshToken = req.cookies?.refresh_token || req.body?.refresh_token;
-
+      const refreshToken = req.cookies?.refresh_token || null;
       if (!refreshToken) {
-        return res.status(401).json({
-          error: {
-            code: 'REFRESH_TOKEN_REQUIRED',
-            message: 'Refresh token is required',
-          },
-          meta: {
-            timestamp: new Date().toISOString(),
-          },
-        });
+        const err = new Error('Refresh token is required');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
       }
 
-      const { response, session } = await this.refreshSessionUseCase.execute({ refreshToken });
+      const { response, session } = await this.refreshSessionUseCase.execute({
+        refreshToken,
+      });
 
       const csrfToken = generateCsrfToken();
       setSessionCookies(res, {

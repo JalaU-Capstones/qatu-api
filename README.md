@@ -114,6 +114,16 @@ Check the `Makefile` for available commands by running:
 make help
 ```
 
+### Authentication
+
+Session uses **HttpOnly cookies** (see `ADR-012`). The client stores no token in `localStorage`/`sessionStorage`.
+
+Register/Login responses set `access_token`, `refresh_token`, `csrf_token` cookies automatically. Subsequent authenticated requests must use `credentials: 'include'` (or `same-origin` in the browser default).
+
+**CSRF:** all state-changing requests (`POST`, `PATCH`, `DELETE`) MUST include `X-CSRF-Token` header matching the `csrf_token` cookie. Auth endpoints (`/v1/auth/*`) are exempt.
+
+**Refresh:** on `401` with `error.code === 'REFRESH_REQUIRED'`, call `POST /v1/auth/refresh` (no CSRF header required) and retry the original request.
+
 ## Database Migrations
 
 Migrations are managed with Sequelize CLI. The configuration is in `.sequelizerc` and `src/infrastructure/config/sequelize.config.js`.

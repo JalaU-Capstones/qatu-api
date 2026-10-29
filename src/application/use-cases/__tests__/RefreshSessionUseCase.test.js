@@ -61,8 +61,9 @@ describe('RefreshSessionUseCase', () => {
 
   it('throws 404 NOT_FOUND when user profile is not found', async () => {
     mockAuthService.refreshSession.mockResolvedValue({
-      user: { id: 'user-uuid-1', email: 'buyer@example.com', created_at: '2026-01-01' },
-      session: { access_token: 'new-access', refresh_token: 'new-refresh' },
+      userId: 'user-uuid-1',
+      accessToken: 'new-access',
+      refreshToken: 'new-refresh',
     });
     mockProfileRepository.findById.mockResolvedValue(null);
 
@@ -75,8 +76,9 @@ describe('RefreshSessionUseCase', () => {
 
   it('returns response and session tokens on successful refresh', async () => {
     mockAuthService.refreshSession.mockResolvedValue({
-      user: { id: 'user-uuid-1', email: 'buyer@example.com', created_at: '2026-01-01' },
-      session: { access_token: 'new-access', refresh_token: 'new-refresh' },
+      userId: 'user-uuid-1',
+      accessToken: 'new-access',
+      refreshToken: 'new-refresh',
     });
     mockProfileRepository.findById.mockResolvedValue(mockProfile);
 

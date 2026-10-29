@@ -243,19 +243,16 @@ describe('AuthController', () => {
       );
     });
 
-    it('returns 401 when no refresh token is provided in cookies or body', async () => {
+    it('calls next with 401 UNAUTHORIZED when no refresh token is provided in cookies', async () => {
       req.cookies = {};
-      req.body = {};
 
       await controller.refresh(req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(401);
-      expect(res.json).toHaveBeenCalledWith(
+      expect(next).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: {
-            code: 'REFRESH_TOKEN_REQUIRED',
-            message: 'Refresh token is required',
-          },
+          code: 'UNAUTHORIZED',
+          statusCode: 401,
+          message: 'Refresh token is required',
         })
       );
     });
@@ -285,24 +282,6 @@ describe('AuthController', () => {
       expect(res.cookie).toHaveBeenCalledTimes(3);
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(mockDto);
-    });
-
-    it('reads refresh token from req.body when cookie is absent', async () => {
-      req.cookies = {};
-      req.body = { refresh_token: 'body-refresh-token' };
-
-      const mockDto = { data: {}, meta: {} };
-      refreshSessionUseCaseMock.execute.mockResolvedValue({
-        response: mockDto,
-        session: { accessToken: 'new-atk', refreshToken: 'new-rtk' },
-      });
-
-      await controller.refresh(req, res, next);
-
-      expect(refreshSessionUseCaseMock.execute).toHaveBeenCalledWith({
-        refreshToken: 'body-refresh-token',
-      });
-      expect(res.status).toHaveBeenCalledWith(200);
     });
 
     it('calls next with error if refreshSessionUseCase throws', async () => {
