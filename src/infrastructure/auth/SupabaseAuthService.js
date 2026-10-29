@@ -120,7 +120,7 @@ export class SupabaseAuthService extends IAuthService {
    * @param {Object} params
    * @param {string} params.email
    * @param {string} params.password
-   * @returns {Promise<{ id: string, email: string, created_at: string, token: string, user_metadata: Object }>}
+   * @returns {Promise<{ id: string, email: string, created_at: string, token: string, refresh_token: string, user_metadata: Object }>}
    */
   async loginUser({ email, password }) {
     if (!this.client) {
@@ -153,8 +153,117 @@ export class SupabaseAuthService extends IAuthService {
       email: data.user.email || normalizedEmail,
       created_at: data.user.created_at || new Date().toISOString(),
       token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
       user_metadata: data.user.user_metadata || {},
     };
+  }
+
+  /**
+   * Exchanges a refresh token for a new session (rotated access_token +
+   * rotated refresh_token, per Supabase defaults). Used by the
+   * `POST /v1/auth/refresh` endpoint.
+   *
+   * Supabase rotates the refresh token on each call — the caller MUST
+   * update the `refresh_token` cookie with the new value or the next
+   * refresh will fail.
+   *
+   * @param {string} refreshToken
+   * @returns {Promise<{
+   *   accessToken: string,
+   *   refreshToken: string,
+   *   userId: string,
+   *   expiresAt: number,
+   *   session: Object,
+   * }>}
+   * @throws {Error & { code: string, statusCode: number }}
+   */
+  async refreshSession(refreshToken) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    if (!refreshToken || typeof refreshToken !== 'string') {
+      const err = new Error('Refresh token is required');
+      err.code = 'INVALID_REQUEST';
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const { data, error } = await this.client.auth.refreshSession({
+      refresh_token: refreshToken,
+    });
+
+    if (error || !data?.session?.access_token || !data?.session?.refresh_token) {
+      const err = new Error('Refresh failed');
+      err.code = 'UNAUTHORIZED';
+      err.statusCode = 401;
+      throw err;
+    }
+
+    return {
+      accessToken: data.session.access_token,
+      refreshToken: data.session.refresh_token,
+      userId: data.session.user?.id ?? null,
+      expiresAt: data.session.expires_at ?? null,
+      session: data.session,
+    };
+  }
+
+  /**
+   * Revokes the current session on Supabase. Per ADR-012 / decision A3:
+   *
+   *  1. Try `admin.signOut(accessToken)` — revokes the current session
+   *     (default scope 'local').
+   *  2. If that fails (e.g. the access token is expired), attempt
+   *     `refreshSession(refreshToken)` to obtain a fresh JWT, then
+   *     `admin.signOut(freshToken)`.
+   *  3. If BOTH attempts fail, return `{ success: false, reason: 'revocation_failed' }`.
+   *
+   * The caller (`LogoutUseCase` in API-35-08) MUST clear the session cookies
+   * regardless of the result. This method never throws for revocation
+   * failures — it returns a result object so the caller can decide. It only
+   * throws when the Supabase client is not initialized (programming error).
+   *
+   * @param {Object} params
+   * @param {string} [params.accessToken]
+   * @param {string} [params.refreshToken]
+   * @returns {Promise<{ success: boolean, reason?: string }>}
+   */
+  async logoutUser({ accessToken, refreshToken }) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    // Attempt 1: direct signOut with the current access token.
+    if (accessToken) {
+      try {
+        const { error } = await this.client.auth.admin.signOut(accessToken);
+        if (!error) return { success: true };
+      } catch {
+        // fall through to attempt 2
+      }
+    }
+
+    // Attempt 2: refresh first, then signOut with the fresh token.
+    if (refreshToken) {
+      try {
+        const { data: refreshed, error: refreshError } = await this.client.auth.refreshSession({
+          refresh_token: refreshToken,
+        });
+
+        if (!refreshError && refreshed?.session?.access_token) {
+          const { error: signOutError } = await this.client.auth.admin.signOut(
+            refreshed.session.access_token
+          );
+          if (!signOutError) return { success: true };
+        }
+      } catch {
+        // fall through
+      }
+    }
+
+    // Both attempts failed. Return non-throwing failure so caller clears cookies.
+    return { success: false, reason: 'revocation_failed' };
   }
 
   /**

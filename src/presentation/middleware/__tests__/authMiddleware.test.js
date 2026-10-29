@@ -90,6 +90,50 @@ describe('authMiddleware', () => {
       expect(supabase.auth.getUser).toHaveBeenCalledWith('cookie-token');
       expect(req.authMethod).toBe('cookie');
     });
+
+    it('falls back to user.role when user_metadata.role is missing (cookie auth)', async () => {
+      supabase.auth.getUser.mockResolvedValueOnce({
+        data: {
+          user: {
+            id: 'u-fallback',
+            email: 'fallback@example.com',
+            role: 'authenticated',
+            user_metadata: {}, // NO role
+          },
+        },
+        error: null,
+      });
+      req.cookies = { access_token: 'valid-cookie' };
+
+      await authMiddleware(req, res, next);
+
+      expect(next).toHaveBeenCalledOnce();
+      expect(req.user).toEqual({
+        id: 'u-fallback',
+        email: 'fallback@example.com',
+        role: 'authenticated', // fallback to user.role
+      });
+    });
+
+    it('sets role to null when neither user_metadata.role nor user.role exists', async () => {
+      supabase.auth.getUser.mockResolvedValueOnce({
+        data: {
+          user: {
+            id: 'u-norole',
+            email: 'norole@example.com',
+            role: null,
+            user_metadata: {},
+          },
+        },
+        error: null,
+      });
+      req.cookies = { access_token: 'valid-cookie' };
+
+      await authMiddleware(req, res, next);
+
+      expect(next).toHaveBeenCalledOnce();
+      expect(req.user.role).toBeNull();
+    });
   });
 
   describe('bearer fallback', () => {
@@ -137,6 +181,27 @@ describe('authMiddleware', () => {
 
       expect(res.status).toHaveBeenCalledWith(401);
       expect(supabase.auth.getUser).not.toHaveBeenCalled();
+    });
+
+    it('falls back to user.role when user_metadata.role is missing (bearer auth)', async () => {
+      supabase.auth.getUser.mockResolvedValueOnce({
+        data: {
+          user: {
+            id: 'u-fallback-b',
+            email: 'fallback-b@example.com',
+            role: 'authenticated',
+            user_metadata: {},
+          },
+        },
+        error: null,
+      });
+      req.cookies = {};
+      req.headers.authorization = 'Bearer valid-bearer';
+
+      await authMiddleware(req, res, next);
+
+      expect(next).toHaveBeenCalledOnce();
+      expect(req.user.role).toBe('authenticated');
     });
   });
 

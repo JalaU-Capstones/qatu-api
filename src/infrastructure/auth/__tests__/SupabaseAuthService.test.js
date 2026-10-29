@@ -11,9 +11,11 @@ describe('SupabaseAuthService', () => {
         admin: {
           createUser: vi.fn(),
           listUsers: vi.fn(),
+          signOut: vi.fn(),
         },
         signInWithPassword: vi.fn(),
         signUp: vi.fn(),
+        refreshSession: vi.fn(),
       },
     };
     authService = new SupabaseAuthService({ client: mockClient });
@@ -246,6 +248,161 @@ describe('SupabaseAuthService', () => {
       const service = new SupabaseAuthService({ client: basicClient });
       const exists = await service.emailExists('test@example.com');
       expect(exists).toBe(false);
+    });
+  });
+
+  describe('loginUser', () => {
+    it('returns refresh_token alongside token on successful login', async () => {
+      mockClient.auth.signInWithPassword.mockResolvedValueOnce({
+        data: {
+          session: {
+            access_token: 'access-jwt',
+            refresh_token: 'refresh-uuid',
+          },
+          user: {
+            id: 'u-1',
+            email: 'buyer@example.com',
+            created_at: '2026-10-01T00:00:00.000Z',
+            user_metadata: {},
+          },
+        },
+        error: null,
+      });
+
+      const result = await authService.loginUser({
+        email: 'buyer@example.com',
+        password: 'StrongPassword123!',
+      });
+
+      expect(result.token).toBe('access-jwt');
+      expect(result.refresh_token).toBe('refresh-uuid');
+    });
+  });
+
+  describe('refreshSession', () => {
+    it('returns rotated tokens on success', async () => {
+      mockClient.auth.refreshSession.mockResolvedValueOnce({
+        data: {
+          session: {
+            access_token: 'new-access-jwt',
+            refresh_token: 'new-refresh-uuid',
+            expires_at: 9999999999,
+            user: { id: 'u-1' },
+          },
+          user: { id: 'u-1' },
+        },
+        error: null,
+      });
+
+      const result = await authService.refreshSession('old-refresh-uuid');
+
+      expect(mockClient.auth.refreshSession).toHaveBeenCalledWith({
+        refresh_token: 'old-refresh-uuid',
+      });
+      expect(result.accessToken).toBe('new-access-jwt');
+      expect(result.refreshToken).toBe('new-refresh-uuid');
+      expect(result.userId).toBe('u-1');
+    });
+
+    it('throws INVALID_REQUEST (400) when refresh token is missing', async () => {
+      await expect(authService.refreshSession('')).rejects.toMatchObject({
+        code: 'INVALID_REQUEST',
+        statusCode: 400,
+      });
+      expect(mockClient.auth.refreshSession).not.toHaveBeenCalled();
+    });
+
+    it('throws INVALID_REQUEST (400) when refresh token is not a string', async () => {
+      await expect(authService.refreshSession(123)).rejects.toMatchObject({
+        code: 'INVALID_REQUEST',
+        statusCode: 400,
+      });
+    });
+
+    it('throws UNAUTHORIZED (401) when Supabase rejects the refresh', async () => {
+      mockClient.auth.refreshSession.mockResolvedValueOnce({
+        data: { session: null, user: null },
+        error: { message: 'Invalid refresh token' },
+      });
+
+      await expect(authService.refreshSession('expired-refresh')).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+        statusCode: 401,
+      });
+    });
+  });
+
+  describe('logoutUser', () => {
+    it('returns success when admin.signOut succeeds on the first attempt', async () => {
+      mockClient.auth.admin.signOut.mockResolvedValueOnce({ error: null });
+
+      const result = await authService.logoutUser({
+        accessToken: 'valid-jwt',
+        refreshToken: 'refresh-uuid',
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockClient.auth.admin.signOut).toHaveBeenCalledTimes(1);
+      expect(mockClient.auth.admin.signOut).toHaveBeenCalledWith('valid-jwt');
+    });
+
+    it('falls back to refreshSession then signOut when direct signOut fails', async () => {
+      mockClient.auth.admin.signOut
+        .mockResolvedValueOnce({ error: { message: 'JWT expired' } })
+        .mockResolvedValueOnce({ error: null }); // second call after refresh
+      mockClient.auth.refreshSession.mockResolvedValueOnce({
+        data: {
+          session: {
+            access_token: 'fresh-jwt',
+            refresh_token: 'fresh-refresh-uuid',
+          },
+          user: { id: 'u-1' },
+        },
+        error: null,
+      });
+
+      const result = await authService.logoutUser({
+        accessToken: 'expired-jwt',
+        refreshToken: 'valid-refresh-uuid',
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockClient.auth.admin.signOut).toHaveBeenCalledTimes(2);
+      expect(mockClient.auth.admin.signOut).toHaveBeenNthCalledWith(1, 'expired-jwt');
+      expect(mockClient.auth.admin.signOut).toHaveBeenNthCalledWith(2, 'fresh-jwt');
+    });
+
+    it('returns { success: false } when both attempts fail', async () => {
+      mockClient.auth.admin.signOut.mockResolvedValueOnce({ error: { message: 'JWT expired' } });
+      mockClient.auth.refreshSession.mockResolvedValueOnce({
+        data: { session: null, user: null },
+        error: { message: 'Invalid refresh token' },
+      });
+
+      const result = await authService.logoutUser({
+        accessToken: 'expired-jwt',
+        refreshToken: 'expired-refresh',
+      });
+
+      expect(result).toEqual({ success: false, reason: 'revocation_failed' });
+    });
+
+    it('does not throw when Supabase SDK methods throw unexpectedly', async () => {
+      mockClient.auth.admin.signOut.mockRejectedValueOnce(new Error('network'));
+      mockClient.auth.refreshSession.mockRejectedValueOnce(new Error('network'));
+
+      const result = await authService.logoutUser({
+        accessToken: 'any',
+        refreshToken: 'any',
+      });
+
+      expect(result).toEqual({ success: false, reason: 'revocation_failed' });
+    });
+
+    it('handles missing accessToken and refreshToken gracefully', async () => {
+      const result = await authService.logoutUser({});
+      expect(result).toEqual({ success: false, reason: 'revocation_failed' });
+      expect(mockClient.auth.admin.signOut).not.toHaveBeenCalled();
     });
   });
 });
