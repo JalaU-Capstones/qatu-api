@@ -1,0 +1,23 @@
+type: apiKey
+in: cookie
+name: access_token
+description: |
+  Supabase-issued **access token** delivered as an HttpOnly cookie set by
+  `POST /v1/auth/login`, `POST /v1/auth/register`, and `POST /v1/auth/refresh`.
+
+  **Cookie flags (enforced by the backend on every `Set-Cookie`):**
+  - `HttpOnly` — not readable from JavaScript
+  - `Secure` — sent only over HTTPS in production
+  - `SameSite=Strict` — not sent on cross-site requests (CSRF defense-in-depth)
+  - `Path=/` — scoped to the entire API surface
+  - `Max-Age` matches the Supabase access token TTL (~3600 seconds)
+
+  **Second cookie also set:** `refresh_token` (long-lived, rotated by `/refresh`).
+  **Third cookie set:** `csrf_token` (**NOT** HttpOnly — the frontend must read
+  it and echo it in the `X-CSRF-Token` header on state-changing requests).
+
+  **Migration note:** during the Sprint 4 transition window, the backend
+  `authMiddleware` accepts both `access_token` cookie and legacy
+  `Authorization: Bearer <token>` header. The Bearer fallback is documented
+  as deprecated and will be removed in Sprint 5. Clients MUST migrate to the
+  cookie flow.

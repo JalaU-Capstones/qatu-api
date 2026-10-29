@@ -10,6 +10,7 @@ upload:
       - product-images
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/productId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:
@@ -116,6 +117,7 @@ deleteImage:
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/productId'
       - $ref: '../components/parameters/path-ids.yaml#/imageId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     responses:
       '204':
         description: Image deleted successfully.

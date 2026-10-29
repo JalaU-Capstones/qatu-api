@@ -59,6 +59,8 @@ adminCreate:
     tags:
       - categories
       - admin
+    parameters:
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:
@@ -132,6 +134,7 @@ adminUpdate:
       - admin
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/categoryId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:
@@ -197,6 +200,7 @@ adminDelete:
       - admin
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/categoryId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     responses:
       '204':
         description: Category deleted successfully.

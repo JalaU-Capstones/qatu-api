@@ -56,6 +56,8 @@ listOrCreate:
       for this buyer-seller-product combination.
     tags:
       - conversations
+    parameters:
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:

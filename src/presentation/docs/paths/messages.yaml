@@ -65,6 +65,7 @@ listOrSend:
       - messages
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/conversationId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:

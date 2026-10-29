@@ -25,7 +25,7 @@ servers:
     description: Production (placeholder)
 
 security:
-  - bearerAuth: []
+  - cookieAuth: []
 
 tags:
   - name: auth
@@ -64,6 +64,9 @@ paths:
 
   /auth/login:
     $ref: './paths/auth.yaml#/login'
+
+  /auth/refresh:
+    $ref: './paths/auth.yaml#/refresh'
 
   /auth/logout:
     $ref: './paths/auth.yaml#/logout'
@@ -222,6 +225,8 @@ components:
   securitySchemes:
     bearerAuth:
       $ref: './components/securitySchemes/bearerAuth.yaml'
+    cookieAuth:
+      $ref: './components/securitySchemes/cookieAuth.yaml'
 
   schemas:
     # Shared / primitives
@@ -305,6 +310,8 @@ components:
       $ref: './components/parameters/path-ids.yaml#/notificationId'
     sellerId:
       $ref: './components/parameters/path-ids.yaml#/sellerId'
+    csrfToken:
+      $ref: './components/parameters/csrf-token.yaml#/csrfToken'
 
   responses:
     BadRequest:

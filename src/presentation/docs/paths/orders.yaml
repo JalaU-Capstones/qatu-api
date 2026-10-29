@@ -47,6 +47,8 @@ listOrCreate:
       Clears the cart on success. Requires at least one item in the cart.
     tags:
       - orders
+    parameters:
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:
@@ -151,6 +153,7 @@ updateStatus:
       - orders
     parameters:
       - $ref: '../components/parameters/path-ids.yaml#/orderId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
     requestBody:
       required: true
       content:

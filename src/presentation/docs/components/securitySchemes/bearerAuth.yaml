@@ -2,5 +2,10 @@ type: http
 scheme: bearer
 bearerFormat: JWT
 description: |
+  **⚠️ DEPRECATED (Sprint 4 → Sprint 5):** Bearer JWT in the `Authorization`
+  header. Kept in the contract only to document the backend's transitional
+  fallback during the HttpOnly cookie migration (ADR-012). New clients MUST
+  use `cookieAuth`. This scheme will be removed in Sprint 5.
+
   JWT issued by Supabase Auth. Send in the `Authorization: Bearer <token>` header.
   Required for all protected endpoints. See `Architecture/Security`.
