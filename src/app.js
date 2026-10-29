@@ -1,8 +1,10 @@
+import cookieParser from 'cookie-parser';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { registerApiDocs } from './presentation/docs/swagger.js';
 import { corsMiddleware } from './presentation/middleware/corsMiddleware.js';
+import { csrfMiddleware } from './presentation/middleware/csrfMiddleware.js';
 import { errorHandler } from './presentation/middleware/errorHandler.js';
 import { authRouter } from './presentation/routes/authRoutes.js';
 import { cartRouter } from './presentation/routes/cartRoutes.js';
@@ -26,6 +28,9 @@ export function createApp({
   // Payload Limit & JSON Body Parser
   app.use(express.json({ limit: '10kb' }));
 
+  // Cookie Parser
+  app.use(cookieParser());
+
   // Interactive Swagger UI API Documentation
   registerApiDocs(app);
 
@@ -33,6 +38,7 @@ export function createApp({
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 20, // Limit each IP to 20 requests per window
+    skip: (req) => req.path === '/refresh',
     message: {
       error: {
         code: 'TOO_MANY_REQUESTS',
@@ -85,6 +91,9 @@ export function createApp({
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
   });
+
+  // CSRF Protection (verifies X-CSRF-Token on mutating requests that authenticate via cookies)
+  app.use(csrfMiddleware);
 
   // API Routes
   app.use('/v1/auth', authLimiter, authRoutes);

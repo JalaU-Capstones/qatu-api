@@ -4,6 +4,9 @@ import { AuthController } from '../AuthController.js';
 describe('AuthController', () => {
   let registerUseCaseMock;
   let loginUseCaseMock;
+  let getCurrentUserUseCaseMock;
+  let refreshSessionUseCaseMock;
+  let logoutUseCaseMock;
   let controller;
   let req;
   let res;
@@ -16,18 +19,33 @@ describe('AuthController', () => {
     loginUseCaseMock = {
       execute: vi.fn(),
     };
+    getCurrentUserUseCaseMock = {
+      execute: vi.fn(),
+    };
+    refreshSessionUseCaseMock = {
+      execute: vi.fn(),
+    };
+    logoutUseCaseMock = {
+      execute: vi.fn(),
+    };
     controller = new AuthController({
       registerBuyerUseCase: registerUseCaseMock,
       loginUseCase: loginUseCaseMock,
+      getCurrentUserUseCase: getCurrentUserUseCaseMock,
+      refreshSessionUseCase: refreshSessionUseCaseMock,
+      logoutUseCase: logoutUseCaseMock,
     });
 
     req = {
       body: {},
+      cookies: {},
       validatedBody: undefined,
+      user: undefined,
     };
     res = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
       cookie: vi.fn().mockReturnThis(),
       clearCookie: vi.fn().mockReturnThis(),
     };
@@ -163,6 +181,179 @@ describe('AuthController', () => {
       await controller.login(req, res, next);
 
       expect(next).toHaveBeenCalledWith(error);
+    });
+  });
+
+  describe('me', () => {
+    it('throws if getCurrentUserUseCase is not configured', async () => {
+      const unconfigured = new AuthController({
+        registerBuyerUseCase: registerUseCaseMock,
+      });
+
+      await unconfigured.me(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'getCurrentUserUseCase is not configured' })
+      );
+    });
+
+    it('returns 200 with user profile from getCurrentUserUseCase', async () => {
+      const mockDto = {
+        data: {
+          user: { id: 'usr-1', email: 'test@example.com' },
+          profile: { id: 'usr-1', username: 'testuser' },
+          roles: [{ id: 1, name: 'buyer' }],
+        },
+        meta: { timestamp: '2026-10-15T12:00:00.000Z' },
+      };
+      getCurrentUserUseCaseMock.execute.mockResolvedValue(mockDto);
+
+      req.user = { id: 'usr-1', email: 'test@example.com' };
+
+      await controller.me(req, res, next);
+
+      expect(getCurrentUserUseCaseMock.execute).toHaveBeenCalledWith({
+        userId: 'usr-1',
+        email: 'test@example.com',
+      });
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(mockDto);
+    });
+
+    it('calls next with error if getCurrentUserUseCase throws', async () => {
+      const error = new Error('Database error');
+      getCurrentUserUseCaseMock.execute.mockRejectedValue(error);
+
+      await controller.me(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(error);
+    });
+  });
+
+  describe('refresh', () => {
+    it('throws if refreshSessionUseCase is not configured', async () => {
+      const unconfigured = new AuthController({
+        registerBuyerUseCase: registerUseCaseMock,
+      });
+
+      await unconfigured.refresh(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'refreshSessionUseCase is not configured' })
+      );
+    });
+
+    it('returns 401 when no refresh token is provided in cookies or body', async () => {
+      req.cookies = {};
+      req.body = {};
+
+      await controller.refresh(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: {
+            code: 'REFRESH_TOKEN_REQUIRED',
+            message: 'Refresh token is required',
+          },
+        })
+      );
+    });
+
+    it('refreshes session and sets new cookies when valid refresh token in cookies', async () => {
+      req.cookies = { refresh_token: 'valid-refresh-token' };
+
+      const mockDto = {
+        data: {
+          user: { id: 'usr-1', email: 'test@example.com' },
+          profile: { id: 'usr-1', username: 'testuser' },
+          roles: [{ id: 1, name: 'buyer' }],
+        },
+        meta: { timestamp: '2026-10-15T12:00:00.000Z' },
+      };
+
+      refreshSessionUseCaseMock.execute.mockResolvedValue({
+        response: mockDto,
+        session: { accessToken: 'new-atk', refreshToken: 'new-rtk' },
+      });
+
+      await controller.refresh(req, res, next);
+
+      expect(refreshSessionUseCaseMock.execute).toHaveBeenCalledWith({
+        refreshToken: 'valid-refresh-token',
+      });
+      expect(res.cookie).toHaveBeenCalledTimes(3);
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(mockDto);
+    });
+
+    it('reads refresh token from req.body when cookie is absent', async () => {
+      req.cookies = {};
+      req.body = { refresh_token: 'body-refresh-token' };
+
+      const mockDto = { data: {}, meta: {} };
+      refreshSessionUseCaseMock.execute.mockResolvedValue({
+        response: mockDto,
+        session: { accessToken: 'new-atk', refreshToken: 'new-rtk' },
+      });
+
+      await controller.refresh(req, res, next);
+
+      expect(refreshSessionUseCaseMock.execute).toHaveBeenCalledWith({
+        refreshToken: 'body-refresh-token',
+      });
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    it('calls next with error if refreshSessionUseCase throws', async () => {
+      req.cookies = { refresh_token: 'invalid-token' };
+      const error = new Error('Invalid refresh token');
+      refreshSessionUseCaseMock.execute.mockRejectedValue(error);
+
+      await controller.refresh(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(error);
+    });
+  });
+
+  describe('logout', () => {
+    it('clears cookies and returns 204 No Content', async () => {
+      req.cookies = { access_token: 'old-atk', refresh_token: 'old-rtk' };
+      logoutUseCaseMock.execute.mockResolvedValue({ success: true });
+
+      await controller.logout(req, res, next);
+
+      expect(logoutUseCaseMock.execute).toHaveBeenCalledWith({
+        accessToken: 'old-atk',
+        refreshToken: 'old-rtk',
+      });
+      expect(res.clearCookie).toHaveBeenCalledTimes(3);
+      expect(res.status).toHaveBeenCalledWith(204);
+      expect(res.send).toHaveBeenCalled();
+    });
+
+    it('clears cookies and returns 204 even if logoutUseCase throws', async () => {
+      req.cookies = { access_token: 'old-atk', refresh_token: 'old-rtk' };
+      logoutUseCaseMock.execute.mockRejectedValue(new Error('Supabase signOut failed'));
+
+      await controller.logout(req, res, next);
+
+      expect(res.clearCookie).toHaveBeenCalledTimes(3);
+      expect(res.status).toHaveBeenCalledWith(204);
+      expect(res.send).toHaveBeenCalled();
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('works safely when logoutUseCase is not configured', async () => {
+      const unconfigured = new AuthController({
+        registerBuyerUseCase: registerUseCaseMock,
+      });
+
+      await unconfigured.logout(req, res, next);
+
+      expect(res.clearCookie).toHaveBeenCalledTimes(3);
+      expect(res.status).toHaveBeenCalledWith(204);
+      expect(res.send).toHaveBeenCalled();
     });
   });
 });
