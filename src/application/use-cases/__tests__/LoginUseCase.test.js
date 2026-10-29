@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { LoginRequestDTO } from '../../dtos/LoginDTO.js';
+import { LoginRequestDTO, LoginResponseDTO } from '../../dtos/LoginDTO.js';
 import { LoginUseCase } from '../LoginUseCase.js';
 
 describe('LoginUseCase', () => {
@@ -34,13 +34,14 @@ describe('LoginUseCase', () => {
     );
   });
 
-  it('authenticates user and returns OpenAPI compliant response with existing profile', async () => {
+  it('authenticates user and returns OpenAPI compliant response with existing profile and session', async () => {
     const now = new Date('2026-10-14T10:00:00.000Z');
     mockAuthService.loginUser.mockResolvedValue({
       id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
       email: 'buyer@example.com',
       created_at: now.toISOString(),
       token: 'jwt-token-123',
+      refresh_token: 'refresh-token-456',
       user_metadata: { username: 'john_doe' },
     });
 
@@ -68,11 +69,20 @@ describe('LoginUseCase', () => {
       email: 'buyer@example.com',
       password: 'StrongPassword123!',
     });
-    expect(result.data.token).toBe('jwt-token-123');
-    expect(result.data.user.email).toBe('buyer@example.com');
-    expect(result.data.profile.username).toBe('john_doe');
-    expect(result.data.roles).toEqual([{ id: 1, name: 'buyer', created_at: now.toISOString() }]);
-    expect(result.meta.timestamp).toEqual(expect.any(String));
+
+    expect(result.response).toBeInstanceOf(LoginResponseDTO);
+    expect(result.response.data.user.email).toBe('buyer@example.com');
+    expect(result.response.data.profile.username).toBe('john_doe');
+    expect(result.response.data.roles).toEqual([
+      { id: 1, name: 'buyer', created_at: now.toISOString() },
+    ]);
+    expect(result.response.meta.timestamp).toEqual(expect.any(String));
+
+    expect(result.response.toJSON().data.token).toBeUndefined();
+    expect(result.token).toBeUndefined();
+
+    expect(result.session.accessToken).toBe('jwt-token-123');
+    expect(result.session.refreshToken).toBe('refresh-token-456');
   });
 
   it('falls back to metadata when profile row is not yet in application db', async () => {
@@ -81,6 +91,7 @@ describe('LoginUseCase', () => {
       email: 'buyer@example.com',
       created_at: '2026-10-14T10:00:00.000Z',
       token: 'jwt-token-123',
+      refresh_token: 'refresh-token-456',
       user_metadata: { username: 'fallback_user', full_name: 'Fallback User' },
     });
     mockProfileRepo.findById.mockResolvedValue(null);
@@ -90,7 +101,32 @@ describe('LoginUseCase', () => {
       password: 'StrongPassword123!',
     });
 
-    expect(result.data.profile.username).toBe('fallback_user');
-    expect(result.data.roles[0].name).toBe('buyer');
+    expect(result.response).toBeInstanceOf(LoginResponseDTO);
+    expect(result.response.data.profile.username).toBe('fallback_user');
+    expect(result.response.data.roles[0].name).toBe('buyer');
+    expect(result.session.accessToken).toBe('jwt-token-123');
+    expect(result.session.refreshToken).toBe('refresh-token-456');
+  });
+
+  it('returns { response, session } with accessToken and refreshToken from Supabase', async () => {
+    mockAuthService.loginUser.mockResolvedValueOnce({
+      id: 'u-1',
+      email: 'buyer@example.com',
+      created_at: '2026-10-01T00:00:00.000Z',
+      token: 'access-jwt',
+      refresh_token: 'refresh-uuid',
+      user_metadata: { role: 'buyer' },
+    });
+    mockProfileRepo.findById.mockResolvedValueOnce(null);
+
+    const result = await useCase.execute({
+      email: 'buyer@example.com',
+      password: 'Pass123!',
+    });
+
+    expect(result.session.accessToken).toBe('access-jwt');
+    expect(result.session.refreshToken).toBe('refresh-uuid');
+    expect(result.response).toBeInstanceOf(LoginResponseDTO);
+    expect(result.response.toJSON().data.token).toBeUndefined();
   });
 });

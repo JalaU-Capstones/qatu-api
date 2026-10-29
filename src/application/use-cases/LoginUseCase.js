@@ -17,7 +17,7 @@ export class LoginUseCase {
 
   /**
    * @param {import('../dtos/LoginDTO.js').LoginRequestDTO} request
-   * @returns {Promise<LoginResponseDTO>}
+   * @returns {Promise<{ response: LoginResponseDTO, session: { accessToken: string, refreshToken: string } }>}
    */
   async execute(request) {
     if (!request?.email) {
@@ -87,16 +87,21 @@ export class LoginUseCase {
           updated_at: authResult.created_at || isoNow,
         };
 
-    return new LoginResponseDTO({
-      user: {
-        id: authResult.id,
-        email: authResult.email,
-        created_at: authResult.created_at || isoNow,
+    return {
+      response: new LoginResponseDTO({
+        user: {
+          id: authResult.id,
+          email: authResult.email,
+          created_at: authResult.created_at || isoNow,
+        },
+        profile: profileData,
+        roles,
+        timestamp: isoNow,
+      }),
+      session: {
+        accessToken: authResult.token,
+        refreshToken: authResult.refresh_token,
       },
-      profile: profileData,
-      roles,
-      token: authResult.token,
-      timestamp: isoNow,
-    });
+    };
   }
 }

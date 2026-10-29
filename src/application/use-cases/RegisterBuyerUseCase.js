@@ -21,7 +21,7 @@ export class RegisterBuyerUseCase {
 
   /**
    * @param {import('../dtos/RegisterDTO.js').RegisterRequestDTO} request
-   * @returns {Promise<RegisterResponseDTO>}
+   * @returns {Promise<{ response: RegisterResponseDTO, session: { accessToken: string, refreshToken: string } }>}
    */
   async execute(request) {
     const emailVO = new Email(request.email);
@@ -75,27 +75,31 @@ export class RegisterBuyerUseCase {
 
     const savedProfile = await this.profileRepository.create(profile);
 
-    return new RegisterResponseDTO({
-      user: {
-        id: authResult.id,
-        email: emailVO.getValue(),
-        created_at: authResult.created_at || isoNow,
+    return {
+      response: new RegisterResponseDTO({
+        user: {
+          id: authResult.id,
+          email: emailVO.getValue(),
+          created_at: authResult.created_at || isoNow,
+        },
+        profile: {
+          id: savedProfile.id,
+          username: savedProfile.username,
+          full_name: savedProfile.fullName || savedProfile.full_name,
+          email: savedProfile.email || emailVO.getValue(),
+          avatar_path: savedProfile.avatarPath || null,
+          bio: savedProfile.bio || null,
+          locale: savedProfile.locale || 'en',
+          created_at: savedProfile.createdAt ? savedProfile.createdAt.toISOString() : isoNow,
+          updated_at: savedProfile.updatedAt ? savedProfile.updatedAt.toISOString() : isoNow,
+        },
+        roles: [buyerRole],
+        timestamp: isoNow,
+      }),
+      session: {
+        accessToken: authResult.token,
+        refreshToken: authResult.refresh_token,
       },
-      profile: {
-        id: savedProfile.id,
-        username: savedProfile.username,
-        full_name: savedProfile.fullName || savedProfile.full_name,
-        email: savedProfile.email || emailVO.getValue(),
-        avatar_path: savedProfile.avatarPath || null,
-        bio: savedProfile.bio || null,
-        locale: savedProfile.locale || 'en',
-        created_at: savedProfile.createdAt ? savedProfile.createdAt.toISOString() : isoNow,
-        updated_at: savedProfile.updatedAt ? savedProfile.updatedAt.toISOString() : isoNow,
-      },
-      roles: [buyerRole],
-      token: authResult.token,
-      session: authResult.session,
-      timestamp: isoNow,
-    });
+    };
   }
 }

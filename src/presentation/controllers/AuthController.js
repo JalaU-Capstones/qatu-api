@@ -1,5 +1,7 @@
 import { LoginRequestDTO } from '../../application/dtos/LoginDTO.js';
 import { RegisterRequestDTO } from '../../application/dtos/RegisterDTO.js';
+import { setSessionCookies } from '../../infrastructure/auth/cookieHelper.js';
+import { generateCsrfToken } from '../../infrastructure/auth/csrfHelper.js';
 
 export class AuthController {
   /**
@@ -26,9 +28,16 @@ export class AuthController {
       const payload = req.validatedBody || req.body;
       const requestDto = new RegisterRequestDTO(payload);
 
-      const result = await this.registerBuyerUseCase.execute(requestDto);
+      const { response, session } = await this.registerBuyerUseCase.execute(requestDto);
 
-      return res.status(201).json(result);
+      const csrfToken = generateCsrfToken();
+      setSessionCookies(res, {
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        csrfToken,
+      });
+
+      return res.status(201).json(response);
     } catch (error) {
       return next(error);
     }
@@ -49,9 +58,16 @@ export class AuthController {
       const payload = req.validatedBody || req.body;
       const requestDto = new LoginRequestDTO(payload);
 
-      const result = await this.loginUseCase.execute(requestDto);
+      const { response, session } = await this.loginUseCase.execute(requestDto);
 
-      return res.status(200).json(result);
+      const csrfToken = generateCsrfToken();
+      setSessionCookies(res, {
+        accessToken: session.accessToken,
+        refreshToken: session.refreshToken,
+        csrfToken,
+      });
+
+      return res.status(200).json(response);
     } catch (error) {
       return next(error);
     }

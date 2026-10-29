@@ -73,12 +73,13 @@ describe('Auth Routes Integration - POST /v1/auth/register', () => {
             created_at: expect.any(String),
           },
         ],
-        token: 'jwt.token.here',
       },
       meta: {
         timestamp: expect.any(String),
       },
     });
+    expect(response.headers['set-cookie']).toBeDefined();
+    expect(response.headers['set-cookie'].length).toBe(3);
   });
 
   it('Scenario: Successful registration using camelCase fullName (201)', async () => {
@@ -91,7 +92,8 @@ describe('Auth Routes Integration - POST /v1/auth/register', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.data.profile.full_name).toBe('Jane Doe');
-    expect(response.body.data.token).toBe('jwt.token.here');
+    expect(response.body.data.token).toBeUndefined();
+    expect(response.headers['set-cookie']).toBeDefined();
   });
 
   it('Scenario: Email already registered (409)', async () => {
