@@ -79,6 +79,7 @@ describe('Auth Routes Integration', () => {
         email: 'newbuyer@example.com',
         created_at: '2026-10-15T10:00:00.000Z',
         token: 'jwt.token.here',
+        refresh_token: 'refresh.token.here',
         session: {
           access_token: 'jwt.token.here',
           refresh_token: 'refresh.token.here',
@@ -99,15 +100,9 @@ describe('Auth Routes Integration', () => {
         user_metadata: { role: 'buyer' },
       }),
       refreshSession: vi.fn().mockResolvedValue({
-        user: {
-          id: 'user-uuid-999',
-          email: 'newbuyer@example.com',
-          created_at: '2026-10-15T10:00:00.000Z',
-        },
-        session: {
-          access_token: 'new.jwt.token',
-          refresh_token: 'new.refresh.token',
-        },
+        userId: 'user-uuid-999',
+        accessToken: 'new.jwt.token',
+        refreshToken: 'new.refresh.token',
       }),
       logoutUser: vi.fn().mockResolvedValue({ success: true }),
     };
@@ -364,26 +359,56 @@ describe('Auth Routes Integration', () => {
     const e2eUserId = '70bad968-8a66-4490-badf-3cc12438c053';
     const cycleUserId = '63156ff9-3909-4ec1-a6bc-978c51d2d16c';
 
+    // Builds a fresh app instance wired with fully-mocked services.
+    // Uses the same mockAuthService / mockProfileRepository from beforeEach
+    // so no real DB or Supabase connection is needed in CI.
+    function makeE2eApp({ extraAuthServiceProps = {}, extraProfileRepoProps = {} } = {}) {
+      const e2eAuthService = { ...mockAuthService, ...extraAuthServiceProps };
+      const e2eProfileRepo = { ...mockProfileRepository, ...extraProfileRepoProps };
+      return createApp({
+        authRoutes: createAuthRouter({
+          authService: e2eAuthService,
+          profileRepository: e2eProfileRepo,
+        }),
+      });
+    }
+
     it('register sets access_token, refresh_token, csrf_token; body has no token', async () => {
-      supabase.auth.admin.createUser.mockResolvedValueOnce({
-        data: {
-          user: { id: e2eUserId, email: 'e2e@example.com', created_at: '2026-10-01T00:00:00Z' },
+      const e2eProfile = {
+        id: e2eUserId,
+        username: 'e2e_user',
+        full_name: 'E2E User',
+        email: 'e2e@example.com',
+        avatar_path: null,
+        bio: null,
+        locale: 'en',
+        roles: [{ id: 1, name: 'buyer', created_at: '2026-10-01T00:00:00.000Z' }],
+        createdAt: new Date('2026-10-01T00:00:00Z'),
+        updatedAt: new Date('2026-10-01T00:00:00Z'),
+      };
+
+      const e2eApp = makeE2eApp({
+        extraAuthServiceProps: {
+          emailExists: vi.fn().mockResolvedValue(false),
+          registerUser: vi.fn().mockResolvedValue({
+            id: e2eUserId,
+            email: 'e2e@example.com',
+            created_at: '2026-10-01T00:00:00Z',
+            token: 'atk-1',
+            refresh_token: 'rtk-1',
+            session: { access_token: 'atk-1', refresh_token: 'rtk-1' },
+          }),
         },
-        error: null,
-      });
-      supabase.auth.admin.listUsers.mockResolvedValueOnce({
-        data: { users: [] },
-        error: null,
-      });
-      supabase.auth.signInWithPassword.mockResolvedValueOnce({
-        data: {
-          session: { access_token: 'atk-1', refresh_token: 'rtk-1' },
-          user: { id: e2eUserId, email: 'e2e@example.com', user_metadata: {} },
+        extraProfileRepoProps: {
+          create: vi.fn().mockImplementation(async (profile) => ({
+            ...e2eProfile,
+            ...profile,
+            id: e2eUserId,
+          })),
         },
-        error: null,
       });
 
-      const agent = request.agent(createApp());
+      const agent = request.agent(e2eApp);
       const res = await agent.post('/v1/auth/register').send({
         email: 'e2e@example.com',
         password: 'StrongPassword123!',
@@ -416,20 +441,45 @@ describe('Auth Routes Integration', () => {
     });
 
     it('GET /me returns user+profile+roles (no token) when cookie-authenticated', async () => {
-      supabase.auth.getUser.mockResolvedValueOnce({
-        data: {
-          user: {
-            id: e2eUserId,
-            email: 'e2e@example.com',
-            role: 'authenticated',
-            user_metadata: { role: 'buyer' },
-          },
-        },
-        error: null,
+      const e2eProfile = {
+        id: e2eUserId,
+        username: 'e2e_user',
+        full_name: 'E2E User',
+        email: 'e2e@example.com',
+        avatar_path: null,
+        bio: null,
+        locale: 'en',
+        roles: [{ id: 1, name: 'buyer', created_at: '2026-10-01T00:00:00.000Z' }],
+        createdAt: new Date('2026-10-01T00:00:00Z'),
+        updatedAt: new Date('2026-10-01T00:00:00Z'),
+      };
+
+      // supabase.auth.getUser is mocked globally — configure it for atk-1
+      supabase.auth.getUser.mockImplementation(async (token) => {
+        if (token === 'atk-1') {
+          return {
+            data: {
+              user: {
+                id: e2eUserId,
+                email: 'e2e@example.com',
+                role: 'authenticated',
+                user_metadata: { role: 'buyer' },
+              },
+            },
+            error: null,
+          };
+        }
+        return { data: { user: null }, error: new Error('Invalid token') };
       });
 
-      const agent = request.agent(createApp());
-      // Inject cookies manually (mock session from register)
+      const e2eApp = makeE2eApp({
+        extraProfileRepoProps: {
+          findById: vi.fn().mockResolvedValue(e2eProfile),
+        },
+      });
+
+      const agent = request.agent(e2eApp);
+      // Inject cookie manually (mock session from register)
       agent.jar.setCookie('access_token=atk-1; Path=/; HttpOnly');
 
       const res = await agent.get('/v1/auth/me');
@@ -439,26 +489,40 @@ describe('Auth Routes Integration', () => {
     });
 
     it('GET /me returns 401 when no session cookie is present', async () => {
-      const agent = request.agent(createApp());
+      const agent = request.agent(makeE2eApp());
       const res = await agent.get('/v1/auth/me');
       expect(res.status).toBe(401);
       expect(res.body.error.code).toBe('UNAUTHORIZED');
     });
 
     it('POST /refresh rotates cookies WITHOUT needing X-CSRF-Token (auth-exempt)', async () => {
-      supabase.auth.refreshSession.mockResolvedValueOnce({
-        data: {
-          session: {
-            access_token: 'atk-2',
-            refresh_token: 'rtk-2',
-            user: { id: e2eUserId },
-          },
-          user: { id: e2eUserId },
+      const e2eProfile = {
+        id: e2eUserId,
+        username: 'e2e_user',
+        full_name: 'E2E User',
+        email: 'e2e@example.com',
+        avatar_path: null,
+        bio: null,
+        locale: 'en',
+        roles: [{ id: 1, name: 'buyer', created_at: '2026-10-01T00:00:00.000Z' }],
+        createdAt: new Date('2026-10-01T00:00:00Z'),
+        updatedAt: new Date('2026-10-01T00:00:00Z'),
+      };
+
+      const e2eApp = makeE2eApp({
+        extraAuthServiceProps: {
+          refreshSession: vi.fn().mockResolvedValue({
+            userId: e2eUserId,
+            accessToken: 'atk-2',
+            refreshToken: 'rtk-2',
+          }),
         },
-        error: null,
+        extraProfileRepoProps: {
+          findById: vi.fn().mockResolvedValue(e2eProfile),
+        },
       });
 
-      const agent = request.agent(createApp());
+      const agent = request.agent(e2eApp);
       agent.jar.setCookie('refresh_token=rtk-1; Path=/; HttpOnly');
 
       const res = await agent.post('/v1/auth/refresh');
@@ -474,9 +538,13 @@ describe('Auth Routes Integration', () => {
     });
 
     it('POST /logout clears all cookies and returns 204 (without X-CSRF-Token needed)', async () => {
-      supabase.auth.admin.signOut.mockResolvedValueOnce({ error: null });
+      const e2eApp = makeE2eApp({
+        extraAuthServiceProps: {
+          logoutUser: vi.fn().mockResolvedValue({ success: true }),
+        },
+      });
 
-      const agent = request.agent(createApp());
+      const agent = request.agent(e2eApp);
       agent.jar.setCookie('access_token=atk-1; Path=/; HttpOnly');
       agent.jar.setCookie('refresh_token=rtk-1; Path=/; HttpOnly');
 
@@ -489,58 +557,70 @@ describe('Auth Routes Integration', () => {
     });
 
     it('full cycle: register → me → refresh → logout → me returns 401', async () => {
-      // Register mocks
-      supabase.auth.admin.createUser.mockResolvedValueOnce({
-        data: {
-          user: {
+      const cycleProfile = {
+        id: cycleUserId,
+        username: 'cycle_user',
+        full_name: 'Cycle User',
+        email: 'cycle@example.com',
+        avatar_path: null,
+        bio: null,
+        locale: 'en',
+        roles: [{ id: 1, name: 'buyer', created_at: '2026-10-01T00:00:00.000Z' }],
+        createdAt: new Date('2026-10-01T00:00:00Z'),
+        updatedAt: new Date('2026-10-01T00:00:00Z'),
+      };
+
+      // Track which access token is "valid" — rotates after refresh
+      let validAccessToken = 'atk-initial';
+
+      supabase.auth.getUser.mockImplementation(async (token) => {
+        if (token === validAccessToken) {
+          return {
+            data: {
+              user: {
+                id: cycleUserId,
+                email: 'cycle@example.com',
+                role: 'authenticated',
+                user_metadata: { role: 'buyer' },
+              },
+            },
+            error: null,
+          };
+        }
+        return { data: { user: null }, error: new Error('Invalid token') };
+      });
+
+      // After refresh, update the valid token
+      const mockRefreshSession = vi.fn().mockImplementation(async () => {
+        validAccessToken = 'atk-rotated';
+        return { userId: cycleUserId, accessToken: 'atk-rotated', refreshToken: 'rtk-rotated' };
+      });
+
+      const cycleApp = makeE2eApp({
+        extraAuthServiceProps: {
+          emailExists: vi.fn().mockResolvedValue(false),
+          registerUser: vi.fn().mockResolvedValue({
             id: cycleUserId,
             email: 'cycle@example.com',
             created_at: '2026-10-01T00:00:00Z',
-          },
+            token: 'atk-initial',
+            refresh_token: 'rtk-initial',
+            session: { access_token: 'atk-initial', refresh_token: 'rtk-initial' },
+          }),
+          refreshSession: mockRefreshSession,
+          logoutUser: vi.fn().mockResolvedValue({ success: true }),
         },
-        error: null,
-      });
-      supabase.auth.admin.listUsers.mockResolvedValueOnce({ data: { users: [] }, error: null });
-      supabase.auth.signInWithPassword.mockResolvedValueOnce({
-        data: {
-          session: { access_token: 'atk-initial', refresh_token: 'rtk-initial' },
-          user: { id: cycleUserId, email: 'cycle@example.com', user_metadata: {} },
+        extraProfileRepoProps: {
+          create: vi.fn().mockImplementation(async (profile) => ({
+            ...cycleProfile,
+            ...profile,
+            id: cycleUserId,
+          })),
+          findById: vi.fn().mockResolvedValue(cycleProfile),
         },
-        error: null,
-      });
-
-      // Me mock (2 calls — after register, and after logout which should fail)
-      supabase.auth.getUser
-        .mockResolvedValueOnce({
-          data: {
-            user: {
-              id: cycleUserId,
-              email: 'cycle@example.com',
-              role: 'authenticated',
-              user_metadata: { role: 'buyer' },
-            },
-          },
-          error: null,
-        })
-        .mockResolvedValueOnce({ data: { user: null }, error: { message: 'invalid' } });
-
-      // Refresh mock
-      supabase.auth.refreshSession.mockResolvedValueOnce({
-        data: {
-          session: {
-            access_token: 'atk-rotated',
-            refresh_token: 'rtk-rotated',
-            user: { id: cycleUserId },
-          },
-          user: { id: cycleUserId },
-        },
-        error: null,
       });
 
-      // SignOut mock
-      supabase.auth.admin.signOut.mockResolvedValueOnce({ error: null });
-
-      const agent = request.agent(createApp());
+      const agent = request.agent(cycleApp);
 
       // 1. Register
       const r1 = await agent.post('/v1/auth/register').send({
@@ -551,7 +631,7 @@ describe('Auth Routes Integration', () => {
       });
       expect(r1.status).toBe(201);
 
-      // 2. Me works
+      // 2. Me works (agent jar has access_token=atk-initial from register cookies)
       const r2 = await agent.get('/v1/auth/me');
       expect(r2.status).toBe(200);
       expect(r2.body.data.user.id).toBe(cycleUserId);
@@ -566,7 +646,11 @@ describe('Auth Routes Integration', () => {
       const r4 = await agent.post('/v1/auth/logout');
       expect(r4.status).toBe(204);
 
-      // 5. Me fails after logout
+      // 5. Me fails after logout — override getUser to always reject now
+      supabase.auth.getUser.mockResolvedValueOnce({
+        data: { user: null },
+        error: new Error('invalid'),
+      });
       const r5 = await agent.get('/v1/auth/me');
       expect(r5.status).toBe(401);
     });
