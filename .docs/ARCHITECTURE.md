@@ -100,6 +100,42 @@ Files use PascalCase for classes (e.g., `PlaceOrderUseCase.js`, `UserRepository.
 ## 1.5 Cross-Cutting Concerns
 
 - **Authentication:** Handled via Supabase Auth in the Infrastructure layer. A custom middleware in the Presentation layer verifies the JWT token.
+
+### Authentication (HttpOnly Cookies — Sprint 4+)
+
+Per **ADR-012**, the API uses HttpOnly cookies as the primary session mechanism. Bearer tokens are deprecated but supported during the Sprint 4 migration window (will be removed in Sprint 5).
+
+#### Cookie contract
+
+| Cookie          | Flags                                               | TTL | Purpose                                        |
+| --------------- | --------------------------------------------------- | --- | ---------------------------------------------- |
+| `access_token`  | HttpOnly; Secure (in prod); SameSite=Strict; Path=/ | 1h  | Supabase access JWT                            |
+| `refresh_token` | HttpOnly; Secure (in prod); SameSite=Strict; Path=/ | 30d | Supabase refresh token (rotated by `/refresh`) |
+| `csrf_token`    | SameSite=Strict; Path=/ (NOT HttpOnly)              | 1h  | Double-submit CSRF                             |
+
+#### SameSite=Strict
+
+The three session cookies use `SameSite=Strict`. This is only valid when the frontend and backend share the same registrable domain (same site). Refer to `README.md` §"SameSite=Strict deployment requirement" for the valid/invalid deployment matrix. If production ever requires a cross-site deployment, change `sameSite` to `'none'` in `cookieHelper.js` (HTTPS only) — the CSRF defense does not depend on the SameSite flag.
+
+#### Endpoints
+
+- `POST /v1/auth/register` — sets 3 cookies, returns `{ user, profile, roles }` (no token)
+- `POST /v1/auth/login` — same
+- `GET /v1/auth/me` — returns current user (requires cookie OR Bearer)
+- `POST /v1/auth/refresh` — rotates access + refresh cookies (CSRF-exempt; the refresh token IS the auth)
+- `POST /v1/auth/logout` — revokes on Supabase, clears cookies, returns 204 (idempotent)
+
+#### Middleware chain
+
+1. `cookieParser()` — parses `req.cookies`
+2. `csrfMiddleware` — enforces `X-CSRF-Token` on mutating requests, EXCEPT `/v1/auth/*` and requests without an `access_token` cookie
+3. `authMiddleware` — per-route; accepts cookie OR Bearer (transition); sets `req.authMethod` and `req.user`
+4. Controllers — call use cases, set/clear cookies via `cookieHelper`, respond with `{ user, profile, roles }` DTOs
+
+#### Migration to Bearer-less (Sprint 5)
+
+Remove the Bearer fallback from `authMiddleware`. Update `securitySchemes/bearerAuth.yaml` → remove entirely. Regenerate OpenAPI bundle.
+
 - **Authorization:** Enforced at the database level using PostgreSQL Row Level Security (RLS). Policies are established in migrations.
 - **Validation (US-24):** Every route that accepts a body, query, or path value runs `validateRequest` with a Joi schema before the use case. Invalid input returns `400` with `error.code = VALIDATION_ERROR` and `error.details[]` (`field`, `message`). Unknown fields are stripped. Repositories send user values only through Sequelize `replacements` (`:name` placeholders). `sort_by` is an allow-list, and `LIKE` wildcards in search are escaped. A payload such as `'; DROP TABLE products;--` is stored or searched as text.
 - **API Specification:** Modular OpenAPI 3.1.0 contract maintained in `src/presentation/docs/` as the single source of truth; served via Swagger UI at `/api-docs`.

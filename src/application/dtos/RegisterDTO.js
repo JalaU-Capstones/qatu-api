@@ -19,7 +19,7 @@ export class RegisterRequestDTO {
 export class RegisterResponseDTO {
   /**
    * Constructs the standardized registration response matching OpenAPI contract:
-   * { data: { user, profile, roles, token }, meta: { timestamp } }
+   * { data: { user, profile, roles }, meta: { timestamp } }
    *
    * @param {Object} params
    * @param {Object} params.user
@@ -28,18 +28,9 @@ export class RegisterResponseDTO {
    * @param {string} [params.user.created_at]
    * @param {Object} [params.profile]
    * @param {Array<Object>} [params.roles]
-   * @param {string} [params.token]
-   * @param {Object} [params.session]
    * @param {string} [params.timestamp]
    */
-  constructor({
-    user,
-    profile = null,
-    roles = null,
-    token = null,
-    session = null,
-    timestamp = null,
-  }) {
+  constructor({ user, profile = null, roles = null, timestamp = null }) {
     const defaultCreatedAt = new Date().toISOString();
     const resolvedUser = {
       id: user.id,
@@ -88,40 +79,42 @@ export class RegisterResponseDTO {
             },
           ];
 
-    const resolvedToken = token || session?.access_token || '';
+    this._user = resolvedUser;
+    this._profile = resolvedProfile;
+    this._roles = resolvedRoles;
+    this._timestamp = timestamp || new Date().toISOString();
 
     this.data = {
       user: resolvedUser,
       profile: resolvedProfile,
       roles: resolvedRoles,
-      token: resolvedToken,
     };
 
     this.meta = {
-      timestamp: timestamp || new Date().toISOString(),
+      timestamp: this._timestamp,
     };
   }
 
   get user() {
-    return this.data.user;
+    return this._user;
   }
 
   get profile() {
-    return this.data.profile;
+    return this._profile;
   }
 
   get roles() {
-    return this.data.roles;
+    return this._roles;
   }
 
-  get token() {
-    return this.data.token;
-  }
-
-  get session() {
+  toJSON() {
     return {
-      access_token: this.data.token,
-      token_type: 'bearer',
+      data: {
+        user: this._user,
+        profile: this._profile,
+        roles: this._roles,
+      },
+      meta: { timestamp: this._timestamp },
     };
   }
 }

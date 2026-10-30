@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { RegisterRequestDTO } from '../../dtos/RegisterDTO.js';
+import { RegisterRequestDTO, RegisterResponseDTO } from '../../dtos/RegisterDTO.js';
 import { RegisterBuyerUseCase } from '../RegisterBuyerUseCase.js';
 
 describe('RegisterBuyerUseCase', () => {
@@ -22,6 +22,7 @@ describe('RegisterBuyerUseCase', () => {
         email: 'buyer@example.com',
         created_at: '2026-10-15T10:00:00.000Z',
         token: 'valid.jwt.token',
+        refresh_token: 'valid.refresh.token',
         session: {
           access_token: 'valid.jwt.token',
           token_type: 'bearer',
@@ -77,19 +78,28 @@ describe('RegisterBuyerUseCase', () => {
     expect(createdProfileArg.role).toBe('buyer');
     expect(createdProfileArg.username).toBe('buyer_jane');
 
-    expect(result.data.user).toEqual({
+    expect(result.response).toBeInstanceOf(RegisterResponseDTO);
+    expect(result.response.data.user).toEqual({
       id: 'auth-uuid-123',
       email: 'buyer@example.com',
       created_at: '2026-10-15T10:00:00.000Z',
     });
-    expect(result.data.profile.full_name).toBe('Jane Buyer');
-    expect(result.data.roles[0].name).toBe('buyer');
-    expect(result.data.token).toBe('valid.jwt.token');
-    expect(result.meta.timestamp).toBeDefined();
+    expect(result.response.data.profile.full_name).toBe('Jane Buyer');
+    expect(result.response.data.roles[0].name).toBe('buyer');
+    expect(result.response.meta.timestamp).toBeDefined();
+
+    // Verify token and session are NOT exposed in JSON response body (security fix)
+    const jsonBody = result.response.toJSON();
+    expect(jsonBody.data.token).toBeUndefined();
+    expect(jsonBody.data.session).toBeUndefined();
+    expect(result.token).toBeUndefined();
+
+    // Verify session contains tokens for controller cookies
+    expect(result.session.accessToken).toBe('valid.jwt.token');
+    expect(result.session.refreshToken).toBe('valid.refresh.token');
 
     // Convenience getters on RegisterResponseDTO
-    expect(result.user.id).toBe('auth-uuid-123');
-    expect(result.session.access_token).toBe('valid.jwt.token');
+    expect(result.response.user.id).toBe('auth-uuid-123');
   });
 
   it('should throw an error if email already exists without creating user or profile', async () => {

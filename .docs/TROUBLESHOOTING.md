@@ -40,3 +40,10 @@
 - **`Could not find a working container runtime strategy` (Testcontainers):** GitLab SaaS shared runners do not provide Docker. The integration test detects `TEST_DATABASE_URL` and connects to a service container instead. If you see this locally, ensure Docker Desktop is running.
 - **`TEST_DATABASE_URL` set but connection refused:** Verify the `services:` block in `.gitlab-ci.yml` (hostname must match `alias`). For GitHub Actions, ensure `ports: 5432:5432` is present and the health check is enabled.
 - **Integration test setup SQL fails:** The test creates a minimal schema in `SCHEMA_SQL`. If a column was added to the real migration, update the test's schema to match — otherwise the test will fail loudly, which is intentional.
+
+## Auth / Cookies
+
+- **`req.cookies` is undefined**: `cookieParser()` is not mounted. Check `app.js` — it must run after `express.json()` and before `csrfMiddleware` and routes.
+- **403 INVALID_CSRF_TOKEN on a legitimate request**: the client must send `X-CSRF-Token` matching the `csrf_token` cookie. If the client is calling from a different origin without `credentials: 'include'`, the cookie is not attached. Verify CORS config in `corsMiddleware.js` has `credentials: true` and the origin is in `ALLOWED_ORIGINS`.
+- **`Set-Cookie` headers not persisting in the browser**: verify `Secure` is `false` in dev (`NODE_ENV !== 'production'`); Secure cookies over HTTP are dropped silently by browsers.
+- **`/refresh` returns 401 even with a valid cookie**: verify the `refresh_token` cookie is sent (check `credentials: 'include'` on the frontend). The endpoint reads it via `req.cookies.refresh_token` only — no body fallback.
