@@ -124,6 +124,22 @@ Register/Login responses set `access_token`, `refresh_token`, `csrf_token` cooki
 
 **Refresh:** on `401` with `error.code === 'REFRESH_REQUIRED'`, call `POST /v1/auth/refresh` (no CSRF header required) and retry the original request.
 
+#### SameSite=Strict deployment requirement
+
+The session cookies use `SameSite=Strict`. This requires the frontend and API to share the **same site** (same eTLD+1, e.g. `qatu.app` + `api.qatu.app`).
+
+**Valid deployments:**
+
+- `qatu.com` (FE) + `api.qatu.com` (BE) → same-site ✅
+- `qatu.app` (FE) + `qatu.app/api` (BE, reverse proxy) → same-origin ✅
+- Local dev (`localhost:5173` + `localhost:3000`) → same-site ✅
+
+**Invalid deployments (cookies will silently not be sent):**
+
+- `qatu.vercel.app` (FE) + `qatu-api.onrender.com` (BE) → cross-site ❌
+
+If a cross-site deployment is ever required, change `sameSite` to `'none'` in `src/infrastructure/auth/cookieHelper.js` (requires HTTPS + `secure: true`). The CSRF double-submit pattern already covers CSRF defense, so the switch is safe — no additional code changes needed.
+
 ## Database Migrations
 
 Migrations are managed with Sequelize CLI. The configuration is in `.sequelizerc` and `src/infrastructure/config/sequelize.config.js`.

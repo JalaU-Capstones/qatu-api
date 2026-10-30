@@ -26,6 +26,20 @@ export const CSRF_TOKEN_TTL_MS = ACCESS_TOKEN_TTL_MS;
 function baseCookieOptions() {
   return {
     secure: (process.env.NODE_ENV || env.NODE_ENV) === 'production',
+    // SameSite=Strict requires the frontend and backend to share the same
+    // site (eTLD+1) in production. This works today because:
+    //   - Local dev: both on `localhost` (different ports are same-site)
+    //   - Production: frontend and backend MUST be deployed under the same
+    //     registrable domain (e.g. `qatu.app` + `api.qatu.app`, or a
+    //     same-origin reverse proxy `qatu.app/api/*`).
+    //
+    // If deployment ever splits them across distinct sites (e.g. `qatu.vercel.app`
+    // + `qatu-api.onrender.com`), change this to `sameSite: 'none'` — which
+    // REQUIRES `secure: true` (HTTPS). The CSRF double-submit pattern
+    // (csrfHelper + csrfMiddleware) already covers the CSRF defense even
+    // when SameSite=None, so the switch is safe. Do NOT change to `'lax'`
+    // without an ADR update — Lax blocks cookies on cross-site POSTs, which
+    // would break cart/order mutations in a cross-site deployment.
     sameSite: 'strict',
     path: '/',
     // domain is intentionally NOT set — defaults to the current host.

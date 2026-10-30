@@ -113,6 +113,10 @@ Per **ADR-012**, the API uses HttpOnly cookies as the primary session mechanism.
 | `refresh_token` | HttpOnly; Secure (in prod); SameSite=Strict; Path=/ | 30d | Supabase refresh token (rotated by `/refresh`) |
 | `csrf_token`    | SameSite=Strict; Path=/ (NOT HttpOnly)              | 1h  | Double-submit CSRF                             |
 
+#### SameSite=Strict
+
+The three session cookies use `SameSite=Strict`. This is only valid when the frontend and backend share the same registrable domain (same site). Refer to `README.md` §"SameSite=Strict deployment requirement" for the valid/invalid deployment matrix. If production ever requires a cross-site deployment, change `sameSite` to `'none'` in `cookieHelper.js` (HTTPS only) — the CSRF defense does not depend on the SameSite flag.
+
 #### Endpoints
 
 - `POST /v1/auth/register` — sets 3 cookies, returns `{ user, profile, roles }` (no token)
