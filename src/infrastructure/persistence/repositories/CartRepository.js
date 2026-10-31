@@ -174,4 +174,45 @@ RETURNING id, user_id, product_id, quantity, created_at, updated_at`,
 
     return Number(rows[0].total ?? 0);
   }
+
+  /**
+   * Retrieves all cart items for the given user with the referenced product
+   * populated. Product fields are aliased with a `product_` prefix so the
+   * use case can serialize them under the OpenAPI `CartItem.product` schema.
+   *
+   * @param {string} userId - User identifier
+   * @returns {Promise<Array>} Raw joined rows (cart item + product columns), ordered oldest first
+   */
+  async findByUserId(userId) {
+    const rows = await this.db.query(
+      `SELECT
+  ci.id, ci.user_id, ci.product_id, ci.quantity, ci.created_at, ci.updated_at,
+  p.seller_id AS product_seller_id,
+  p.category_id AS product_category_id,
+  p.name AS product_name,
+  p.slug AS product_slug,
+  p.description AS product_description,
+  p.price AS product_price,
+  p.currency AS product_currency,
+  p.stock AS product_stock,
+  p.attributes AS product_attributes,
+  p.primary_image_path AS product_primary_image_path,
+  p.state AS product_state,
+  p.average_rating AS product_average_rating,
+  p.ratings_count AS product_ratings_count,
+  p.published_at AS product_published_at,
+  p.created_at AS product_created_at,
+  p.updated_at AS product_updated_at
+FROM public.cart_items ci
+INNER JOIN public.products p ON p.id = ci.product_id AND p.deleted_at IS NULL
+WHERE ci.user_id = :userId
+ORDER BY ci.created_at ASC, ci.id ASC`,
+      {
+        replacements: { userId },
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    return rows || [];
+  }
 }

@@ -96,4 +96,15 @@ export class ICartRepository {
   async findById(id) {
     throw new Error('Method not implemented.');
   }
+
+  /**
+   * Retrieves all cart items for a specific user, including product details.
+   *
+   * @param {string} userId - User identifier
+   * @returns {Promise<Array>} Array of cart items with product data
+   */
+  // eslint-disable-next-line no-unused-vars
+  async findByUserId(userId) {
+    throw new Error('Method not implemented: findByUserId');
+  }
 }

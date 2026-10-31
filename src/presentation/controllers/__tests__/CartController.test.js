@@ -7,6 +7,7 @@ describe('CartController', () => {
   let mockUpdateCartItemUseCase;
   let mockRemoveCartItemUseCase;
   let mockClearCartUseCase;
+  let mockGetCartUseCase;
   let req;
   let res;
   let next;
@@ -20,12 +21,14 @@ describe('CartController', () => {
     mockUpdateCartItemUseCase = { execute: vi.fn() };
     mockRemoveCartItemUseCase = { execute: vi.fn() };
     mockClearCartUseCase = { execute: vi.fn() };
+    mockGetCartUseCase = { execute: vi.fn() };
 
     controller = new CartController({
       addToCartUseCase: mockAddToCartUseCase,
       updateCartItemUseCase: mockUpdateCartItemUseCase,
       removeCartItemUseCase: mockRemoveCartItemUseCase,
       clearCartUseCase: mockClearCartUseCase,
+      getCartUseCase: mockGetCartUseCase,
     });
 
     req = {
@@ -123,6 +126,49 @@ describe('CartController', () => {
           statusCode: 401,
         })
       );
+    });
+  });
+
+  describe('getCart', () => {
+    beforeEach(() => {
+      req.validatedQuery = {};
+    });
+
+    it('Scenario 1: Valid request -> 200 OK with cart items and meta', async () => {
+      const items = [{ id: cartItemId, user_id: userId, product_id: productId, quantity: 1 }];
+      mockGetCartUseCase.execute.mockResolvedValue(items);
+
+      await controller.getCart(req, res, next);
+
+      expect(mockGetCartUseCase.execute).toHaveBeenCalledWith({ userId });
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        data: items,
+        meta: expect.objectContaining({ timestamp: expect.any(String) }),
+      });
+    });
+
+    it('Scenario 2: Missing auth user -> calls next with 401 UNAUTHORIZED', async () => {
+      req.user = null;
+
+      await controller.getCart(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'UNAUTHORIZED',
+          statusCode: 401,
+        })
+      );
+      expect(mockGetCartUseCase.execute).not.toHaveBeenCalled();
+    });
+
+    it('Scenario 3: Use case error -> calls next with the error', async () => {
+      const failure = new Error('boom');
+      mockGetCartUseCase.execute.mockRejectedValue(failure);
+
+      await controller.getCart(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(failure);
     });
   });
 });

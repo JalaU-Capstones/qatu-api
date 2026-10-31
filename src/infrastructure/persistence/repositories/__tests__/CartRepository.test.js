@@ -54,6 +54,45 @@ describe('CartRepository', () => {
     });
   });
 
+  describe('findByUserId', () => {
+    it('Scenario 1: Returns the joined cart item + product rows for the user', async () => {
+      const mockRow = {
+        id: cartItemId,
+        user_id: userId,
+        product_id: productId,
+        quantity: 2,
+        created_at: new Date(),
+        updated_at: new Date(),
+        product_seller_id: '660e8400-e29b-41d4-a716-446655440001',
+        product_name: 'Ergonomic Office Chair',
+        product_slug: 'ergonomic-office-chair',
+        product_price: 199.99,
+      };
+
+      mockDb.query.mockResolvedValue([mockRow]);
+
+      const result = await repository.findByUserId(userId);
+
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.stringContaining('FROM public.cart_items ci'),
+        expect.objectContaining({
+          replacements: { userId },
+          type: QueryTypes.SELECT,
+        })
+      );
+      expect(result).toEqual([mockRow]);
+      expect(result[0].product_name).toBe('Ergonomic Office Chair');
+    });
+
+    it('Scenario 2: Returns an empty array when the user has no cart items', async () => {
+      mockDb.query.mockResolvedValue([]);
+
+      const result = await repository.findByUserId(userId);
+
+      expect(result).toEqual([]);
+    });
+  });
+
   describe('updateQuantity', () => {
     it('Scenario 1: Updates quantity and returns domain entity', async () => {
       const mockRow = {
