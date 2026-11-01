@@ -123,6 +123,28 @@ describe('Order Routes Integration - /v1/orders', () => {
       });
     });
 
+    it('authenticates successfully via access_token HttpOnly cookie', async () => {
+      mockListOrdersUseCase.execute.mockResolvedValue({
+        data: [sampleOrder.toJSON()],
+        meta: {
+          page: 1,
+          per_page: 20,
+          total: 1,
+          total_pages: 1,
+        },
+      });
+
+      const res = await request(app)
+        .get('/v1/orders')
+        .set('Cookie', [`access_token=${validToken}`]);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toHaveLength(1);
+      expect(mockListOrdersUseCase.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ buyerId })
+      );
+    });
+
     it('Scenario: No orders - returns empty list with total 0', async () => {
       mockListOrdersUseCase.execute.mockResolvedValue({
         data: [],
@@ -194,6 +216,20 @@ describe('Order Routes Integration - /v1/orders', () => {
       expect(res.status).toBe(200);
       expect(res.body.data.id).toBe(orderId);
       expect(res.body.data.total).toBe(115);
+    });
+
+    it('returns 200 with order details via access_token cookie', async () => {
+      mockGetOrderByIdUseCase.execute.mockResolvedValue({
+        data: sampleOrder.toJSON(),
+        meta: { timestamp: new Date().toISOString() },
+      });
+
+      const res = await request(app)
+        .get(`/v1/orders/${orderId}`)
+        .set('Cookie', [`access_token=${validToken}`]);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.id).toBe(orderId);
     });
 
     it('returns 404 when order is not found', async () => {

@@ -12,10 +12,7 @@ export const listOrdersSchema = Joi.object({
     'number.min': 'limit must be at least 1',
     'number.max': 'limit must be at most 100',
   }),
-  status: Joi.string()
-    .valid('pending', 'confirmed', 'shipped', 'delivered', 'cancelled', 'refunded')
-    .messages({
-      'any.only':
-        'status must be one of: pending, confirmed, shipped, delivered, cancelled, refunded',
-    }),
+  status: Joi.string().valid('pending', 'confirmed', 'shipped', 'delivered', 'cancelled').messages({
+    'any.only': 'status must be one of: pending, confirmed, shipped, delivered, cancelled',
+  }),
 });

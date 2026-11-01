@@ -1,13 +1,6 @@
 import { OrderItem } from './OrderItem.js';
 
-const VALID_STATUSES = Object.freeze([
-  'pending',
-  'confirmed',
-  'shipped',
-  'delivered',
-  'cancelled',
-  'refunded',
-]);
+const VALID_STATUSES = Object.freeze(['pending', 'confirmed', 'shipped', 'delivered', 'cancelled']);
 
 const VALID_CURRENCIES = Object.freeze(['USD', 'EUR', 'BOB', 'PEN', 'ARS', 'COP', 'MXN', 'BRL']);
 
