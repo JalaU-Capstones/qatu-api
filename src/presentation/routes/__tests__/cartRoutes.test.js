@@ -19,6 +19,7 @@ describe('Cart Routes Integration', () => {
   let mockUpdateCartItemUseCase;
   let mockRemoveCartItemUseCase;
   let mockClearCartUseCase;
+  let mockGetCartUseCase;
 
   const userId = '00000000-0000-0000-0000-000000000002';
   const productId = '10000000-0000-0000-0000-000000000001';
@@ -76,12 +77,16 @@ describe('Cart Routes Integration', () => {
     mockClearCartUseCase = {
       execute: vi.fn(),
     };
+    mockGetCartUseCase = {
+      execute: vi.fn(),
+    };
 
     const customRouter = createCartRouter({
       addToCartUseCase: mockAddToCartUseCase,
       updateCartItemUseCase: mockUpdateCartItemUseCase,
       removeCartItemUseCase: mockRemoveCartItemUseCase,
       clearCartUseCase: mockClearCartUseCase,
+      getCartUseCase: mockGetCartUseCase,
     });
 
     app = createApp({ cartRoutes: customRouter });
@@ -329,5 +334,84 @@ describe('Cart Routes Integration', () => {
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe('UNAUTHORIZED');
     expect(mockClearCartUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it('Scenario 15: GET /v1/cart with valid JWT -> 200 OK, returns lightweight items without product', async () => {
+    const mockItems = [
+      {
+        id: cartItemId,
+        user_id: userId,
+        product_id: productId,
+        quantity: 2,
+        created_at: '2026-10-14T10:00:00.000Z',
+        updated_at: '2026-10-14T10:00:00.000Z',
+      },
+    ];
+
+    mockGetCartUseCase.execute.mockResolvedValueOnce(mockItems);
+
+    const response = await request(app)
+      .get('/v1/cart')
+      .set('Authorization', `Bearer ${validToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(mockItems);
+    expect(response.body.data[0].product).toBeUndefined();
+    expect(response.body.meta.timestamp).toBeDefined();
+    expect(mockGetCartUseCase.execute).toHaveBeenCalledWith({
+      userId,
+      includeProduct: false,
+    });
+  });
+
+  it('Scenario 16: GET /v1/cart?include=product with valid JWT -> 200 OK, returns items with product', async () => {
+    const mockItems = [
+      {
+        id: cartItemId,
+        user_id: userId,
+        product_id: productId,
+        quantity: 2,
+        created_at: '2026-10-14T10:00:00.000Z',
+        updated_at: '2026-10-14T10:00:00.000Z',
+        product: {
+          id: productId,
+          name: 'Ergonomic Office Chair',
+          price: 199.99,
+        },
+      },
+    ];
+
+    mockGetCartUseCase.execute.mockResolvedValueOnce(mockItems);
+
+    const response = await request(app)
+      .get('/v1/cart?include=product')
+      .set('Authorization', `Bearer ${validToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual(mockItems);
+    expect(response.body.data[0].product).toBeDefined();
+    expect(response.body.data[0].product.name).toBe('Ergonomic Office Chair');
+    expect(mockGetCartUseCase.execute).toHaveBeenCalledWith({
+      userId,
+      includeProduct: true,
+    });
+  });
+
+  it('Scenario 17: GET /v1/cart?include=invalid with valid JWT -> 400 VALIDATION_ERROR', async () => {
+    const response = await request(app)
+      .get('/v1/cart?include=invalid')
+      .set('Authorization', `Bearer ${validToken}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(mockGetCartUseCase.execute).not.toHaveBeenCalled();
+  });
+
+  it('Scenario 18: GET /v1/cart with no Authorization header -> 401 UNAUTHORIZED', async () => {
+    const response = await request(app).get('/v1/cart');
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe('UNAUTHORIZED');
+    expect(mockGetCartUseCase.execute).not.toHaveBeenCalled();
   });
 });

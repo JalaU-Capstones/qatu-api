@@ -37,7 +37,7 @@ properties:
       - 2
   product:
     $ref: './Product.yaml'
-    description: Optional populated product details.
+    description: Optional populated product details. Present only when requested via `include=product`.
   created_at:
     type: string
     format: date-time

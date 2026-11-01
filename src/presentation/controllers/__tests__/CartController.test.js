@@ -132,15 +132,16 @@ describe('CartController', () => {
   describe('getCart', () => {
     beforeEach(() => {
       req.validatedQuery = {};
+      req.query = {};
     });
 
-    it('Scenario 1: Valid request -> 200 OK with cart items and meta', async () => {
+    it('Scenario 1: Valid request without include -> 200 OK and passes includeProduct: false', async () => {
       const items = [{ id: cartItemId, user_id: userId, product_id: productId, quantity: 1 }];
       mockGetCartUseCase.execute.mockResolvedValue(items);
 
       await controller.getCart(req, res, next);
 
-      expect(mockGetCartUseCase.execute).toHaveBeenCalledWith({ userId });
+      expect(mockGetCartUseCase.execute).toHaveBeenCalledWith({ userId, includeProduct: false });
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith({
         data: items,
@@ -148,7 +149,30 @@ describe('CartController', () => {
       });
     });
 
-    it('Scenario 2: Missing auth user -> calls next with 401 UNAUTHORIZED', async () => {
+    it('Scenario 2: Valid request with include=product -> passes includeProduct: true', async () => {
+      req.query = { include: 'product' };
+      const items = [
+        {
+          id: cartItemId,
+          user_id: userId,
+          product_id: productId,
+          quantity: 1,
+          product: { id: productId, name: 'Chair' },
+        },
+      ];
+      mockGetCartUseCase.execute.mockResolvedValue(items);
+
+      await controller.getCart(req, res, next);
+
+      expect(mockGetCartUseCase.execute).toHaveBeenCalledWith({ userId, includeProduct: true });
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith({
+        data: items,
+        meta: expect.objectContaining({ timestamp: expect.any(String) }),
+      });
+    });
+
+    it('Scenario 3: Missing auth user -> calls next with 401 UNAUTHORIZED', async () => {
       req.user = null;
 
       await controller.getCart(req, res, next);
@@ -162,7 +186,7 @@ describe('CartController', () => {
       expect(mockGetCartUseCase.execute).not.toHaveBeenCalled();
     });
 
-    it('Scenario 3: Use case error -> calls next with the error', async () => {
+    it('Scenario 4: Use case error -> calls next with the error', async () => {
       const failure = new Error('boom');
       mockGetCartUseCase.execute.mockRejectedValue(failure);
 

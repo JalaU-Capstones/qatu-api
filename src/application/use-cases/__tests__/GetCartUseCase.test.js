@@ -46,13 +46,32 @@ describe('GetCartUseCase', () => {
     expect(() => new GetCartUseCase()).toThrow('cartRepository is required');
   });
 
-  it('should return cart items in the CartItem schema shape with the product populated', async () => {
+  it('should return cart items without product by default when includeProduct is false', async () => {
     mockCartRepository.findByUserId.mockResolvedValue([createSampleRow()]);
 
     const useCase = new GetCartUseCase({ cartRepository: mockCartRepository });
     const result = await useCase.execute({ userId });
 
-    expect(mockCartRepository.findByUserId).toHaveBeenCalledWith(userId);
+    expect(mockCartRepository.findByUserId).toHaveBeenCalledWith(userId, { includeProduct: false });
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: cartItemId,
+      user_id: userId,
+      product_id: productId,
+      quantity: 2,
+      created_at: '2026-10-14T10:00:00.000Z',
+      updated_at: '2026-10-14T10:30:00.000Z',
+    });
+    expect(result[0].product).toBeUndefined();
+  });
+
+  it('should return cart items with populated product when includeProduct is true', async () => {
+    mockCartRepository.findByUserId.mockResolvedValue([createSampleRow()]);
+
+    const useCase = new GetCartUseCase({ cartRepository: mockCartRepository });
+    const result = await useCase.execute({ userId, includeProduct: true });
+
+    expect(mockCartRepository.findByUserId).toHaveBeenCalledWith(userId, { includeProduct: true });
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({
       id: cartItemId,
@@ -84,7 +103,7 @@ describe('GetCartUseCase', () => {
     const useCase = new GetCartUseCase({ cartRepository: mockCartRepository });
     const result = await useCase.execute({ userId: new GetCartRequestDTO({ userId }) });
 
-    expect(mockCartRepository.findByUserId).toHaveBeenCalledWith(userId);
+    expect(mockCartRepository.findByUserId).toHaveBeenCalledWith(userId, { includeProduct: false });
     expect(result).toEqual([]);
   });
 
@@ -97,13 +116,13 @@ describe('GetCartUseCase', () => {
     expect(result).toEqual([]);
   });
 
-  it('should omit the product field when the row has no product populated', async () => {
+  it('should omit the product field when the row has no product populated even if includeProduct is true', async () => {
     mockCartRepository.findByUserId.mockResolvedValue([
       createSampleRow({ product_name: null, product_seller_id: null }),
     ]);
 
     const useCase = new GetCartUseCase({ cartRepository: mockCartRepository });
-    const result = await useCase.execute({ userId });
+    const result = await useCase.execute({ userId, includeProduct: true });
 
     expect(result[0].product).toBeUndefined();
   });

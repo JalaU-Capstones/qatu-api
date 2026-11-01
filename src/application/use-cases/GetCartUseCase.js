@@ -13,30 +13,33 @@ export class GetCartUseCase {
   }
 
   /**
-   * Returns the authenticated user's cart items ordered oldest first, with the
-   * referenced product populated (see the OpenAPI `CartItem.product` field).
+   * Returns the authenticated user's cart items ordered oldest first, optionally
+   * populating the referenced product when `includeProduct` is true.
    *
    * @param {Object} params
    * @param {string|import('../dtos/GetCartDTO.js').GetCartRequestDTO} [params.userId]
+   * @param {boolean} [params.includeProduct=false]
    * @returns {Promise<Array>} Array of snake_case CartItem JSON objects
    */
-  async execute({ userId } = {}) {
+  async execute({ userId, includeProduct = false } = {}) {
     const requestDto =
       userId instanceof GetCartRequestDTO ? userId : new GetCartRequestDTO({ userId });
 
-    const rows = await this.cartRepository.findByUserId(requestDto.userId);
+    const rows = await this.cartRepository.findByUserId(requestDto.userId, { includeProduct });
 
-    return rows.map((row) => this._toCartItemDTO(row).toJSON());
+    return (rows || []).map((row) => this._toCartItemDTO(row, { includeProduct }).toJSON());
   }
 
   /**
    * Builds a CartItemDTO from a joined cart item + product row.
    *
    * @param {Object} row
+   * @param {Object} [options]
+   * @param {boolean} [options.includeProduct=false]
    * @returns {CartItemDTO}
    * @private
    */
-  _toCartItemDTO(row) {
+  _toCartItemDTO(row, { includeProduct = false } = {}) {
     return new CartItemDTO({
       id: row.id,
       userId: row.user_id,
@@ -44,7 +47,7 @@ export class GetCartUseCase {
       quantity: Number(row.quantity),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      product: this._toProductJSON(row),
+      product: includeProduct ? this._toProductJSON(row) : null,
     });
   }
 

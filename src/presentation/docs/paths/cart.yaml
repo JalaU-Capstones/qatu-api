@@ -5,6 +5,18 @@ getOrClear:
     description: Returns all items in the authenticated user's shopping cart.
     tags:
       - cart
+    parameters:
+      - name: include
+        in: query
+        required: false
+        description: |
+          Comma-separated list of related resources to expand.
+          Currently only `product` is supported. When omitted, the response
+          contains only the cart item fields (lightweight).
+        schema:
+          type: string
+          enum: [product]
+        example: product
     responses:
       '200':
         description: Cart contents.
@@ -22,13 +34,45 @@ getOrClear:
                   $ref: '../components/schemas/shared.yaml#/Meta'
             examples:
               cartContents:
-                summary: Cart with one item
+                summary: Cart with one item (lightweight)
                 value:
                   data:
                     - id: '5b4a3c2d-1e0f-9a8b-7c6d-5e4f3a2b1c0d'
                       user_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
                       product_id: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
                       quantity: 2
+                      created_at: '2026-10-14T10:00:00.000Z'
+                      updated_at: '2026-10-14T10:00:00.000Z'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+              cartContentsExpanded:
+                summary: Cart with one item and expanded product
+                value:
+                  data:
+                    - id: '5b4a3c2d-1e0f-9a8b-7c6d-5e4f3a2b1c0d'
+                      user_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+                      product_id: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+                      quantity: 2
+                      product:
+                        id: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+                        seller_id: '660e8400-e29b-41d4-a716-446655440001'
+                        category_id: '770e8400-e29b-41d4-a716-446655440002'
+                        name: 'Ergonomic Office Chair'
+                        slug: 'ergonomic-office-chair'
+                        description: 'High quality ergonomic mesh chair.'
+                        price: 199.99
+                        currency: 'USD'
+                        stock: 25
+                        state: 'published'
+                        attributes:
+                          color: 'black'
+                          material: 'mesh'
+                        primary_image_path: 'product-images/chair.webp'
+                        average_rating: 4.8
+                        ratings_count: 12
+                        published_at: '2026-10-10T14:30:00.000Z'
+                        created_at: '2026-10-09T08:00:00.000Z'
+                        updated_at: '2026-10-10T14:30:00.000Z'
                       created_at: '2026-10-14T10:00:00.000Z'
                       updated_at: '2026-10-14T10:00:00.000Z'
                   meta:

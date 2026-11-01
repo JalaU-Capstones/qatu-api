@@ -136,8 +136,8 @@ export class CartController {
 
   /**
    * Handles GET /v1/cart
-   * Returns every cart item of the authenticated user, with the referenced
-   * product populated (see the OpenAPI `CartItem.product` field).
+   * Returns cart items of the authenticated user. When `?include=product`
+   * is provided, each item includes the populated product details.
    * @returns 200 OK with the CartItem list.
    */
   async getCart(req, res, next) {
@@ -154,7 +154,9 @@ export class CartController {
         throw new Error('getCartUseCase is not injected');
       }
 
-      const items = await this.getCartUseCase.execute({ userId });
+      const includeProduct = (req.query?.include ?? req.validatedQuery?.include) === 'product';
+
+      const items = await this.getCartUseCase.execute({ userId, includeProduct });
 
       return res.status(200).json({
         data: items,

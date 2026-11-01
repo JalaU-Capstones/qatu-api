@@ -10,6 +10,7 @@ import { CartController } from '../controllers/CartController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { addToCartSchema } from '../validators/addToCartSchema.js';
+import { getCartQuerySchema } from '../validators/getCartQuerySchema.js';
 import { updateCartItemSchema } from '../validators/updateCartItemSchema.js';
 
 export function createCartRouter({
@@ -61,7 +62,12 @@ export function createCartRouter({
 
   router.delete('/', authMiddleware, (req, res, next) => controller.clearCart(req, res, next));
 
-  router.get('/', authMiddleware, (req, res, next) => controller.getCart(req, res, next));
+  router.get(
+    '/',
+    authMiddleware,
+    validateRequest(getCartQuerySchema, { source: 'query' }),
+    (req, res, next) => controller.getCart(req, res, next)
+  );
 
   return router;
 }

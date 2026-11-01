@@ -55,7 +55,33 @@ describe('CartRepository', () => {
   });
 
   describe('findByUserId', () => {
-    it('Scenario 1: Returns the joined cart item + product rows for the user', async () => {
+    it('Scenario 1: includeProduct: false (default) -> query does NOT contain JOIN', async () => {
+      const mockRow = {
+        id: cartItemId,
+        user_id: userId,
+        product_id: productId,
+        quantity: 2,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      mockDb.query.mockResolvedValue([mockRow]);
+
+      const result = await repository.findByUserId(userId);
+
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.stringMatching(/FROM\s+public\.cart_items/),
+        expect.objectContaining({
+          replacements: { userId },
+          type: QueryTypes.SELECT,
+        })
+      );
+      const sqlQuery = mockDb.query.mock.calls[0][0];
+      expect(sqlQuery).not.toContain('JOIN');
+      expect(result).toEqual([mockRow]);
+    });
+
+    it('Scenario 2: includeProduct: true -> query DOES contain JOIN', async () => {
       const mockRow = {
         id: cartItemId,
         user_id: userId,
@@ -71,7 +97,7 @@ describe('CartRepository', () => {
 
       mockDb.query.mockResolvedValue([mockRow]);
 
-      const result = await repository.findByUserId(userId);
+      const result = await repository.findByUserId(userId, { includeProduct: true });
 
       expect(mockDb.query).toHaveBeenCalledWith(
         expect.stringContaining('FROM public.cart_items ci'),
@@ -80,11 +106,13 @@ describe('CartRepository', () => {
           type: QueryTypes.SELECT,
         })
       );
+      const sqlQuery = mockDb.query.mock.calls[0][0];
+      expect(sqlQuery).toContain('INNER JOIN public.products p');
       expect(result).toEqual([mockRow]);
       expect(result[0].product_name).toBe('Ergonomic Office Chair');
     });
 
-    it('Scenario 2: Returns an empty array when the user has no cart items', async () => {
+    it('Scenario 3: Returns an empty array when the user has no cart items', async () => {
       mockDb.query.mockResolvedValue([]);
 
       const result = await repository.findByUserId(userId);

@@ -24,7 +24,7 @@ export class CartItemDTO {
   /**
    * Serializes a cart item row into the snake_case shape required by the
    * OpenAPI `CartItem` schema, optionally populating the referenced product
-   * with the full `Product` schema shape.
+   * with the full `Product` schema shape when `?include=product` is requested.
    *
    * @param {Object} params
    * @param {string} [params.id=null] - Cart item identifier
