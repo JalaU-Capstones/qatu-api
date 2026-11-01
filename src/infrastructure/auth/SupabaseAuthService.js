@@ -286,4 +286,51 @@ export class SupabaseAuthService extends IAuthService {
 
     return false;
   }
+
+  /**
+   * Exchanges a Supabase access token + refresh token (obtained by the frontend
+   * after PKCE OAuth exchange) for the backend's session contract.
+   *
+   * The backend verifies the access token server-side via supabase.auth.getUser().
+   * The refresh token is returned as-is (Supabase already issued it).
+   *
+   * @param {string} accessToken  - Supabase JWT
+   * @param {string} refreshToken - Supabase refresh token
+   * @returns {Promise<{ user: object, accessToken: string, refreshToken: string }>}
+   * @throws {Error} if the access token is invalid/expired
+   */
+  async exchangeOAuthToken(accessToken, refreshToken) {
+    if (!this.client) {
+      throw new Error('Supabase client not initialized');
+    }
+
+    if (!accessToken || typeof accessToken !== 'string') {
+      const err = new Error('accessToken is required');
+      err.status = 400;
+      err.statusCode = 400;
+      throw err;
+    }
+    if (!refreshToken || typeof refreshToken !== 'string') {
+      const err = new Error('refreshToken is required');
+      err.status = 400;
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const { data, error } = await this.client.auth.getUser(accessToken);
+
+    if (error || !data?.user) {
+      const err = new Error('Invalid or expired OAuth access token');
+      err.status = 401;
+      err.statusCode = 401;
+      err.code = 'UNAUTHORIZED';
+      throw err;
+    }
+
+    return {
+      user: data.user,
+      accessToken,
+      refreshToken,
+    };
+  }
 }
