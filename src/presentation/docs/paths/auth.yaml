@@ -343,3 +343,99 @@ me:
         $ref: '../components/responses/errors.yaml#/TooManyRequests'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+oauthExchange:
+  post:
+    operationId: exchangeOAuthTokens
+    summary: Exchange OAuth tokens for a session
+    description: |
+      Handles the OAuth callback handoff from the frontend. The frontend
+      completes the Supabase PKCE exchange on `/auth/callback` and holds a
+      valid `session.access_token` and `session.refresh_token`. It then calls
+      this endpoint with both tokens. The backend verifies the access token
+      server-side via `supabase.auth.getUser(token)` and sets the three
+      HttpOnly session cookies (access_token, refresh_token, csrf_token)
+      identical to `/auth/login`.
+
+      **Public endpoint:** the token in the body IS the auth. No cookie or
+      Bearer header is required.
+
+      **No token in the response body:** the session lives exclusively in the
+      cookies, per ADR-012.
+
+      **Implementation companion:** see `Architecture/OAuth-Flow.md` in the
+      Wiki for the full sequence diagram, the field mapping from Google, and
+      the frontend code sketch.
+    tags:
+      - auth
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - access_token
+              - refresh_token
+            properties:
+              access_token:
+                type: string
+                description: |
+                  Supabase access token returned by the PKCE exchange on the
+                  frontend. Verified server-side via `supabase.auth.getUser()`.
+                examples:
+                  - 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhMGVlYmM5OS05YzBiLTRlZjgtYmI2ZC02YmI5YmQzODBhMTEiLCJlbWFpbCI6ImJ1eWVyQGV4YW1wbGUuY29tIn0.signature'
+              refresh_token:
+                type: string
+                description: |
+                  Supabase refresh token returned by the PKCE exchange. Stored
+                  in the HttpOnly `refresh_token` cookie for `/auth/refresh`.
+                examples:
+                  - 'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d'
+            additionalProperties: false
+          examples:
+            default:
+              $ref: '../components/examples/auth.yaml#/OAuthExchangeRequest'
+    responses:
+      '200':
+        description: OAuth session established; HttpOnly cookies set; no token in body.
+        headers:
+          Set-Cookie:
+            description: |
+              Three cookies set: `access_token` (HttpOnly, Secure in prod,
+              SameSite=Strict), `refresh_token` (same flags), and `csrf_token`
+              (readable, SameSite=Strict, NOT HttpOnly).
+            schema:
+              type: string
+              example: 'access_token=eyJhbGciOi...; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600'
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  properties:
+                    user:
+                      $ref: '../components/schemas/User.yaml'
+                    profile:
+                      $ref: '../components/schemas/Profile.yaml'
+                    roles:
+                      type: array
+                      items:
+                        $ref: '../components/schemas/Role.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              default:
+                $ref: '../components/examples/auth.yaml#/OAuthExchangeResponse'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '429':
+        $ref: '../components/responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
