@@ -1,3 +1,4 @@
+import { URL } from 'url';
 import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import { Sequelize } from 'sequelize';
 import request from 'supertest';
@@ -48,12 +49,31 @@ const SCHEMA_SQL = `
 describe('POST /v1/auth/oauth/exchange (integration)', () => {
   let container;
   let sequelize;
+  let adminSequelize;
+  let isolatedDbName;
   let app;
   let authServiceMock;
 
   beforeAll(async () => {
     if (process.env.TEST_DATABASE_URL) {
-      sequelize = new Sequelize(process.env.TEST_DATABASE_URL, { logging: false });
+      try {
+        const url = new URL(process.env.TEST_DATABASE_URL);
+        const originalDb = url.pathname.replace(/^\//, '') || 'postgres';
+        isolatedDbName = `${originalDb}_oauth`;
+
+        const adminUrl = new URL(process.env.TEST_DATABASE_URL);
+        adminUrl.pathname = '/postgres';
+
+        adminSequelize = new Sequelize(adminUrl.toString(), { logging: false });
+        await adminSequelize.query(`drop database if exists "${isolatedDbName}";`);
+        await adminSequelize.query(`create database "${isolatedDbName}";`);
+
+        const targetUrl = new URL(process.env.TEST_DATABASE_URL);
+        targetUrl.pathname = `/${isolatedDbName}`;
+        sequelize = new Sequelize(targetUrl.toString(), { logging: false });
+      } catch {
+        sequelize = new Sequelize(process.env.TEST_DATABASE_URL, { logging: false });
+      }
     } else {
       container = await new PostgreSqlContainer('postgres:17-alpine')
         .withDatabase('qatu_test')
@@ -80,6 +100,14 @@ describe('POST /v1/auth/oauth/exchange (integration)', () => {
 
   afterAll(async () => {
     await sequelize?.close();
+    if (adminSequelize && isolatedDbName) {
+      try {
+        await adminSequelize.query(`drop database if exists "${isolatedDbName}";`);
+        await adminSequelize.close();
+      } catch {
+        // Ignore cleanup error
+      }
+    }
     await container?.stop();
   });
 
