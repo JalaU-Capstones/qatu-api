@@ -1,6 +1,7 @@
 image: node:26
 
 stages:
+  - helloworld
   - lint
   - test
   - build
@@ -17,6 +18,16 @@ before_script:
   - npm install -g pnpm@11
   - pnpm config set store-dir $PNPM_CACHE_FOLDER
   - pnpm install --frozen-lockfile
+
+helloworld:
+  stage: helloworld
+  before_script: []
+  script:
+    - echo "Hello World"
+  only:
+    - main
+    - develop
+    - merge_requests
 
 lint:
   stage: lint

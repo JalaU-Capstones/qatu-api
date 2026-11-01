@@ -21,3 +21,5 @@ overrides:
   vite@>=8.3.0 <=8.3.2: ^8.3.3
   # Force qs to patched version (GHSA-6pq8-jhm2-2vcw DoS)
   qs: '>=6.16.1'
+  # Force joi to patched version (GHSA-4528-x5fx-h6hg DoS)
+  joi: '>=18.3.1'

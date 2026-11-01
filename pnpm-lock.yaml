@@ -10,6 +10,7 @@ overrides:
   uuid: '>=11.1.1'
   vite@>=8.3.0 <=8.3.2: ^8.3.3
   qs: '>=6.16.1'
+  joi: '>=18.3.1'
 
 importers:
 
@@ -40,7 +41,7 @@ importers:
         specifier: ^8.3.0
         version: 8.3.0
       joi:
-        specifier: ^18.3.1
+        specifier: '>=18.3.1'
         version: 18.3.1
       js-yaml:
         specifier: ^5.4.3

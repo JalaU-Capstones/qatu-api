@@ -42,7 +42,6 @@ properties:
       - shipped
       - delivered
       - cancelled
-      - refunded
     description: Current fulfillment status of the order.
     examples:
       - 'pending'

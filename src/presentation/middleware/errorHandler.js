@@ -40,6 +40,33 @@ export function errorHandler(err, req, res, next) {
     });
   }
 
+  // FORBIDDEN
+  if (err.statusCode === 403 || err.code === 'FORBIDDEN') {
+    return res.status(403).json({
+      error: {
+        code: 'FORBIDDEN',
+        message: err.message || 'You do not have permission to access this resource',
+      },
+      meta: { timestamp },
+    });
+  }
+
+  // NOT FOUND
+  if (
+    err.statusCode === 404 ||
+    err.code === 'NOT_FOUND' ||
+    err.code === 'ORDER_NOT_FOUND' ||
+    err.code === 'PRODUCT_NOT_FOUND'
+  ) {
+    return res.status(404).json({
+      error: {
+        code: err.code || 'NOT_FOUND',
+        message: err.message || 'Resource not found',
+      },
+      meta: { timestamp },
+    });
+  }
+
   // CONFLICTS
   if (err.code === 'EMAIL_ALREADY_EXISTS' || err.statusCode === 409) {
     return res.status(409).json({
