@@ -141,3 +141,34 @@ RefreshResponse:
           created_at: '2026-10-01T00:00:00.000Z'
     meta:
       timestamp: '2026-10-14T12:00:00.000Z'
+
+OAuthExchangeRequest:
+  summary: OAuth token handoff from frontend
+  value:
+    access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhMGVlYmM5OS05YzBiLTRlZjgtYmI2ZC02YmI5YmQzODBhMTEiLCJlbWFpbCI6ImJ1eWVyQGV4YW1wbGUuY29tIn0.signature'
+    refresh_token: 'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d'
+
+OAuthExchangeResponse:
+  summary: Session established via OAuth
+  value:
+    data:
+      user:
+        id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+        email: 'buyer@example.com'
+        created_at: '2026-10-31T20:00:00.000Z'
+      profile:
+        id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+        username: 'buyer_xyz1'
+        full_name: 'Jane Doe'
+        email: 'buyer@example.com'
+        avatar_path: 'https://lh3.googleusercontent.com/a/example'
+        bio: null
+        locale: 'en'
+        created_at: '2026-10-31T20:00:00.000Z'
+        updated_at: '2026-10-31T20:00:00.000Z'
+      roles:
+        - id: 1
+          name: 'buyer'
+          created_at: '2026-10-01T00:00:00.000Z'
+    meta:
+      timestamp: '2026-10-31T20:00:00.000Z'

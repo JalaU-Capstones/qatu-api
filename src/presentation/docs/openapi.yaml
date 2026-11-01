@@ -74,6 +74,9 @@ paths:
   /auth/me:
     $ref: './paths/auth.yaml#/me'
 
+  /auth/oauth/exchange:
+    $ref: './paths/auth.yaml#/oauthExchange'
+
   # ── Profiles ─────────────────────────────────────────────────────────────────
   /profiles/{id}:
     $ref: './paths/profiles.yaml#/getById'
