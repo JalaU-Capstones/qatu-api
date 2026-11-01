@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AddToCartUseCase } from '../../application/use-cases/AddToCartUseCase.js';
 import { ClearCartUseCase } from '../../application/use-cases/ClearCartUseCase.js';
+import { GetCartUseCase } from '../../application/use-cases/GetCartUseCase.js';
 import { RemoveCartItemUseCase } from '../../application/use-cases/RemoveCartItemUseCase.js';
 import { UpdateCartItemUseCase } from '../../application/use-cases/UpdateCartItemUseCase.js';
 import { CartRepository } from '../../infrastructure/persistence/repositories/CartRepository.js';
@@ -9,6 +10,7 @@ import { CartController } from '../controllers/CartController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { addToCartSchema } from '../validators/addToCartSchema.js';
+import { getCartQuerySchema } from '../validators/getCartQuerySchema.js';
 import { updateCartItemSchema } from '../validators/updateCartItemSchema.js';
 
 export function createCartRouter({
@@ -18,6 +20,7 @@ export function createCartRouter({
   updateCartItemUseCase,
   removeCartItemUseCase,
   clearCartUseCase,
+  getCartUseCase,
   cartController,
 } = {}) {
   const router = Router();
@@ -27,6 +30,7 @@ export function createCartRouter({
     updateCartItemUseCase || new UpdateCartItemUseCase({ cartRepository, productRepository });
   const removeUC = removeCartItemUseCase || new RemoveCartItemUseCase({ cartRepository });
   const clearUC = clearCartUseCase || new ClearCartUseCase({ cartRepository });
+  const getUC = getCartUseCase || new GetCartUseCase({ cartRepository });
 
   const controller =
     cartController ||
@@ -35,6 +39,7 @@ export function createCartRouter({
       updateCartItemUseCase: updateUC,
       removeCartItemUseCase: removeUC,
       clearCartUseCase: clearUC,
+      getCartUseCase: getUC,
     });
 
   router.post(
@@ -56,6 +61,13 @@ export function createCartRouter({
   );
 
   router.delete('/', authMiddleware, (req, res, next) => controller.clearCart(req, res, next));
+
+  router.get(
+    '/',
+    authMiddleware,
+    validateRequest(getCartQuerySchema, { source: 'query' }),
+    (req, res, next) => controller.getCart(req, res, next)
+  );
 
   return router;
 }

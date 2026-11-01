@@ -96,4 +96,18 @@ export class ICartRepository {
   async findById(id) {
     throw new Error('Method not implemented.');
   }
+
+  /**
+   * Retrieves cart items for a user. When `includeProduct` is true, joins
+   * the products table and returns product columns aliased with `product_`.
+   *
+   * @param {string} userId - User identifier
+   * @param {Object} [options]
+   * @param {boolean} [options.includeProduct=false]
+   * @returns {Promise<Array>} Array of cart items (optionally with product data)
+   */
+  // eslint-disable-next-line no-unused-vars
+  async findByUserId(userId, { includeProduct = false } = {}) {
+    throw new Error('Method not implemented: findByUserId');
+  }
 }

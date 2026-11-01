@@ -54,6 +54,73 @@ describe('CartRepository', () => {
     });
   });
 
+  describe('findByUserId', () => {
+    it('Scenario 1: includeProduct: false (default) -> query does NOT contain JOIN', async () => {
+      const mockRow = {
+        id: cartItemId,
+        user_id: userId,
+        product_id: productId,
+        quantity: 2,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+
+      mockDb.query.mockResolvedValue([mockRow]);
+
+      const result = await repository.findByUserId(userId);
+
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.stringMatching(/FROM\s+public\.cart_items/),
+        expect.objectContaining({
+          replacements: { userId },
+          type: QueryTypes.SELECT,
+        })
+      );
+      const sqlQuery = mockDb.query.mock.calls[0][0];
+      expect(sqlQuery).not.toContain('JOIN');
+      expect(result).toEqual([mockRow]);
+    });
+
+    it('Scenario 2: includeProduct: true -> query DOES contain JOIN', async () => {
+      const mockRow = {
+        id: cartItemId,
+        user_id: userId,
+        product_id: productId,
+        quantity: 2,
+        created_at: new Date(),
+        updated_at: new Date(),
+        product_seller_id: '660e8400-e29b-41d4-a716-446655440001',
+        product_name: 'Ergonomic Office Chair',
+        product_slug: 'ergonomic-office-chair',
+        product_price: 199.99,
+      };
+
+      mockDb.query.mockResolvedValue([mockRow]);
+
+      const result = await repository.findByUserId(userId, { includeProduct: true });
+
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.stringContaining('FROM public.cart_items ci'),
+        expect.objectContaining({
+          replacements: { userId },
+          type: QueryTypes.SELECT,
+        })
+      );
+      const sqlQuery = mockDb.query.mock.calls[0][0];
+      expect(sqlQuery).toContain('INNER JOIN public.products p');
+      expect(result).toEqual([mockRow]);
+      expect(result[0].product_name).toBe('Ergonomic Office Chair');
+    });
+
+    it('Scenario 3: Returns an empty array when the user has no cart items', async () => {
+      mockDb.query.mockResolvedValue([]);
+
+      const result = await repository.findByUserId(userId);
+
+      expect(result).toEqual([]);
+    });
+  });
+
   describe('updateQuantity', () => {
     it('Scenario 1: Updates quantity and returns domain entity', async () => {
       const mockRow = {
