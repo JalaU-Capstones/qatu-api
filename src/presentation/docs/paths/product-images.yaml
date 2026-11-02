@@ -71,7 +71,30 @@ upload:
       '409':
         $ref: '../components/responses/errors.yaml#/Conflict'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: The uploaded file is too large or has an unsupported format.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              fileTooLarge:
+                summary: File exceeds size limit
+                value:
+                  error:
+                    code: 'FILE_TOO_LARGE'
+                    message: 'The image exceeds the maximum size of 5 MB.'
+                    details: []
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+              invalidFormat:
+                summary: Unsupported image format
+                value:
+                  error:
+                    code: 'INVALID_FILE_FORMAT'
+                    message: 'Only JPEG, PNG, and WebP images are accepted.'
+                    details: []
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 

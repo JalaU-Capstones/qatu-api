@@ -114,6 +114,20 @@ listOrCreate:
       '404':
         $ref: '../components/responses/errors.yaml#/NotFound'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: Conversation cannot be created with the given parameters.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              selfConversation:
+                summary: Cannot start a conversation with yourself
+                value:
+                  error:
+                    code: 'SELF_CONVERSATION'
+                    message: 'You cannot start a conversation with yourself.'
+                    details: []
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'

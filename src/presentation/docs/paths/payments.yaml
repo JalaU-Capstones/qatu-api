@@ -74,7 +74,21 @@ createOrGet:
       '409':
         $ref: '../components/responses/errors.yaml#/Conflict'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: The order is not in a state that allows payment.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              invalidPaymentState:
+                summary: Order is not in a payable state
+                value:
+                  error:
+                    code: 'INVALID_PAYMENT_STATE'
+                    message: 'The order must be confirmed before a payment can be processed.'
+                    details: []
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 

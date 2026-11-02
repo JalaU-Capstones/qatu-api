@@ -120,7 +120,23 @@ adminCreate:
       '409':
         $ref: '../components/responses/errors.yaml#/Conflict'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: Category semantic validation failed.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              validation:
+                summary: Invalid category field
+                value:
+                  error:
+                    code: 'VALIDATION_ERROR'
+                    message: 'One or more category fields are invalid.'
+                    details:
+                      - field: 'name'
+                        message: 'Category name must be between 2 and 80 characters.'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 
@@ -184,7 +200,23 @@ adminUpdate:
       '404':
         $ref: '../components/responses/errors.yaml#/NotFound'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: Category semantic validation failed.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              validation:
+                summary: Invalid category field
+                value:
+                  error:
+                    code: 'VALIDATION_ERROR'
+                    message: 'One or more category fields are invalid.'
+                    details:
+                      - field: 'name'
+                        message: 'Category name must be between 2 and 80 characters.'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 

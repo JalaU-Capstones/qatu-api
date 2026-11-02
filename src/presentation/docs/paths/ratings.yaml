@@ -82,7 +82,32 @@ create:
       '409':
         $ref: '../components/responses/errors.yaml#/Conflict'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: Rating cannot be created due to business rules.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              validation:
+                summary: Invalid rating value
+                value:
+                  error:
+                    code: 'VALIDATION_ERROR'
+                    message: 'The rating value must be between 1 and 5.'
+                    details:
+                      - field: 'rating'
+                        message: 'Rating must be between 1 and 5.'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+              notPurchased:
+                summary: Purchase required before rating
+                value:
+                  error:
+                    code: 'NOT_PURCHASED'
+                    message: 'You can only rate products or sellers you have purchased from.'
+                    details: []
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 

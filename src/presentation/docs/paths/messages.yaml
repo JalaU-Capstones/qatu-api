@@ -119,6 +119,22 @@ listOrSend:
       '404':
         $ref: '../components/responses/errors.yaml#/NotFound'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: Message failed semantic validation.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              validation:
+                summary: Empty message or closed conversation
+                value:
+                  error:
+                    code: 'VALIDATION_ERROR'
+                    message: 'The message cannot be sent.'
+                    details:
+                      - field: 'content'
+                        message: 'Message content cannot be empty.'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
