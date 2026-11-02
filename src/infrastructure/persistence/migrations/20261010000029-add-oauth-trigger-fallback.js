@@ -46,14 +46,30 @@ module.exports = {
           resolved_avatar text;
           resolved_full_name text;
         begin
-          -- Username: prefer explicit, else email prefix + 4 hex chars, else UUID fallback
+          -- Username strategy:
+          --   1. Password signup: explicit username as-is (assumed valid, Joi-validated at signup).
+          --   2. OAuth: sanitize the email prefix (strip anything outside [a-zA-Z0-9_]),
+          --      truncate to 20 chars, then append _<4hex> so the worst case is:
+          --      20 + 1 + 4 = 25 chars (fits {3,30}); with a collision suffix _<N>
+          --      it grows to at most 30 chars for N up to 9999.
+          --   3. Fallback: email missing OR sanitized prefix < 3 chars (constraint requires >= 3).
+          --
+          -- Why 20 chars: username CHECK is {3,30}. \`_<4hex>\` costs 5. Collision loop
+          -- can append \`_<N>\` up to 4 digits (10k collisions on the same prefix,
+          -- astronomically unlikely in practice). 20 + 5 + 5 = 30, so we stay safe.
           base_username := case
             when new.raw_user_meta_data->>'username' is not null
               and char_length(new.raw_user_meta_data->>'username') > 0
               then new.raw_user_meta_data->>'username'
             when new.email is not null
-              and char_length(new.email) > 0
-              then split_part(new.email, '@', 1) || '_' || substr(md5(random()::text), 1, 4)
+              and char_length(
+                regexp_replace(split_part(new.email, '@', 1), '[^a-zA-Z0-9_]', '', 'g')
+              ) >= 3
+              then substr(
+                     regexp_replace(split_part(new.email, '@', 1), '[^a-zA-Z0-9_]', '', 'g'),
+                     1,
+                     20
+                   ) || '_' || substr(md5(random()::text), 1, 4)
             else 'user_' || substring(replace(new.id::text, '-', '') from 1 for 10)
           end;
           candidate_username := base_username;
