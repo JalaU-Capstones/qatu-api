@@ -9,11 +9,11 @@ BadRequest:
           summary: Validation error
           value:
             error:
-              code: VALIDATION_ERROR
-              message: Invalid input data
+              code: 'VALIDATION_ERROR'
+              message: 'The request body is invalid. See error.details for field-level errors.'
               details:
-                - field: email
-                  message: Email must be a valid email address
+                - field: 'name'
+                  message: 'Name is required'
             meta:
               timestamp: '2026-10-14T12:00:00.000Z'
 
@@ -25,11 +25,11 @@ Unauthorized:
         $ref: '../schemas/Error.yaml'
       examples:
         missingToken:
-          summary: Missing or invalid JWT
+          summary: Missing or invalid token
           value:
             error:
-              code: UNAUTHORIZED
-              message: Missing or invalid authentication token
+              code: 'UNAUTHORIZED'
+              message: 'Authentication required or session expired.'
             meta:
               timestamp: '2026-10-14T12:00:00.000Z'
 
@@ -44,8 +44,8 @@ Forbidden:
           summary: Insufficient role permissions
           value:
             error:
-              code: FORBIDDEN
-              message: You do not have permission to access this resource
+              code: 'FORBIDDEN'
+              message: 'You do not have permission to perform this action.'
             meta:
               timestamp: '2026-10-14T12:00:00.000Z'
 
@@ -60,8 +60,8 @@ NotFound:
           summary: Resource not found
           value:
             error:
-              code: NOT_FOUND
-              message: The requested resource was not found
+              code: 'NOT_FOUND'
+              message: 'The requested resource was not found.'
             meta:
               timestamp: '2026-10-14T12:00:00.000Z'
 
@@ -76,24 +76,56 @@ Conflict:
           summary: State or uniqueness conflict
           value:
             error:
-              code: CONFLICT
-              message: A resource with these attributes already exists
+              code: 'CONFLICT'
+              message: 'The request conflicts with the current state of the resource.'
             meta:
               timestamp: '2026-10-14T12:00:00.000Z'
 
 UnprocessableEntity:
-  description: Unprocessable Entity — semantic validation error or failed business condition.
+  description: |
+    The request was well-formed but cannot be processed due to semantic errors.
+    The exact reason depends on the endpoint — check `error.code` for the specific case.
   content:
     application/json:
       schema:
         $ref: '../schemas/Error.yaml'
       examples:
-        outOfStock:
-          summary: Business rule violation
+        validation:
+          summary: Field-level validation failure
           value:
             error:
-              code: UNPROCESSABLE_ENTITY
-              message: Requested product quantity exceeds available inventory
+              code: 'VALIDATION_ERROR'
+              message: 'One or more fields have invalid values.'
+              details:
+                - field: 'new_password'
+                  message: 'Password must be at least 8 characters long.'
+            meta:
+              timestamp: '2026-10-14T12:00:00.000Z'
+        insufficientStock:
+          summary: Product stock too low (checkout context)
+          value:
+            error:
+              code: 'INSUFFICIENT_STOCK'
+              message: 'Requested quantity exceeds available inventory.'
+              details: []
+            meta:
+              timestamp: '2026-10-14T12:00:00.000Z'
+        invalidStatusTransition:
+          summary: Invalid order status transition
+          value:
+            error:
+              code: 'INVALID_STATUS_TRANSITION'
+              message: 'Cannot transition the order to the requested status.'
+              details: []
+            meta:
+              timestamp: '2026-10-14T12:00:00.000Z'
+        fileTooLarge:
+          summary: Uploaded file exceeds size limit
+          value:
+            error:
+              code: 'FILE_TOO_LARGE'
+              message: 'The uploaded file exceeds the maximum allowed size.'
+              details: []
             meta:
               timestamp: '2026-10-14T12:00:00.000Z'
 
@@ -121,8 +153,8 @@ TooManyRequests:
           summary: Rate limit exceeded
           value:
             error:
-              code: TOO_MANY_REQUESTS
-              message: Rate limit exceeded. Please retry later.
+              code: 'TOO_MANY_REQUESTS'
+              message: 'Too many requests. Try again later.'
             meta:
               timestamp: '2026-10-14T12:00:00.000Z'
 
@@ -137,7 +169,7 @@ InternalServerError:
           summary: Unexpected server error
           value:
             error:
-              code: INTERNAL_SERVER_ERROR
-              message: An unexpected server error occurred
+              code: 'INTERNAL_SERVER_ERROR'
+              message: 'An unexpected error occurred on the server.'
             meta:
               timestamp: '2026-10-14T12:00:00.000Z'

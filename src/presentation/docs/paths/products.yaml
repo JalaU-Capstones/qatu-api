@@ -158,7 +158,23 @@ create:
       '403':
         $ref: '../components/responses/errors.yaml#/Forbidden'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: Product semantic validation failed.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              validation:
+                summary: Semantic validation failure
+                value:
+                  error:
+                    code: 'VALIDATION_ERROR'
+                    message: 'Price must be greater than zero.'
+                    details:
+                      - field: 'price'
+                        message: 'Price must be greater than zero.'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 
@@ -226,7 +242,23 @@ update:
       '404':
         $ref: '../components/responses/errors.yaml#/NotFound'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: Product semantic validation failed.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              validation:
+                summary: Semantic validation failure
+                value:
+                  error:
+                    code: 'VALIDATION_ERROR'
+                    message: 'Price must be greater than zero.'
+                    details:
+                      - field: 'price'
+                        message: 'Price must be greater than zero.'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 

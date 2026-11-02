@@ -486,6 +486,22 @@ changePassword:
       '401':
         $ref: '../components/responses/errors.yaml#/Unauthorized'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: Password does not meet the complexity requirements.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              validation:
+                summary: Weak new password
+                value:
+                  error:
+                    code: 'VALIDATION_ERROR'
+                    message: 'Password must be at least 8 characters, with uppercase, lowercase, number, and special character.'
+                    details:
+                      - field: 'new_password'
+                        message: 'Password does not meet complexity requirements.'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'

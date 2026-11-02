@@ -102,7 +102,21 @@ listOrCreate:
       '401':
         $ref: '../components/responses/errors.yaml#/Unauthorized'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: Order placement failed due to insufficient stock or business condition.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              insufficientStock:
+                summary: Product stock too low
+                value:
+                  error:
+                    code: 'INSUFFICIENT_STOCK'
+                    message: 'Requested quantity exceeds available inventory.'
+                    details: []
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 
@@ -200,6 +214,20 @@ updateStatus:
       '409':
         $ref: '../components/responses/errors.yaml#/Conflict'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: Invalid order status transition.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              invalidStatusTransition:
+                summary: Invalid order status transition
+                value:
+                  error:
+                    code: 'INVALID_STATUS_TRANSITION'
+                    message: 'Cannot transition the order to the requested status.'
+                    details: []
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'

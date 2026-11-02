@@ -154,7 +154,21 @@ add:
       '404':
         $ref: '../components/responses/errors.yaml#/NotFound'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: Requested item quantity exceeds available stock.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              insufficientStock:
+                summary: Product stock too low
+                value:
+                  error:
+                    code: 'INSUFFICIENT_STOCK'
+                    message: 'Requested quantity exceeds available inventory.'
+                    details: []
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 
@@ -201,7 +215,21 @@ updateOrRemove:
       '404':
         $ref: '../components/responses/errors.yaml#/NotFound'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: Requested quantity exceeds available inventory.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              insufficientStock:
+                summary: Product stock too low
+                value:
+                  error:
+                    code: 'INSUFFICIENT_STOCK'
+                    message: 'Requested quantity exceeds available inventory.'
+                    details: []
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 

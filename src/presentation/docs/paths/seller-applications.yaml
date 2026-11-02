@@ -55,7 +55,23 @@ create:
       '409':
         $ref: '../components/responses/errors.yaml#/Conflict'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: Seller application semantic validation failed.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              validation:
+                summary: Semantic validation failure
+                value:
+                  error:
+                    code: 'VALIDATION_ERROR'
+                    message: 'Business document or tax ID is invalid.'
+                    details:
+                      - field: 'tax_id'
+                        message: 'Tax ID is required and must be valid.'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 
@@ -190,6 +206,20 @@ adminReview:
       '404':
         $ref: '../components/responses/errors.yaml#/NotFound'
       '422':
-        $ref: '../components/responses/errors.yaml#/UnprocessableEntity'
+        description: Invalid application review status transition.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              invalidStatusTransition:
+                summary: Invalid status transition
+                value:
+                  error:
+                    code: 'INVALID_STATUS_TRANSITION'
+                    message: 'Application has already been reviewed.'
+                    details: []
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
