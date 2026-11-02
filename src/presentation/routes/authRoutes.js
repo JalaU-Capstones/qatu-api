@@ -1,5 +1,6 @@
 import express, { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import { ExchangeOAuthTokenUseCase } from '../../application/use-cases/ExchangeOAuthTokenUseCase.js';
 import { GetCurrentUserUseCase } from '../../application/use-cases/GetCurrentUserUseCase.js';
 import { LoginUseCase } from '../../application/use-cases/LoginUseCase.js';
 import { LogoutUseCase } from '../../application/use-cases/LogoutUseCase.js';
@@ -9,9 +10,12 @@ import { SupabaseAuthService } from '../../infrastructure/auth/SupabaseAuthServi
 import { supabase } from '../../infrastructure/config/supabase.js';
 import { ProfileRepository } from '../../infrastructure/persistence/repositories/ProfileRepository.js';
 import { AuthController } from '../controllers/AuthController.js';
+import { OAuthController } from '../controllers/OAuthController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { oauthExchangeLimiter } from '../middleware/rateLimiter.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { loginSchema } from '../validators/LoginSchema.js';
+import { oauthExchangeSchema } from '../validators/oauthExchangeSchema.js';
 import { registerSchema } from '../validators/registerSchema.js';
 
 export function createAuthRouter({
@@ -22,7 +26,9 @@ export function createAuthRouter({
   getCurrentUserUseCase,
   refreshSessionUseCase,
   logoutUseCase,
+  exchangeOAuthTokenUseCase,
   authController,
+  oauthController,
 } = {}) {
   const router = Router();
 
@@ -59,6 +65,13 @@ export function createAuthRouter({
       authService,
     });
 
+  const exchangeOAuthUC =
+    exchangeOAuthTokenUseCase ||
+    new ExchangeOAuthTokenUseCase({
+      authService,
+      profileRepository,
+    });
+
   const controller =
     authController ||
     new AuthController({
@@ -67,6 +80,12 @@ export function createAuthRouter({
       getCurrentUserUseCase: getCurrentUserUC,
       refreshSessionUseCase: refreshSessionUC,
       logoutUseCase: logoutUC,
+    });
+
+  const oauthCtrl =
+    oauthController ||
+    new OAuthController({
+      exchangeOAuthTokenUseCase: exchangeOAuthUC,
     });
 
   // Rate limiter specifically for token refresh (100 req/min/IP per ADR-012)
@@ -95,6 +114,13 @@ export function createAuthRouter({
     express.json({ limit: '1kb' }),
     validateRequest(loginSchema),
     (req, res, next) => controller.login(req, res, next)
+  );
+
+  router.post(
+    '/oauth/exchange',
+    oauthExchangeLimiter,
+    validateRequest(oauthExchangeSchema),
+    (req, res, next) => oauthCtrl.exchange(req, res, next)
   );
 
   // POST /v1/auth/refresh — rotación de sesión (no authMiddleware, usa refreshLimiter)
