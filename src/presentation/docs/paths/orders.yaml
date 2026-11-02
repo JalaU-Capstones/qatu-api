@@ -3,8 +3,26 @@ listOrCreate:
     operationId: listOrders
     summary: List orders
     description: |
-      Returns a paginated list of orders for the authenticated user.
-      Buyers see their own orders; sellers see orders containing their products; admins see all orders.
+      Returns a paginated list of orders visible to the authenticated user.
+
+      **Visibility (enforced by RLS):**
+      - **Buyers:** see only the orders they placed.
+      - **Sellers:** see only orders that contain at least one of their products.
+        **Important:** the `items[]` array contains ONLY the seller's own items
+        (RLS filters `order_items` per seller). However, `subtotal`, `shipping_cost`,
+        `tax`, and `total` reflect the **full order** as created by the buyer, since
+        those fields were computed at checkout across all items. A seller dashboard
+        must compute the seller's own revenue from `items[]` (sum of `item.subtotal`),
+        not from the order's `total`.
+      - **Admins:** see all orders.
+
+      **Buyer identification:** the response includes `buyer_id` (UUID) but not the
+      buyer's profile. Frontends that need to display the buyer's name should fetch
+      `GET /v1/profiles/{buyer_id}` separately. Keeping the payload lean avoids
+      cross-aggregate expansion in list views.
+
+      **Query parameters:** `page`, `limit`, `status` (one of `pending`, `confirmed`,
+      `shipped`, `delivered`, `cancelled`).
     tags:
       - orders
     parameters:
@@ -34,6 +52,45 @@ listOrCreate:
             examples:
               orderList:
                 $ref: '../components/examples/orders.yaml#/orderList'
+              sellerOrderList:
+                summary: Seller view — only own items, full-order totals
+                value:
+                  data:
+                    - id: '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+                      order_number: 'ORD-00100042'
+                      buyer_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+                      status: 'pending'
+                      currency: 'USD'
+                      subtotal: 250.00
+                      shipping_cost: 15.00
+                      tax: 0.00
+                      total: 265.00
+                      items:
+                        - id: 'e1f2a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b'
+                          order_id: '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+                          product_id: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+                          product_name: 'Ergonomic Office Chair'
+                          product_image_path: 'product-images/chair.webp'
+                          quantity: 1
+                          unit_price: 199.99
+                          subtotal: 199.99
+                          created_at: '2026-10-14T11:00:00.000Z'
+                        - id: 'f2a3b4c5-d6e7-8f9a-0b1c-2d3e4f5a6b7c'
+                          order_id: '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+                          product_id: '8f3c0b7d-2e3e-4c7f-9d4b-0e6a2f3b5c8d'
+                          product_name: 'Adjustable Standing Desk'
+                          product_image_path: 'product-images/desk.webp'
+                          quantity: 1
+                          unit_price: 50.01
+                          subtotal: 50.01
+                          created_at: '2026-10-14T11:00:00.000Z'
+                      created_at: '2026-10-14T11:00:00.000Z'
+                      updated_at: '2026-10-14T11:00:00.000Z'
+                  meta:
+                    page: 1
+                    per_page: 20
+                    total: 1
+                    total_pages: 1
       '401':
         $ref: '../components/responses/errors.yaml#/Unauthorized'
       '500':
@@ -161,8 +218,24 @@ updateStatus:
     operationId: updateOrderStatus
     summary: Update order status
     description: |
-      Updates the status of an order. Sellers may mark orders as `confirmed`, `shipped`, or `delivered`.
-      Buyers may cancel `pending` orders. Admins may set any status.
+      Transitions an order to a new status.
+
+      **Valid transitions per role.** Any transition not listed below returns `422 INVALID_STATUS_TRANSITION`:
+
+      | Actor | From | To |
+      |-------|------|-----|
+      | Seller | `pending` | `confirmed` |
+      | Seller | `confirmed` | `shipped` |
+      | Seller | `shipped` | `delivered` |
+      | Seller | `confirmed` | `cancelled` |
+      | Buyer | `pending` | `cancelled` |
+      | Admin | any non-terminal state | any status |
+
+      `delivered` and `cancelled` are terminal — no further transitions are allowed.
+
+      **Access control (enforced by RLS):** a seller may only update orders that
+      contain at least one of their products. Attempting to update another seller's
+      order returns `403 FORBIDDEN`.
     tags:
       - orders
     parameters:

@@ -66,10 +66,12 @@ create:
                 value:
                   error:
                     code: 'VALIDATION_ERROR'
-                    message: 'Business document or tax ID is invalid.'
+                    message: 'One or more application fields are invalid.'
                     details:
-                      - field: 'tax_id'
-                        message: 'Tax ID is required and must be valid.'
+                      - field: 'business_name'
+                        message: 'Business name must be between 2 and 120 characters.'
+                      - field: 'business_description'
+                        message: 'Business description must be between 20 and 2000 characters.'
                   meta:
                     timestamp: '2026-10-14T12:00:00.000Z'
       '500':
@@ -79,7 +81,17 @@ getMine:
   get:
     operationId: getMySellerApplication
     summary: Get my seller application
-    description: Returns the authenticated user's most recent seller application.
+    description: |
+      Returns the authenticated user's most recent seller application.
+
+      **Behavior:**
+      - Returns `404 Not Found` when the user has never applied.
+      - Otherwise returns the application with its current `status`
+        (`pending`, `approved`, `rejected`, or `withdrawn`).
+
+      A user already holding the `seller` role (from `/v1/auth/me`) has an
+      `approved` application, so the frontend can distinguish "new applicant"
+      from "already a seller" without a dedicated endpoint.
     tags:
       - seller-applications
     responses:
@@ -172,8 +184,10 @@ adminReview:
               rejection_reason:
                 type: string
                 maxLength: 500
-                description: Required when `status` is `rejected`.
-                example: 'Insufficient business description.'
+                description: |
+                  Required when `status` is `rejected`. Explains the rejection to the
+                  applicant and is surfaced in the `SellerRejected` notification.
+                example: 'Insufficient business documentation.'
           examples:
             approveApplication:
               summary: Approve application
@@ -206,18 +220,18 @@ adminReview:
       '404':
         $ref: '../components/responses/errors.yaml#/NotFound'
       '422':
-        description: Invalid application review status transition.
+        description: The application has already been reviewed or the requested transition is invalid.
         content:
           application/json:
             schema:
               $ref: '../components/schemas/Error.yaml'
             examples:
-              invalidStatusTransition:
-                summary: Invalid status transition
+              alreadyReviewed:
+                summary: Application already approved or rejected
                 value:
                   error:
-                    code: 'INVALID_STATUS_TRANSITION'
-                    message: 'Application has already been reviewed.'
+                    code: 'ALREADY_REVIEWED'
+                    message: 'This application has already been reviewed.'
                     details: []
                   meta:
                     timestamp: '2026-10-14T12:00:00.000Z'
