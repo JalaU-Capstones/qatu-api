@@ -74,6 +74,9 @@ paths:
   /auth/me:
     $ref: './paths/auth.yaml#/me'
 
+  /auth/password:
+    $ref: './paths/auth.yaml#/changePassword'
+
   /auth/oauth/exchange:
     $ref: './paths/auth.yaml#/oauthExchange'
 
@@ -83,6 +86,9 @@ paths:
 
   /profiles/me:
     $ref: './paths/profiles.yaml#/updateMe'
+
+  /profiles/me/avatar:
+    $ref: './paths/profiles.yaml#/uploadAvatar'
 
   # ── Seller Applications ───────────────────────────────────────────────────────
   /seller-applications:
