@@ -131,6 +131,105 @@ export class OrderRepository extends IOrderRepository {
     return { items, total };
   }
 
+  /** Inserts a pending order and its items (order_number and item subtotal are DB-generated). */
+  async createWithItems(
+    { buyerId, currency, subtotal, shippingCost, tax, total, shippingAddress, notes = null, items },
+    { transaction } = {}
+  ) {
+    const queryOptions = transaction ? { transaction } : {};
+
+    const orderRows = await this.db.query(
+      `INSERT INTO public.orders
+         (buyer_id, status, currency, subtotal, shipping_cost, tax, total, shipping_address, notes)
+       VALUES
+         (:buyerId, 'pending', :currency, :subtotal, :shippingCost, :tax, :total,
+          CAST(:shippingAddress AS jsonb), :notes)
+       RETURNING id, order_number, buyer_id, status, currency, subtotal, shipping_cost, tax, total,
+                 shipping_address, notes, cancellation_reason, confirmed_at, shipped_at,
+                 delivered_at, cancelled_at, created_at, updated_at`,
+      {
+        replacements: {
+          buyerId,
+          currency,
+          subtotal,
+          shippingCost,
+          tax,
+          total,
+          shippingAddress: JSON.stringify(shippingAddress),
+          notes,
+        },
+        type: QueryTypes.SELECT,
+        ...queryOptions,
+      }
+    );
+
+    if (!orderRows || orderRows.length === 0) {
+      throw new Error('Failed to create order: no row returned');
+    }
+    const orderRow = orderRows[0];
+
+    const itemEntities = [];
+    for (const item of items) {
+      const itemRows = await this.db.query(
+        `INSERT INTO public.order_items
+           (order_id, product_id, product_name, product_image_path, quantity, unit_price)
+         VALUES
+           (:orderId, :productId, :productName, :productImagePath, :quantity, :unitPrice)
+         RETURNING id, order_id, product_id, product_name, product_image_path, quantity,
+                   unit_price, subtotal, created_at`,
+        {
+          replacements: {
+            orderId: orderRow.id,
+            productId: item.productId,
+            productName: item.productName,
+            productImagePath: item.productImagePath ?? null,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+          },
+          type: QueryTypes.SELECT,
+          ...queryOptions,
+        }
+      );
+
+      const itemRow = itemRows[0];
+      itemEntities.push(
+        new OrderItem({
+          id: itemRow.id,
+          orderId: itemRow.order_id,
+          productId: itemRow.product_id,
+          productName: itemRow.product_name,
+          productImagePath: itemRow.product_image_path,
+          quantity: itemRow.quantity,
+          unitPrice: Number(itemRow.unit_price),
+          subtotal: itemRow.subtotal !== null ? Number(itemRow.subtotal) : null,
+          createdAt: itemRow.created_at,
+        })
+      );
+    }
+
+    return new Order({
+      id: orderRow.id,
+      orderNumber: orderRow.order_number,
+      buyerId: orderRow.buyer_id,
+      status: orderRow.status,
+      currency: orderRow.currency,
+      subtotal: Number(orderRow.subtotal),
+      shippingCost: Number(orderRow.shipping_cost),
+      tax: Number(orderRow.tax),
+      total: Number(orderRow.total),
+      shippingAddress: orderRow.shipping_address,
+      notes: orderRow.notes,
+      cancellationReason: orderRow.cancellation_reason,
+      confirmedAt: orderRow.confirmed_at,
+      shippedAt: orderRow.shipped_at,
+      deliveredAt: orderRow.delivered_at,
+      cancelledAt: orderRow.cancelled_at,
+      createdAt: orderRow.created_at,
+      updatedAt: orderRow.updated_at,
+      items: itemEntities,
+    });
+  }
+
   /**
    * Returns an order by its unique identifier, or null if not found.
    *

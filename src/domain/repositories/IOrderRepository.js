@@ -36,4 +36,10 @@ export class IOrderRepository {
   async findById(orderId) {
     throw new Error('Method not implemented: findById');
   }
+
+  /** Persists a `pending` order with its items (order_number comes from the DB sequence). */
+  // eslint-disable-next-line no-unused-vars
+  async createWithItems(params, { transaction } = {}) {
+    throw new Error('Method not implemented: createWithItems');
+  }
 }

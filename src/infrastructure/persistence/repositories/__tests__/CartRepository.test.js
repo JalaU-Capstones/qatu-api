@@ -186,5 +186,93 @@ describe('CartRepository', () => {
         })
       );
     });
+
+    it('Scenario 2: Joins the checkout transaction when one is given', async () => {
+      mockDb.query.mockResolvedValue();
+      const transaction = { id: 'tx' };
+
+      await repository.clearCart(userId, { transaction });
+
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.stringContaining('DELETE FROM public.cart_items'),
+        expect.objectContaining({ transaction })
+      );
+    });
+
+    it('Scenario 3: Does not add a transaction key when none is given', async () => {
+      mockDb.query.mockResolvedValue();
+
+      await repository.clearCart(userId);
+
+      expect(mockDb.query.mock.calls[0][1]).not.toHaveProperty('transaction');
+    });
+  });
+
+  describe('findCheckoutLines', () => {
+    const baseRow = {
+      cart_item_id: cartItemId,
+      product_id: productId,
+      quantity: 2,
+      seller_id: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f',
+      name: 'Clean Code',
+      price: '19.99',
+      currency: 'USD',
+      state: 'published',
+      primary_image_path: 'img/clean-code.webp',
+      deleted_at: null,
+    };
+
+    it('Scenario 1: Locks only the cart rows and orders by product id', async () => {
+      mockDb.query.mockResolvedValue([baseRow]);
+      const transaction = { id: 'tx' };
+
+      await repository.findCheckoutLines(userId, { transaction });
+
+      const [sql, options] = mockDb.query.mock.calls[0];
+      expect(sql).toContain('FOR UPDATE OF ci');
+      expect(sql).toContain('ORDER BY ci.product_id ASC');
+      expect(options).toMatchObject({
+        replacements: { userId },
+        type: QueryTypes.SELECT,
+        transaction,
+      });
+    });
+
+    it('Scenario 2: Maps rows to checkout lines with numeric price and quantity', async () => {
+      mockDb.query.mockResolvedValue([baseRow]);
+
+      const lines = await repository.findCheckoutLines(userId);
+
+      expect(lines).toEqual([
+        {
+          cartItemId,
+          productId,
+          sellerId: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f',
+          name: 'Clean Code',
+          unitPrice: 19.99,
+          currency: 'USD',
+          quantity: 2,
+          imagePath: 'img/clean-code.webp',
+          isAvailable: true,
+        },
+      ]);
+    });
+
+    it('Scenario 3: Flags unpublished or deleted products as unavailable', async () => {
+      mockDb.query.mockResolvedValue([
+        { ...baseRow, state: 'unpublished' },
+        { ...baseRow, deleted_at: new Date() },
+      ]);
+
+      const lines = await repository.findCheckoutLines(userId);
+
+      expect(lines.map((l) => l.isAvailable)).toEqual([false, false]);
+    });
+
+    it('Scenario 4: Returns an empty array for an empty cart', async () => {
+      mockDb.query.mockResolvedValue([]);
+
+      await expect(repository.findCheckoutLines(userId)).resolves.toEqual([]);
+    });
   });
 });

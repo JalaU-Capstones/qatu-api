@@ -171,4 +171,62 @@ describe('errorHandler Middleware', () => {
       })
     );
   });
+  describe('422 Unprocessable Entity (business rules)', () => {
+    it('serializes code, message and details', () => {
+      const res = createMockRes();
+      const err = Object.assign(new Error('Insufficient stock for Clean Code'), {
+        statusCode: 422,
+        code: 'INSUFFICIENT_STOCK',
+        details: [{ field: 'items.p-1', message: 'Insufficient stock for Clean Code' }],
+      });
+
+      errorHandler(err, mockReq, res, mockNext);
+
+      expect(res.status).toHaveBeenCalledWith(422);
+      expect(res.json).toHaveBeenCalledWith({
+        error: {
+          code: 'INSUFFICIENT_STOCK',
+          message: 'Insufficient stock for Clean Code',
+          details: [{ field: 'items.p-1', message: 'Insufficient stock for Clean Code' }],
+        },
+        meta: expect.objectContaining({ timestamp: expect.any(String) }),
+      });
+    });
+
+    it('omits details when there are none', () => {
+      const res = createMockRes();
+      const err = Object.assign(new Error('Your cart is empty'), {
+        statusCode: 422,
+        code: 'EMPTY_CART',
+        details: [],
+      });
+
+      errorHandler(err, mockReq, res, mockNext);
+
+      expect(res.json.mock.calls[0][0].error).toEqual({
+        code: 'EMPTY_CART',
+        message: 'Your cart is empty',
+      });
+    });
+
+    it('is not remapped to 400 when a product name happens to contain "is required"', () => {
+      const res = createMockRes();
+      const err = Object.assign(new Error('Insufficient stock for Name is required Edition'), {
+        statusCode: 422,
+        code: 'INSUFFICIENT_STOCK',
+      });
+
+      errorHandler(err, mockReq, res, mockNext);
+
+      expect(res.status).toHaveBeenCalledWith(422);
+    });
+
+    it('falls back to UNPROCESSABLE_ENTITY when no code is set', () => {
+      const res = createMockRes();
+
+      errorHandler(Object.assign(new Error('nope'), { statusCode: 422 }), mockReq, res, mockNext);
+
+      expect(res.json.mock.calls[0][0].error.code).toBe('UNPROCESSABLE_ENTITY');
+    });
+  });
 });

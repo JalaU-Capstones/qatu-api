@@ -1,3 +1,4 @@
+import { QueryTypes } from 'sequelize';
 import { Product } from '../../../domain/entities/Product.js';
 import { IProductRepository } from '../../../domain/repositories/IProductRepository.js';
 import { sequelize } from '../../config/sequelize.js';
@@ -67,6 +68,29 @@ export class ProductRepository extends IProductRepository {
       created_at: row.created_at,
       updated_at: row.updated_at,
     });
+  }
+
+  /** One atomic UPDATE ... WHERE stock >= qty: the remaining stock, or null if not reservable. */
+  async decrementStockIfAvailable({ productId, quantity }, { transaction } = {}) {
+    const rows = await this.db.query(
+      `UPDATE public.products
+       SET stock = stock - :quantity, updated_at = NOW()
+       WHERE id = :productId
+         AND stock >= :quantity
+         AND state = 'published'
+         AND deleted_at IS NULL
+       RETURNING stock`,
+      {
+        replacements: { productId, quantity },
+        type: QueryTypes.SELECT,
+        ...(transaction ? { transaction } : {}),
+      }
+    );
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+    return Number(rows[0].stock);
   }
 
   /**

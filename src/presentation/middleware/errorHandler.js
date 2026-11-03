@@ -67,6 +67,22 @@ export function errorHandler(err, req, res, next) {
     });
   }
 
+  // Business-rule failures (EMPTY_CART, INSUFFICIENT_STOCK…). Before the generic matching below,
+  // so a product name containing "is required" is never remapped to 400.
+  // UNPROCESSABLE ENTITY — business rule violations (e.g. EMPTY_CART, INSUFFICIENT_STOCK).
+  // Handled before the generic validation matching below so a message that happens
+  // to contain e.g. "is required" (product names are user content) is never remapped to 400.
+  if (err.statusCode === 422) {
+    return res.status(422).json({
+      error: {
+        code: err.code || 'UNPROCESSABLE_ENTITY',
+        message: err.message || 'The request could not be processed',
+        ...(Array.isArray(err.details) && err.details.length > 0 ? { details: err.details } : {}),
+      },
+      meta: { timestamp },
+    });
+  }
+
   // CONFLICTS
   if (err.code === 'EMAIL_ALREADY_EXISTS' || err.statusCode === 409) {
     return res.status(409).json({

@@ -140,15 +140,47 @@ RETURNING id, user_id, product_id, quantity, created_at, updated_at`,
     );
   }
 
-  async clearCart(userId) {
+  async clearCart(userId, { transaction } = {}) {
     await this.db.query(
       `DELETE FROM public.cart_items
        WHERE user_id = :userId`,
       {
         replacements: { userId },
         type: QueryTypes.DELETE,
+        ...(transaction ? { transaction } : {}),
       }
     );
+  }
+
+  /** Cart lines with product data; locks the cart rows (FOR UPDATE OF ci) until the transaction ends. */
+  async findCheckoutLines(userId, { transaction } = {}) {
+    const rows = await this.db.query(
+      `SELECT ci.id AS cart_item_id, ci.product_id, ci.quantity,
+              p.seller_id, p.name, p.price, p.currency, p.state,
+              p.primary_image_path, p.deleted_at
+       FROM public.cart_items ci
+       INNER JOIN public.products p ON p.id = ci.product_id
+       WHERE ci.user_id = :userId
+       ORDER BY ci.product_id ASC
+       FOR UPDATE OF ci`,
+      {
+        replacements: { userId },
+        type: QueryTypes.SELECT,
+        ...(transaction ? { transaction } : {}),
+      }
+    );
+
+    return (rows || []).map((row) => ({
+      cartItemId: row.cart_item_id,
+      productId: row.product_id,
+      sellerId: row.seller_id,
+      name: row.name,
+      unitPrice: Number(row.price),
+      currency: row.currency,
+      quantity: Number(row.quantity),
+      imagePath: row.primary_image_path ?? null,
+      isAvailable: row.state === 'published' && row.deleted_at === null,
+    }));
   }
 
   /**
