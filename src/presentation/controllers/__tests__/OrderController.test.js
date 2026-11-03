@@ -87,4 +87,80 @@ describe('OrderController', () => {
       })
     );
   });
+  describe('createOrder (US-10)', () => {
+    const body = {
+      shipping_address: {
+        full_name: 'Aaron Florez',
+        phone: '71234567',
+        street: '123 Main St',
+        city: 'La Paz',
+        country: 'BO',
+      },
+      payment_method: 'cash_on_delivery',
+      notes: 'Leave at reception',
+    };
+    const makeRes = () => ({ status: vi.fn().mockReturnThis(), json: vi.fn() });
+
+    it('returns 201 with the use case result, using the session user as buyer', async () => {
+      const result = { data: { id: 'order-1' }, meta: { timestamp: 'now' } };
+      const createOrderUseCase = { execute: vi.fn().mockResolvedValue(result) };
+      const controller = new OrderController({
+        listOrdersUseCase: { execute: vi.fn() },
+        createOrderUseCase,
+      });
+      const res = makeRes();
+      const next = vi.fn();
+
+      await controller.createOrder(
+        { user: { id: userId }, validatedBody: { ...body, buyer_id: 'forged' } },
+        res,
+        next
+      );
+
+      expect(createOrderUseCase.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          buyerId: userId,
+          paymentMethod: 'cash_on_delivery',
+          notes: 'Leave at reception',
+        })
+      );
+      expect(res.status).toHaveBeenCalledWith(201);
+      expect(res.json).toHaveBeenCalledWith(result);
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('forwards a 401 to next when there is no authenticated user', async () => {
+      const controller = new OrderController({
+        listOrdersUseCase: { execute: vi.fn() },
+        createOrderUseCase: { execute: vi.fn() },
+      });
+      const next = vi.fn();
+
+      await controller.createOrder({ validatedBody: body }, makeRes(), next);
+
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401 }));
+    });
+
+    it('forwards business errors (e.g. 422) untouched', async () => {
+      const failure = Object.assign(new Error('Your cart is empty'), { statusCode: 422 });
+      const controller = new OrderController({
+        listOrdersUseCase: { execute: vi.fn() },
+        createOrderUseCase: { execute: vi.fn().mockRejectedValue(failure) },
+      });
+      const next = vi.fn();
+
+      await controller.createOrder({ user: { id: userId }, validatedBody: body }, makeRes(), next);
+
+      expect(next).toHaveBeenCalledWith(failure);
+    });
+
+    it('fails with 500 when the use case is not wired', async () => {
+      const controller = new OrderController({ listOrdersUseCase: { execute: vi.fn() } });
+      const next = vi.fn();
+
+      await controller.createOrder({ user: { id: userId }, validatedBody: body }, makeRes(), next);
+
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 500 }));
+    });
+  });
 });

@@ -51,4 +51,36 @@ describe('Environment & Supabase Configuration', () => {
     expect(client).toBeDefined();
     expect(client.auth).toBeDefined();
   });
+  describe('messaging configuration (ADR-014)', () => {
+    it('keeps messaging OFF by default so tests and CI never need a broker', () => {
+      const config = createEnvConfig({});
+
+      expect(config.RABBITMQ_ENABLED).toBe(false);
+      expect(config.RABBITMQ_VHOST).toBeNull();
+      expect(config.RABBITMQ_EXCHANGE).toBe('qatu.events');
+      expect(config.RABBITMQ_NOTIFICATIONS_QUEUE).toBe('qatu.notifications');
+      expect(config.RABBITMQ_DLX).toBe('qatu.dlx');
+      expect(config.RABBITMQ_DLQ).toBe('qatu.notifications.dlq');
+      expect(config.OUTBOX_POLL_INTERVAL_MS).toBe(2000);
+      expect(config.OUTBOX_MAX_ATTEMPTS).toBe(3);
+    });
+
+    it('only enables messaging for the exact string "true"', () => {
+      expect(createEnvConfig({ RABBITMQ_ENABLED: 'true' }).RABBITMQ_ENABLED).toBe(true);
+      expect(createEnvConfig({ RABBITMQ_ENABLED: '1' }).RABBITMQ_ENABLED).toBe(false);
+      expect(createEnvConfig({ RABBITMQ_ENABLED: 'false' }).RABBITMQ_ENABLED).toBe(false);
+    });
+
+    it('reads custom values and falls back on invalid numbers', () => {
+      const config = createEnvConfig({
+        RABBITMQ_VHOST: 'qatu-prod',
+        OUTBOX_POLL_INTERVAL_MS: '5000',
+        OUTBOX_MAX_ATTEMPTS: 'abc',
+      });
+
+      expect(config.RABBITMQ_VHOST).toBe('qatu-prod');
+      expect(config.OUTBOX_POLL_INTERVAL_MS).toBe(5000);
+      expect(config.OUTBOX_MAX_ATTEMPTS).toBe(3);
+    });
+  });
 });

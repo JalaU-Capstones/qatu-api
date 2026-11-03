@@ -17,6 +17,7 @@ describe('Order Routes Integration - /v1/orders', () => {
   let app;
   let mockListOrdersUseCase;
   let mockGetOrderByIdUseCase;
+  let mockCreateOrderUseCase;
 
   const buyerId = '00000000-0000-0000-0000-000000000002';
   const orderId = '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a';
@@ -70,9 +71,14 @@ describe('Order Routes Integration - /v1/orders', () => {
       execute: vi.fn(),
     };
 
+    mockCreateOrderUseCase = {
+      execute: vi.fn(),
+    };
+
     const orderRoutes = createOrderRouter({
       listOrdersUseCase: mockListOrdersUseCase,
       getOrderByIdUseCase: mockGetOrderByIdUseCase,
+      createOrderUseCase: mockCreateOrderUseCase,
     });
 
     app = createApp({ orderRoutes });
@@ -244,6 +250,188 @@ describe('Order Routes Integration - /v1/orders', () => {
 
       expect(res.status).toBe(404);
       expect(res.body.error.code).toBe('NOT_FOUND');
+    });
+  });
+  describe('POST /v1/orders (US-10 checkout)', () => {
+    const csrfToken = 'c'.repeat(64);
+    const validBody = {
+      shipping_address: {
+        full_name: 'Aaron Florez',
+        phone: '71234567',
+        street: '123 Market Street',
+        city: 'La Paz',
+        state: 'La Paz',
+        postal_code: '0000',
+        country: 'bo',
+      },
+      notes: 'Leave at reception',
+    };
+    const createdOrder = {
+      data: { ...sampleOrder.toJSON(), items: [] },
+      meta: { timestamp: '2026-11-01T10:00:00.000Z' },
+    };
+
+    const cookieSession = (token = validToken) => [
+      `access_token=${token}`,
+      `csrf_token=${csrfToken}`,
+    ];
+
+    it('returns 201 with the order when authenticated via HttpOnly cookie + CSRF header', async () => {
+      mockCreateOrderUseCase.execute.mockResolvedValue(createdOrder);
+
+      const res = await request(app)
+        .post('/v1/orders')
+        .set('Cookie', cookieSession())
+        .set('X-CSRF-Token', csrfToken)
+        .send(validBody);
+
+      expect(res.status).toBe(201);
+      expect(res.body.data).toMatchObject({ id: orderId, order_number: 'ORD-00100042' });
+      expect(res.body.meta.timestamp).toBeDefined();
+    });
+
+    it('takes the buyer from the session and normalizes the address (country upper-cased)', async () => {
+      mockCreateOrderUseCase.execute.mockResolvedValue(createdOrder);
+
+      await request(app)
+        .post('/v1/orders')
+        .set('Cookie', cookieSession())
+        .set('X-CSRF-Token', csrfToken)
+        .send({ ...validBody, buyer_id: 'someone-else' });
+
+      const [dto] = mockCreateOrderUseCase.execute.mock.calls[0];
+      expect(dto.buyerId).toBe(buyerId);
+      expect(dto.shippingAddress).toEqual({
+        full_name: 'Aaron Florez',
+        phone: '71234567',
+        street: '123 Market Street',
+        city: 'La Paz',
+        state: 'La Paz',
+        postal_code: '0000',
+        country: 'BO',
+      });
+      expect(dto.notes).toBe('Leave at reception');
+      expect(dto.paymentMethod).toBe('simulated');
+    });
+
+    it('forwards the chosen payment method', async () => {
+      mockCreateOrderUseCase.execute.mockResolvedValue(createdOrder);
+
+      await request(app)
+        .post('/v1/orders')
+        .set('Cookie', cookieSession())
+        .set('X-CSRF-Token', csrfToken)
+        .send({ ...validBody, payment_method: 'cash_on_delivery' });
+
+      expect(mockCreateOrderUseCase.execute.mock.calls[0][0].paymentMethod).toBe(
+        'cash_on_delivery'
+      );
+    });
+
+    it('still accepts a Bearer token (transitional) without CSRF', async () => {
+      mockCreateOrderUseCase.execute.mockResolvedValue(createdOrder);
+
+      const res = await request(app)
+        .post('/v1/orders')
+        .set('Authorization', `Bearer ${validToken}`)
+        .send(validBody);
+
+      expect(res.status).toBe(201);
+    });
+
+    it('returns 403 INVALID_CSRF_TOKEN when the cookie session has no X-CSRF-Token header', async () => {
+      const res = await request(app)
+        .post('/v1/orders')
+        .set('Cookie', cookieSession())
+        .send(validBody);
+
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('INVALID_CSRF_TOKEN');
+      expect(mockCreateOrderUseCase.execute).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 without a session', async () => {
+      const res = await request(app).post('/v1/orders').send(validBody);
+
+      expect(res.status).toBe(401);
+      expect(res.body.error.code).toBe('UNAUTHORIZED');
+      expect(mockCreateOrderUseCase.execute).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['missing shipping_address', {}],
+      [
+        'missing street',
+        { shipping_address: { ...validBody.shipping_address, street: undefined } },
+      ],
+      ['missing phone', { shipping_address: { ...validBody.shipping_address, phone: undefined } }],
+      ['unknown payment method', { ...validBody, payment_method: 'bitcoin' }],
+      [
+        'invalid country code',
+        { shipping_address: { ...validBody.shipping_address, country: 'BOL' } },
+      ],
+      ['notes too long', { ...validBody, notes: 'x'.repeat(501) }],
+    ])('returns 400 VALIDATION_ERROR for %s', async (_name, body) => {
+      const res = await request(app)
+        .post('/v1/orders')
+        .set('Cookie', cookieSession())
+        .set('X-CSRF-Token', csrfToken)
+        .send(body);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+      expect(mockCreateOrderUseCase.execute).not.toHaveBeenCalled();
+    });
+
+    it('returns 422 EMPTY_CART for an empty cart', async () => {
+      const { EmptyCartError } = await import('../../../domain/errors/CheckoutErrors.js');
+      mockCreateOrderUseCase.execute.mockRejectedValue(new EmptyCartError());
+
+      const res = await request(app)
+        .post('/v1/orders')
+        .set('Cookie', cookieSession())
+        .set('X-CSRF-Token', csrfToken)
+        .send(validBody);
+
+      expect(res.status).toBe(422);
+      expect(res.body.error).toEqual({ code: 'EMPTY_CART', message: 'Your cart is empty' });
+    });
+
+    it('returns 422 INSUFFICIENT_STOCK naming the product', async () => {
+      const { InsufficientStockError } = await import('../../../domain/errors/CheckoutErrors.js');
+      mockCreateOrderUseCase.execute.mockRejectedValue(
+        new InsufficientStockError({ productId: 'p-1', productName: 'Clean Code' })
+      );
+
+      const res = await request(app)
+        .post('/v1/orders')
+        .set('Cookie', cookieSession())
+        .set('X-CSRF-Token', csrfToken)
+        .send(validBody);
+
+      expect(res.status).toBe(422);
+      expect(res.body.error.code).toBe('INSUFFICIENT_STOCK');
+      expect(res.body.error.message).toBe('Insufficient stock for Clean Code');
+      expect(res.body.error.details).toEqual([
+        { field: 'items.p-1', message: 'Insufficient stock for Clean Code' },
+      ]);
+    });
+
+    it('returns a generic 500 (no internals leaked) when the transaction fails', async () => {
+      mockCreateOrderUseCase.execute.mockRejectedValue(new Error('deadlock detected on orders'));
+
+      const res = await request(app)
+        .post('/v1/orders')
+        .set('Cookie', cookieSession())
+        .set('X-CSRF-Token', csrfToken)
+        .send(validBody);
+
+      expect(res.status).toBe(500);
+      expect(res.body.error).toEqual({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'An unexpected server error occurred',
+      });
+      expect(JSON.stringify(res.body)).not.toContain('deadlock');
     });
   });
 });

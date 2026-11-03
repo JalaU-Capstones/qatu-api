@@ -342,7 +342,53 @@ describe('ProductRepository (unit)', () => {
     });
   });
 
+  describe('decrementStockIfAvailable', () => {
+    const productId = '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c';
+
+    it('should run ONE atomic UPDATE guarded by stock >= quantity (no FOR UPDATE)', async () => {
+      mockDb.query.mockResolvedValueOnce([{ stock: 3 }]);
+      const transaction = { id: 'tx' };
+
+      const remaining = await repository.decrementStockIfAvailable(
+        { productId, quantity: 2 },
+        { transaction }
+      );
+
+      expect(remaining).toBe(3);
+      expect(mockDb.query).toHaveBeenCalledTimes(1);
+      const [sql, options] = mockDb.query.mock.calls[0];
+      expect(sql).toContain('SET stock = stock - :quantity');
+      expect(sql).toContain('stock >= :quantity');
+      expect(sql).toContain("state = 'published'");
+      expect(sql).toContain('deleted_at IS NULL');
+      expect(sql).toContain('RETURNING stock');
+      expect(sql).not.toMatch(/FOR UPDATE/i);
+      expect(options).toMatchObject({ replacements: { productId, quantity: 2 }, transaction });
+    });
+
+    it('should return null when no row matched (insufficient stock or unavailable)', async () => {
+      mockDb.query.mockResolvedValueOnce([]);
+
+      await expect(
+        repository.decrementStockIfAvailable({ productId, quantity: 99 })
+      ).resolves.toBeNull();
+    });
+
+    it('should allow stock to reach exactly zero', async () => {
+      mockDb.query.mockResolvedValueOnce([{ stock: 0 }]);
+
+      await expect(repository.decrementStockIfAvailable({ productId, quantity: 1 })).resolves.toBe(
+        0
+      );
+    });
+  });
+
   describe('IProductRepository Interface', () => {
+    it('should throw Method not implemented when calling decrementStockIfAvailable', async () => {
+      const iRepo = new IProductRepository();
+      await expect(iRepo.decrementStockIfAvailable({})).rejects.toThrow('Method not implemented');
+    });
+
     it('should throw Method not implemented when calling findByIdWithDetails', async () => {
       const iRepo = new IProductRepository();
       await expect(iRepo.findByIdWithDetails('123')).rejects.toThrow('Method not implemented');

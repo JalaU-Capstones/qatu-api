@@ -3,11 +3,14 @@ CreateRequest:
   description: Example payload submitted by buyer to checkout items currently in cart.
   value:
     shipping_address:
+      full_name: 'Aaron Florez'
+      phone: '71234567'
       street: '123 Market Street, Apt 4B'
       city: 'Cochabamba'
       state: 'Cochabamba'
       postal_code: '0000'
       country: 'BO'
+    payment_method: 'simulated'
     notes: 'Please leave package at the reception desk.'
 
 DetailResponse:
@@ -124,6 +127,8 @@ createOrder:
   summary: Place order payload
   value:
     shipping_address:
+      full_name: 'Aaron Florez'
+      phone: '71234567'
       street: '123 Market Street, Apt 4B'
       city: 'Cochabamba'
       state: 'Cochabamba'

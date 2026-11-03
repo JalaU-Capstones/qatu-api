@@ -68,10 +68,12 @@ export class ICartRepository {
   /**
    * Clears all items in the user's cart.
    * @param {string} userId
+   * @param {Object} [options]
+   * @param {*} [options.transaction] Joins an existing transaction (checkout).
    * @returns {Promise<void>}
    */
   // eslint-disable-next-line no-unused-vars
-  async clearCart(userId) {
+  async clearCart(userId, { transaction } = {}) {
     throw new Error('Method not implemented: clearCart');
   }
 
@@ -109,5 +111,11 @@ export class ICartRepository {
   // eslint-disable-next-line no-unused-vars
   async findByUserId(userId, { includeProduct = false } = {}) {
     throw new Error('Method not implemented: findByUserId');
+  }
+
+  /** Cart lines with product data; locks the cart rows until the transaction ends. */
+  // eslint-disable-next-line no-unused-vars
+  async findCheckoutLines(userId, { transaction } = {}) {
+    throw new Error('Method not implemented: findCheckoutLines');
   }
 }

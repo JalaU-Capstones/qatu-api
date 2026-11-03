@@ -46,4 +46,13 @@ export class IProductRepository {
   async findByIdWithDetails(productId) {
     throw new Error('Method not implemented: findByIdWithDetails');
   }
+
+  /**
+   * One atomic `UPDATE ... WHERE stock >= qty` (never read-then-write or FOR UPDATE).
+   * Returns the remaining stock, or null if it could not be reserved.
+   */
+  // eslint-disable-next-line no-unused-vars
+  async decrementStockIfAvailable({ productId, quantity }, { transaction } = {}) {
+    throw new Error('Method not implemented: decrementStockIfAvailable');
+  }
 }

@@ -2,6 +2,11 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+function parsePositiveInt(value, fallback) {
+  const parsed = parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 /**
  * Validates and normalizes environment variables for the application.
  */
@@ -30,6 +35,16 @@ function createEnvConfig(source = process.env) {
     SUPABASE_ANON_KEY: supabaseAnonKey,
     SUPABASE_SERVICE_ROLE_KEY: supabaseServiceRoleKey,
     RABBITMQ_URL: source.RABBITMQ_URL || 'amqp://qatu:qatu_dev_password@localhost:5672',
+    // Off unless enabled, so tests and CI never need a broker.
+    // Messaging (ADR-014). Off unless explicitly enabled so tests/CI never need a broker.
+    RABBITMQ_ENABLED: source.RABBITMQ_ENABLED === 'true',
+    RABBITMQ_VHOST: source.RABBITMQ_VHOST || null,
+    RABBITMQ_EXCHANGE: source.RABBITMQ_EXCHANGE || 'qatu.events',
+    RABBITMQ_NOTIFICATIONS_QUEUE: source.RABBITMQ_NOTIFICATIONS_QUEUE || 'qatu.notifications',
+    RABBITMQ_DLX: source.RABBITMQ_DLX || 'qatu.dlx',
+    RABBITMQ_DLQ: source.RABBITMQ_DLQ || 'qatu.notifications.dlq',
+    OUTBOX_POLL_INTERVAL_MS: parsePositiveInt(source.OUTBOX_POLL_INTERVAL_MS, 2000),
+    OUTBOX_MAX_ATTEMPTS: parsePositiveInt(source.OUTBOX_MAX_ATTEMPTS, 3),
     JWT_SECRET: source.JWT_SECRET || 'default-jwt-secret-for-dev',
     FRONTEND_URL: frontendUrl,
     ALLOWED_ORIGINS: allowedOrigins,

@@ -100,8 +100,15 @@ listOrCreate:
     operationId: createOrder
     summary: Create an order
     description: |
-      Places a new order from the authenticated buyer's cart contents.
-      Clears the cart on success. Requires at least one item in the cart.
+      Checkout: turns the authenticated buyer's cart into a `pending` order. The cart is read
+      server-side, so prices and quantities cannot be tampered with.
+
+      Everything runs in one transaction: order and items, atomic stock decrement, a `pending`
+      payment, an `OrderPlaced` event in the outbox (published to RabbitMQ asynchronously) and
+      the cart is cleared. If any step fails nothing is kept and the cart is **not** cleared.
+
+      Shipping is free from a 50.00 subtotal, otherwise a flat 4.99. No taxes yet.
+      Requires the session cookie plus the `X-CSRF-Token` header.
     tags:
       - orders
     parameters:
@@ -112,29 +119,62 @@ listOrCreate:
         application/json:
           schema:
             type: object
+            required:
+              - shipping_address
             properties:
               shipping_address:
                 type: object
                 required:
+                  - full_name
+                  - phone
                   - street
                   - city
                   - country
                 properties:
+                  full_name:
+                    type: string
+                    minLength: 2
+                    maxLength: 100
+                    example: 'Aaron Florez'
+                  phone:
+                    type: string
+                    description: Contact phone (digits, spaces, +, -, parentheses).
+                    pattern: '^[0-9+()\-\s]{6,20}$'
+                    example: '71234567'
                   street:
                     type: string
-                    example: '123 Main St'
+                    minLength: 3
+                    maxLength: 200
+                    example: 'Av. Arce #123'
                   city:
                     type: string
-                    example: 'Buenos Aires'
+                    minLength: 2
+                    maxLength: 100
+                    example: 'La Paz'
                   state:
                     type: string
-                    example: 'CABA'
+                    maxLength: 100
+                    example: 'La Paz'
                   postal_code:
                     type: string
-                    example: 'C1001'
+                    maxLength: 20
+                    example: '0000'
                   country:
                     type: string
-                    example: 'AR'
+                    description: ISO 3166-1 alpha-2 country code.
+                    minLength: 2
+                    maxLength: 2
+                    example: 'BO'
+              payment_method:
+                type: string
+                enum: [simulated, cash_on_delivery]
+                default: simulated
+                description: The payment is always created `pending`; no real charge is made.
+              notes:
+                type: string
+                maxLength: 500
+                description: Optional delivery instructions.
+                example: 'Please leave package at the front desk.'
           examples:
             createOrder:
               $ref: '../components/examples/orders.yaml#/createOrder'
@@ -158,20 +198,54 @@ listOrCreate:
         $ref: '../components/responses/errors.yaml#/BadRequest'
       '401':
         $ref: '../components/responses/errors.yaml#/Unauthorized'
-      '422':
-        description: Order placement failed due to insufficient stock or business condition.
+      '403':
+        description: Forbidden — the `X-CSRF-Token` header is missing or does not match the `csrf_token` cookie.
         content:
           application/json:
             schema:
               $ref: '../components/schemas/Error.yaml'
             examples:
+              invalidCsrf:
+                summary: Invalid CSRF token
+                value:
+                  error:
+                    code: 'INVALID_CSRF_TOKEN'
+                    message: 'CSRF token missing or invalid'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+      '422':
+        description: |
+          Unprocessable Entity — the cart cannot become an order. The transaction is rolled back and
+          the cart is **not** cleared.
+
+          | `error.code` | When |
+          |---|---|
+          | `EMPTY_CART` | The buyer has no items in the cart. |
+          | `INSUFFICIENT_STOCK` | A product has less stock than requested (including the concurrent "last unit" case). `details[].field` is `items.<product_id>`. |
+          | `PRODUCT_UNAVAILABLE` | A product in the cart is no longer published. |
+          | `MIXED_CURRENCIES` | The cart mixes products priced in different currencies. |
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              emptyCart:
+                summary: Empty cart
+                value:
+                  error:
+                    code: 'EMPTY_CART'
+                    message: 'Your cart is empty'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
               insufficientStock:
-                summary: Product stock too low
+                summary: Not enough stock
                 value:
                   error:
                     code: 'INSUFFICIENT_STOCK'
-                    message: 'Requested quantity exceeds available inventory.'
-                    details: []
+                    message: 'Insufficient stock for Ergonomic Office Chair'
+                    details:
+                      - field: 'items.7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+                        message: 'Insufficient stock for Ergonomic Office Chair'
                   meta:
                     timestamp: '2026-10-14T12:00:00.000Z'
       '500':

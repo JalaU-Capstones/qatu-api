@@ -46,7 +46,7 @@ Qatu (Quechua word for "store") is an online digital marketplace where sellers c
 4. **Start Infrastructure:**
 
    ```bash
-   make docker:up
+   make docker-up
    ```
 
 5. **Run Migrations:**
@@ -205,6 +205,7 @@ The REST API contract is defined using **OpenAPI 3.1.0** and served interactivel
 Detailed documentation is available in the `.docs/` directory:
 
 - [Architecture](.docs/ARCHITECTURE.md) — Onion Architecture, layers, dependency rule, folder structure, cross-cutting concerns, and testing strategy.
+- [Checkout and Messaging](.docs/CHECKOUT.md) — US-10 checkout transaction, transactional outbox, RabbitMQ topology, error codes, local setup, tests and performance baseline.
 - [Migrations](.docs/MIGRATIONS.md) — Migration workflow, naming conventions, RLS policies, trigger ordering, and seeder guidelines.
 - [OpenAPI Specification](.docs/OPENAPI.md) — OpenAPI 3.1 contract, Swagger UI, Redocly tooling, linting, and guide for adding endpoints.
 - [Troubleshooting](.docs/TROUBLESHOOTING.md) — Common issues with Docker, pnpm, Node.js, PostgreSQL, RabbitMQ, Husky, ESLint, Vitest, and Migrations.
