@@ -1,0 +1,126 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ProfileController } from '../ProfileController.js';
+
+describe('ProfileController', () => {
+  let mockGetProfileByIdUseCase;
+  let mockUpdateProfileUseCase;
+  let controller;
+  let req;
+  let res;
+  let next;
+
+  const sampleProfileEnvelope = {
+    data: {
+      id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+      username: 'john_doe',
+      full_name: 'John Doe',
+      email: 'john@example.com',
+      avatar_path: null,
+      bio: 'Artisan collector.',
+      locale: 'en',
+      created_at: '2026-10-01T00:00:00.000Z',
+      updated_at: '2026-10-01T00:00:00.000Z',
+    },
+    meta: {
+      timestamp: '2026-10-14T12:00:00.000Z',
+    },
+  };
+
+  beforeEach(() => {
+    mockGetProfileByIdUseCase = {
+      execute: vi.fn().mockResolvedValue(sampleProfileEnvelope),
+    };
+    mockUpdateProfileUseCase = {
+      execute: vi.fn().mockResolvedValue(sampleProfileEnvelope),
+    };
+    controller = new ProfileController({
+      getProfileByIdUseCase: mockGetProfileByIdUseCase,
+      updateProfileUseCase: mockUpdateProfileUseCase,
+    });
+
+    req = {
+      params: {},
+      body: {},
+      user: { id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
+    };
+    res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+    };
+    next = vi.fn();
+  });
+
+  it('should throw when required use cases are missing', () => {
+    expect(() => new ProfileController()).toThrow('getProfileByIdUseCase is required');
+    expect(
+      () => new ProfileController({ getProfileByIdUseCase: mockGetProfileByIdUseCase })
+    ).toThrow('updateProfileUseCase is required');
+  });
+
+  describe('getById', () => {
+    it('should return 200 with profile data when found', async () => {
+      req.params = { id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' };
+
+      await controller.getById(req, res, next);
+
+      expect(mockGetProfileByIdUseCase.execute).toHaveBeenCalledTimes(1);
+      const dto = mockGetProfileByIdUseCase.execute.mock.calls[0][0];
+      expect(dto.profileId).toBe('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11');
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(sampleProfileEnvelope);
+    });
+
+    it('should forward errors to next middleware', async () => {
+      const err = new Error('Profile not found');
+      err.statusCode = 404;
+      mockGetProfileByIdUseCase.execute.mockRejectedValueOnce(err);
+
+      await controller.getById(req, res, next);
+      expect(next).toHaveBeenCalledWith(err);
+    });
+  });
+
+  describe('updateMe', () => {
+    it('should return 200 with updated profile data for authenticated user', async () => {
+      req.validatedBody = {
+        full_name: 'Jane Doe',
+        bio: 'Updated bio',
+      };
+
+      await controller.updateMe(req, res, next);
+
+      expect(mockUpdateProfileUseCase.execute).toHaveBeenCalledTimes(1);
+      const dto = mockUpdateProfileUseCase.execute.mock.calls[0][0];
+      expect(dto.userId).toBe('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11');
+      expect(dto.updates).toEqual({
+        full_name: 'Jane Doe',
+        bio: 'Updated bio',
+      });
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(sampleProfileEnvelope);
+    });
+
+    it('should call next with 401 UNAUTHORIZED when req.user is missing', async () => {
+      req.user = null;
+
+      await controller.updateMe(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'UNAUTHORIZED',
+          statusCode: 401,
+        })
+      );
+      expect(mockUpdateProfileUseCase.execute).not.toHaveBeenCalled();
+    });
+
+    it('should forward use case errors to next middleware', async () => {
+      const err = new Error('Validation error');
+      err.statusCode = 400;
+      mockUpdateProfileUseCase.execute.mockRejectedValueOnce(err);
+
+      await controller.updateMe(req, res, next);
+      expect(next).toHaveBeenCalledWith(err);
+    });
+  });
+});
