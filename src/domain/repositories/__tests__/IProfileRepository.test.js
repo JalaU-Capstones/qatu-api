@@ -16,4 +16,9 @@ describe('IProfileRepository Interface', () => {
     const repo = new IProfileRepository();
     await expect(repo.findByUsername('user-1')).rejects.toThrow('Method not implemented');
   });
+
+  it('should throw Method not implemented when calling update', async () => {
+    const repo = new IProfileRepository();
+    await expect(repo.update('id-1', { bio: 'test' })).rejects.toThrow('Method not implemented');
+  });
 });
