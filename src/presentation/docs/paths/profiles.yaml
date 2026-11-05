@@ -30,7 +30,6 @@ getById:
                     id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
                     username: 'john_doe'
                     full_name: 'John Doe'
-                    email: null
                     avatar_path: null
                     bio: 'Artisan collector.'
                     locale: 'en'
@@ -75,7 +74,7 @@ updateMe:
               avatar_path:
                 type: [string, 'null']
                 maxLength: 500
-                description: Storage path or URL of the user's avatar image.
+                description: Storage path of the user's avatar image in Supabase Storage.
               locale:
                 type: string
                 maxLength: 20
@@ -87,7 +86,7 @@ updateMe:
               value:
                 full_name: 'Camila Morales'
                 bio: 'Coleccionista de textiles y cerámica andina.'
-                avatar_path: 'https://cdn.qatu.pe/avatars/camila.png'
+                avatar_path: 'avatars/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/avatar.webp'
                 locale: 'es-PE'
     responses:
       '200':
@@ -110,8 +109,7 @@ updateMe:
                     id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
                     username: 'camila_m'
                     full_name: 'Camila Morales'
-                    email: null
-                    avatar_path: 'https://cdn.qatu.pe/avatars/camila.png'
+                    avatar_path: 'avatars/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/avatar.webp'
                     bio: 'Coleccionista de textiles y cerámica andina.'
                     locale: 'es-PE'
                     created_at: '2026-10-01T00:00:00.000Z'
