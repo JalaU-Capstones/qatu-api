@@ -32,12 +32,49 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm openapi:bundle
 
+# ── Stage 2.5: development ──────────────────────────────────────────────────
+# Extends `build` with the same runtime tooling as `runtime` (entrypoint.sh,
+# dumb-init, postgresql17-client, global sequelize-cli) so that
+# `docker compose -f docker-compose.yml -f docker-compose.dev.yml up api`
+# runs the SAME migration-and-start flow as production, plus hot reload via
+# the dev compose's `command:` override (pnpm dev) and bind mounts.
+#
+# Why this stage exists: `build` has no ENTRYPOINT, so `docker compose run`
+# (and `up` when combined with the dev override) would bypass entrypoint.sh
+# and skip migrations. This stage closes that gap without polluting the
+# `runtime` stage with dev-only tooling.
+FROM build AS development
+
+ENV NODE_ENV=development \
+    NODE_NO_WARNINGS=1 \
+    HUSKY=0
+
+RUN apk add --no-cache postgresql17-client dumb-init \
+    && npm install -g sequelize-cli@6 \
+    && npm cache clean --force
+
+COPY --chown=node:node docker/entrypoint.sh ./docker/entrypoint.sh
+RUN chmod +x ./docker/entrypoint.sh
+
+# Fix ownership: the `build` stage leaves /app owned by root, but the
+# dev command (docker-compose.dev.yml) runs `pnpm install` as `node`.
+# Without this chown, pnpm hits EACCES on the anonymous /app/node_modules
+# volume (initialized from the root-owned image).
+RUN chown -R node:node /app
+
+USER node
+EXPOSE 3000
+
+ENTRYPOINT ["dumb-init", "--", "./docker/entrypoint.sh"]
+CMD ["node", "src/server.js"]
+
 # ── Stage 3: runtime ────────────────────────────────────────────────────────
 FROM node:26-alpine AS runtime
 WORKDIR /app
 
 ENV NODE_ENV=production \
     NODE_NO_WARNINGS=1 \
+    HUSKY=0 \
     PORT=3000
 
 # System dependencies:

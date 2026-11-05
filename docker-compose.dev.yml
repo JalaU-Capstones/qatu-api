@@ -20,9 +20,12 @@ services:
       - '15672:15672'
 
   api:
+    # `target: development` (not `build`) so the entrypoint.sh runs and
+    # migrations are applied before `pnpm dev` starts the API. Without this,
+    # the container boots with an empty database.
     build:
       context: .
-      target: build
+      target: development
     command: sh -c "pnpm install --frozen-lockfile && pnpm dev"
     environment:
       NODE_ENV: development

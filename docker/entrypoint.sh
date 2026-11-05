@@ -4,21 +4,25 @@ set -e
 log() { printf '[entrypoint] %s\n' "$*"; }
 
 # ── Derive Postgres host/port from DATABASE_URL (falling back to env) ──────
-HOST="${POSTGRES_HOST:-postgres}"
-PORT="${POSTGRES_PORT:-5432}"
+# NOTE: these are named PG_HOST / PG_PORT (not HOST / PORT) on purpose.
+# Assigning to HOST or PORT here would shadow the container's exported
+# application environment variables (PORT=3000 in the Dockerfile), causing
+# Node to listen on the Postgres port instead of the application port.
+PG_HOST="${POSTGRES_HOST:-postgres}"
+PG_PORT="${POSTGRES_PORT:-5432}"
 
 if [ -n "${DATABASE_URL:-}" ]; then
   HOSTPORT=$(printf '%s' "${DATABASE_URL}" | sed -E 's|^postgres(ql)?://[^@]+@([^/]+)/.*$|\2|')
   case "${HOSTPORT}" in
-    *:*) HOST="${HOSTPORT%:*}"; PORT="${HOSTPORT#*:}" ;;
-    *)   HOST="${HOSTPORT}";     PORT="5432" ;;
+    *:*) PG_HOST="${HOSTPORT%:*}"; PG_PORT="${HOSTPORT#*:}" ;;
+    *)   PG_HOST="${HOSTPORT}";     PG_PORT="5432" ;;
   esac
 fi
 
-log "waiting for postgres at ${HOST}:${PORT}..."
+log "waiting for postgres at ${PG_HOST}:${PG_PORT}..."
 MAX_TRIES="${POSTGRES_WAIT_TRIES:-30}"
 TRIES=0
-until pg_isready -h "${HOST}" -p "${PORT}" -q; do
+until pg_isready -h "${PG_HOST}" -p "${PG_PORT}" -q; do
   TRIES=$((TRIES + 1))
   if [ "${TRIES}" -ge "${MAX_TRIES}" ]; then
     log "postgres did not become ready in ${MAX_TRIES} attempts; aborting"

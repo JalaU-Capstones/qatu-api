@@ -15,7 +15,10 @@ services:
     image: dpage/pgadmin4:9
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@qatu.com}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      # pgAdmin v9 requires a password of at least 6 characters. The old
+      # default `admin` (5 chars) caused the container to reject logins
+      # silently. Use `admin123` unless overridden via PGADMIN_PASSWORD.
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
     volumes:
@@ -26,7 +29,12 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - '8080:80'
+      # pgAdmin v9 with `no-new-privileges:true` internally changes
+      # PGADMIN_LISTEN_PORT from 80 to 8080 (avoiding CAP_NET_BIND_SERVICE).
+      # gunicorn listens on 8080 inside the container, so the host must
+      # forward to 8080, not 80. (Prompt 42 tried 8080:80 and got
+      # "Connection reset by peer".)
+      - '8080:8080'
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -36,6 +44,16 @@ services:
       - DAC_OVERRIDE
       - SETGID
       - SETUID
+    healthcheck:
+      # pgAdmin runs with SERVER_MODE=False (Desktop mode, no auth), so
+      # `/login` returns 401 and wget treats that as an error. The `/misc/ping`
+      # endpoint returns 200 OK with body `PING` in both Desktop and Server
+      # modes, so it's the reliable readiness probe.
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:8080/misc/ping || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
 
 volumes:
   pgadmin_data:

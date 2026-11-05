@@ -76,6 +76,18 @@ What happens:
 2. `rabbitmq:4.1-management-alpine` starts, management UI on `:15672`.
 3. `api` builds the `build` stage of the Dockerfile, mounts the source, runs `pnpm dev` (nodemon).
 
+### Why `up`, not `run` (workflow tip)
+
+`docker compose up` starts the full stack: dependencies (postgres, rabbitmq) → api. Ports defined in `docker-compose.dev.yml` are published (`:3000`, `:15672`).
+
+`docker compose run --rm api` starts a **one-off** container from the service definition, but:
+
+- It does **NOT** publish ports by default (use `--service-ports` if you need them).
+- It runs `command:` and exits when the command exits (with `--rm`, the container is removed).
+- It's useful for one-shot commands like `docker compose run --rm api npx sequelize-cli db:migrate`.
+
+**Rule of thumb:** use `up` for the long-running dev stack; use `run --rm` for one-off commands that should NOT interfere with the running stack.
+
 ### Daily development
 
 ```bash
@@ -87,14 +99,18 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f api
 
 # Add pgAdmin (DB inspection)
 docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.dev-tools.yml up -d pgadmin
-# → http://localhost:8080 (admin@qatu.com / admin)
+# → http://localhost:8080 (admin@qatu.com / admin123)
 ```
 
-Hot reload works: edit `src/**/*.js` and nodemon restarts the container automatically. Migrations do not re-run on restart by default — if you add a migration, restart with `RUN_MIGRATIONS=true`:
+Hot reload works: edit `src/**/*.js` and nodemon restarts the container automatically. Migrations do not re-run on restart by default — if you add a migration, restart the api service (which re-runs entrypoint.sh):
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm \
-  -e RUN_MIGRATIONS=true api
+# Restart the api so entrypoint.sh re-runs migrations on startup
+docker compose -f docker-compose.yml -f docker-compose.dev.yml restart api
+
+# OR run migrations once without restarting the stack
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api \
+  npx sequelize-cli db:migrate
 ```
 
 ### Stop and clean
@@ -327,7 +343,7 @@ docker compose exec api npx sequelize-cli db:migrate:status
 | `POSTGRES_PASSWORD`            | `postgres`                                              | no                      | Postgres container password (docker-compose only).                             |
 | `POSTGRES_DB`                  | `postgres`                                              | no                      | Postgres container database (docker-compose only).                             |
 | `PGADMIN_EMAIL`                | `admin@qatu.com`                                        | n/a (dev only)          | pgAdmin login (dev-tools override only).                                       |
-| `PGADMIN_PASSWORD`             | `admin`                                                 | n/a (dev only)          | pgAdmin password (dev-tools override only).                                    |
+| `PGADMIN_PASSWORD`             | `admin123`                                              | n/a (dev only)          | pgAdmin password (dev-tools override only). pgAdmin v9 requires ≥ 6 chars.     |
 | `POSTGRES_WAIT_TRIES`          | `30`                                                    | no                      | Number of `pg_isready` attempts before failing (entrypoint.sh).                |
 | `RUN_MIGRATIONS`               | `true`                                                  | no                      | Set to `false` to skip migrations on startup (useful for one-shot containers). |
 
@@ -394,7 +410,7 @@ For GitLab: tags only (no manual trigger). Use `git tag manual-$(git rev-parse -
 
 ## Reference
 
-- **Dockerfile:** `./Dockerfile` (three stages: deps → build → runtime)
+- **Dockerfile:** `./Dockerfile` (four stages: deps → build → development → runtime)
 - **Entrypoint:** `./docker/entrypoint.sh` (waits for Postgres, runs migrations, then execs CMD)
 - **Compose files:** `./docker-compose.yml`, `./docker-compose.dev.yml`, `./docker-compose.prod.yml`, `./docker-compose.dev-tools.yml`
 - **CI workflows:** `.github/workflows/publish-image.yml`, `.gitlab-ci.yml` (`publish:image` job)
