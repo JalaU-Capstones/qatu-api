@@ -106,6 +106,34 @@ curl -sG 'http://localhost:3000/v1/products' --data-urlencode "search='; DROP TA
 curl -s 'http://localhost:3000/v1/products?sort_by=price;DROP' | jq '.error.details'
 ```
 
+## Containerization
+
+The API runs in Docker for both development and production. Full guide: [`.docs/CONTAINERIZATION.md`](./.docs/CONTAINERIZATION.md).
+
+**Quick start (development):**
+
+```bash
+cp .env.example .env
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+The API will be available at `http://localhost:3000/v1`. Health check: `curl http://localhost:3000/health`.
+
+**Quick start (production):**
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+**Images:**
+
+- `ghcr.io/jala-university1/qatu-api:latest` (GHCR, via GitHub Actions)
+- `$CI_REGISTRY_IMAGE:latest` (GitLab Container Registry, via GitLab CI)
+
+Publishing is triggered by pushing a `v*` tag (e.g. `git tag v0.1.0 && git push origin v0.1.0`).
+
+See [`.docs/CONTAINERIZATION.md`](./.docs/CONTAINERIZATION.md) for prerequisites, all three environment modes (Supabase CLI on host / fully containerized / Supabase Cloud), debugging, and the "add a new service" checklist.
+
 ## Available Scripts
 
 Check the `Makefile` for available commands by running:
@@ -204,6 +232,7 @@ The REST API contract is defined using **OpenAPI 3.1.0** and served interactivel
 
 Detailed documentation is available in the `.docs/` directory:
 
+- [Containerization](.docs/CONTAINERIZATION.md) — Docker multi-stage build, compose topology (dev/prod/dev-tools), deployment modes, debugging, and CI/CD publishing.
 - [Architecture](.docs/ARCHITECTURE.md) — Onion Architecture, layers, dependency rule, folder structure, cross-cutting concerns, and testing strategy.
 - [Checkout and Messaging](.docs/CHECKOUT.md) — US-10 checkout transaction, transactional outbox, RabbitMQ topology, error codes, local setup, tests and performance baseline.
 - [Migrations](.docs/MIGRATIONS.md) — Migration workflow, naming conventions, RLS policies, trigger ordering, and seeder guidelines.

@@ -183,3 +183,70 @@ Migrations are versioned in `src/infrastructure/persistence/migrations/` and run
 Seeders live in `src/infrastructure/persistence/seeders/` and are idempotent. They populate roles, categories, and the admin user for development and staging.
 
 See [`.docs/MIGRATIONS.md`](MIGRATIONS.md) for the full guide.
+
+## Container Topology
+
+The API is containerized in four compose files under the repo root. The base file is never run on its own; it is combined with a dev, prod, or dev-tools override.
+
+```
+                    ┌─────────────────────────────────────────────┐
+                    │              qatu-net (bridge)              │
+                    │                                             │
+  host:3000 ────────┤  api          postgres         rabbitmq     │
+  (dev only)        │  node:26      postgres:17      rabbitmq:4   │
+                    │  UID 1001     UID 999          UID 999       │
+                    │                :5432           :5672/:15672  │
+                    │                  │                 │         │
+  host:15672 ───────┤  (rabbitmq management UI, dev only)        │
+                    │                                             │
+  host:8080 ────────┤  pgadmin (dev-tools override only)          │
+                    │  dpage/pgadmin4:9                           │
+                    └─────────────────────────────────────────────┘
+                       │
+                       │  external: qatu-net (shared with client repo)
+                       │
+                    [client repo's nginx proxies /v1/ → api:3000]
+```
+
+### Base (`docker-compose.yml`)
+
+| Service    | Image                            | Exposed        | Purpose                                                                        |
+| ---------- | -------------------------------- | -------------- | ------------------------------------------------------------------------------ |
+| `postgres` | `postgres:17-alpine`             | `expose: 5432` | Application DB + Supabase `auth` compatibility schema (created by migration 1) |
+| `rabbitmq` | `rabbitmq:4.1-management-alpine` | `expose: 5672` | Message broker (ADR-014)                                                       |
+| `api`      | built from `./Dockerfile`        | `expose: 3000` | Express API                                                                    |
+
+All services use `security_opt: ["no-new-privileges:true"]` and `cap_drop: ["ALL"]` (postgres re-adds `CHOWN, DAC_OVERRIDE, SETGID, SETUID` for its init scripts).
+
+### Development (`docker-compose.dev.yml`)
+
+- `api` mounts source for hot reload, runs `pnpm dev` (nodemon), builds `target: build` stage (has dev deps).
+- `api` opens host `:3000`.
+- `rabbitmq` opens host `:15672` (management UI).
+- `postgres` stays internal.
+- `extra_hosts: ["host.docker.internal:host-gateway"]` on `api` for Linux Supabase CLI access.
+
+### Production (`docker-compose.prod.yml`)
+
+- `api` builds `target: runtime` (multi-stage, no dev deps).
+- **No host ports are opened.** The client repo's compose runs nginx on port 80/443 and proxies `/v1/` over the shared `qatu-net` external network.
+- `restart: unless-stopped` on all services.
+- Migrations run on startup via `entrypoint.sh`.
+- Healthcheck on `/health` every 30s.
+
+### Dev tools (`docker-compose.dev-tools.yml`, optional)
+
+- Adds `pgadmin` on host `:8080` for DB inspection.
+- Never deployed to production.
+- Requires `cap_add: [CHOWN, DAC_OVERRIDE, SETGID, SETUID]` (pgAdmin writes to its config dir).
+
+### Network isolation guarantees
+
+| Rule                                                       | Enforced by                                                                                                      |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Postgres is not reachable from the host in prod            | Base uses `expose`, not `ports`. Prod override adds nothing.                                                     |
+| RabbitMQ management is not reachable from the host in prod | `rabbitmq:4.1-management-alpine` includes the UI, but only `docker-compose.dev.yml` opens `:15672`.              |
+| API is not reachable from the host in prod                 | `docker-compose.prod.yml` does not publish `:3000`. Only nginx (client repo) reaches it over the shared network. |
+| No secrets in images                                       | All config via `.env`; Dockerfile has no `ARG` for secrets.                                                      |
+
+For the full operator guide, see [CONTAINERIZATION.md](CONTAINERIZATION.md).
