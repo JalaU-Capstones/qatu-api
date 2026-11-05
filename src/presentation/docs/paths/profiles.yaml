@@ -69,14 +69,12 @@ updateMe:
                 maxLength: 100
                 description: Display full name.
               bio:
-                type: string
+                type: [string, 'null']
                 maxLength: 500
-                nullable: true
                 description: Short profile biography.
               avatar_path:
-                type: string
+                type: [string, 'null']
                 maxLength: 500
-                nullable: true
                 description: Storage path or URL of the user's avatar image.
               locale:
                 type: string
