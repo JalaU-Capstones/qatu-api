@@ -41,13 +41,13 @@ describe('GetProfileByIdUseCase', () => {
       id: validId,
       username: 'john_doe',
       full_name: 'John Doe',
-      email: 'john@example.com',
       avatar_path: 'avatars/john.webp',
       bio: 'Artisan collector.',
       locale: 'en',
       created_at: '2026-10-01T00:00:00.000Z',
       updated_at: '2026-10-01T00:00:00.000Z',
     });
+    expect(result.data).not.toHaveProperty('email');
     expect(result.meta.timestamp).toEqual(expect.any(String));
   });
 

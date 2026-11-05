@@ -17,7 +17,9 @@ export class GetProfileByIdRequestDTO {
 export class UpdateProfileRequestDTO {
   /**
    * @param {Object} params
-   * @param {string} params.userId
+   * @param {string} [params.userId]
+   * @param {string} [params.targetUserId]
+   * @param {string} [params.requestingUserId]
    * @param {Object} [params.updates]
    * @param {string} [params.full_name]
    * @param {string} [params.fullName]
@@ -27,7 +29,13 @@ export class UpdateProfileRequestDTO {
    * @param {string} [params.locale]
    */
   constructor(params = {}) {
-    this.userId = typeof params.userId === 'string' ? params.userId.trim() : '';
+    const rawTargetId = params.targetUserId !== undefined ? params.targetUserId : params.userId;
+    this.userId = typeof rawTargetId === 'string' ? rawTargetId.trim() : '';
+    this.targetUserId = this.userId;
+
+    const rawRequestingId =
+      params.requestingUserId !== undefined ? params.requestingUserId : params.userId;
+    this.requestingUserId = typeof rawRequestingId === 'string' ? rawRequestingId.trim() : '';
 
     const source = params.updates && typeof params.updates === 'object' ? params.updates : params;
 
@@ -64,6 +72,46 @@ export class UpdateProfileRequestDTO {
   }
 }
 
+export class UploadAvatarRequestDTO {
+  /**
+   * @param {Object} params
+   * @param {string} [params.userId]
+   * @param {string} [params.targetUserId]
+   * @param {string} [params.requestingUserId]
+   * @param {Object} [params.file]
+   * @param {Buffer} [params.buffer]
+   * @param {string} [params.mimeType]
+   * @param {string} [params.originalName]
+   * @param {number} [params.size]
+   */
+  constructor(params = {}) {
+    const rawTargetId = params.targetUserId !== undefined ? params.targetUserId : params.userId;
+    this.userId = typeof rawTargetId === 'string' ? rawTargetId.trim() : '';
+    this.targetUserId = this.userId;
+
+    const rawRequestingId =
+      params.requestingUserId !== undefined ? params.requestingUserId : params.userId;
+    this.requestingUserId = typeof rawRequestingId === 'string' ? rawRequestingId.trim() : '';
+
+    const fileSource = params.file && typeof params.file === 'object' ? params.file : params;
+    this.buffer = Buffer.isBuffer(fileSource.buffer) ? fileSource.buffer : null;
+    this.mimeType =
+      typeof fileSource.mimeType === 'string'
+        ? fileSource.mimeType.trim().toLowerCase()
+        : typeof fileSource.mimetype === 'string'
+          ? fileSource.mimetype.trim().toLowerCase()
+          : '';
+    this.originalName =
+      typeof fileSource.originalName === 'string'
+        ? fileSource.originalName.trim()
+        : typeof fileSource.originalname === 'string'
+          ? fileSource.originalname.trim()
+          : '';
+    this.size =
+      typeof fileSource.size === 'number' ? fileSource.size : this.buffer ? this.buffer.length : 0;
+  }
+}
+
 export class ProfileResponseDTO {
   /**
    * @param {import('../../domain/entities/Profile.js').Profile|Object} profile
@@ -74,7 +122,6 @@ export class ProfileResponseDTO {
     this.id = raw.id;
     this.username = raw.username;
     this.full_name = raw.full_name ?? raw.fullName ?? null;
-    this.email = raw.email ?? null;
     this.avatar_path = raw.avatar_path ?? raw.avatarPath ?? null;
     this.bio = raw.bio ?? null;
     this.locale = raw.locale || 'en';
@@ -97,7 +144,6 @@ export class ProfileResponseDTO {
         id: this.id,
         username: this.username,
         full_name: this.full_name,
-        email: this.email,
         avatar_path: this.avatar_path,
         bio: this.bio,
         locale: this.locale,

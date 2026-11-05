@@ -4,6 +4,7 @@ import {
   GetProfileByIdRequestDTO,
   ProfileResponseDTO,
   UpdateProfileRequestDTO,
+  UploadAvatarRequestDTO,
 } from '../ProfileDTO.js';
 
 describe('ProfileDTO', () => {
@@ -62,8 +63,32 @@ describe('ProfileDTO', () => {
     });
   });
 
+  describe('UploadAvatarRequestDTO', () => {
+    it('should normalize userId, targetUserId, requestingUserId, and file fields', () => {
+      const buf = Buffer.from('test');
+      const dto = new UploadAvatarRequestDTO({
+        userId: ' user-1 ',
+        requestingUserId: ' user-1 ',
+        file: {
+          buffer: buf,
+          mimeType: ' IMAGE/PNG ',
+          originalName: ' avatar.png ',
+          size: 4,
+        },
+      });
+
+      expect(dto.userId).toBe('user-1');
+      expect(dto.targetUserId).toBe('user-1');
+      expect(dto.requestingUserId).toBe('user-1');
+      expect(dto.buffer).toBe(buf);
+      expect(dto.mimeType).toBe('image/png');
+      expect(dto.originalName).toBe('avatar.png');
+      expect(dto.size).toBe(4);
+    });
+  });
+
   describe('ProfileResponseDTO', () => {
-    it('should serialize a Profile entity into the standard response envelope', () => {
+    it('should serialize a Profile entity into the standard response envelope excluding email', () => {
       const profile = new Profile({
         id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
         username: 'john_doe',
@@ -77,12 +102,12 @@ describe('ProfileDTO', () => {
       });
 
       const responseDto = new ProfileResponseDTO(profile, '2026-10-14T12:00:00.000Z');
-      expect(responseDto.toJSON()).toEqual({
+      const json = responseDto.toJSON();
+      expect(json).toEqual({
         data: {
           id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
           username: 'john_doe',
           full_name: 'John Doe',
-          email: 'john@example.com',
           avatar_path: 'avatars/john.webp',
           bio: 'Hello world',
           locale: 'en',
@@ -93,6 +118,7 @@ describe('ProfileDTO', () => {
           timestamp: '2026-10-14T12:00:00.000Z',
         },
       });
+      expect(json.data).not.toHaveProperty('email');
     });
   });
 });

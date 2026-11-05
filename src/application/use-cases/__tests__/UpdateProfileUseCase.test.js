@@ -55,14 +55,55 @@ describe('UpdateProfileUseCase', () => {
       id: userId,
       username: 'john_doe',
       full_name: 'Jane Doe',
-      email: 'john@example.com',
       avatar_path: 'avatars/jane.webp',
       bio: 'Online marketplace enthusiast.',
       locale: 'es',
       created_at: '2026-10-01T00:00:00.000Z',
       updated_at: '2026-10-14T12:00:00.000Z',
     });
+    expect(result.data).not.toHaveProperty('email');
     expect(result.meta.timestamp).toEqual(expect.any(String));
+  });
+
+  it('should throw 403 FORBIDDEN when requestingUserId does not match targetUserId', async () => {
+    await expect(
+      useCase.execute({
+        targetUserId: userId,
+        requestingUserId: '11111111-2222-3333-4444-555555555555',
+        updates: { bio: 'Trying to modify another profile' },
+      })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      statusCode: 403,
+      message: 'You do not have permission to update this profile',
+    });
+    expect(mockProfileRepository.update).not.toHaveBeenCalled();
+  });
+
+  it('should throw 400 VALIDATION_ERROR when avatar_path has an invalid format', async () => {
+    await expect(
+      useCase.execute({
+        userId,
+        updates: { avatar_path: '../etc/passwd' },
+      })
+    ).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      statusCode: 400,
+      message: 'Avatar path must be a valid storage path or URL.',
+    });
+
+    await expect(
+      useCase.execute({
+        userId,
+        updates: { avatar_path: 'avatars/hack.exe' },
+      })
+    ).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      statusCode: 400,
+      message: 'Avatar path must be a valid storage path or URL.',
+    });
+
+    expect(mockProfileRepository.update).not.toHaveBeenCalled();
   });
 
   it('should throw 401 UNAUTHORIZED when userId is missing', async () => {

@@ -4,7 +4,16 @@ import { ProfileResponseDTO, UpdateProfileRequestDTO } from '../dtos/ProfileDTO.
 const MAX_BIO_LENGTH = 500;
 const MAX_AVATAR_PATH_LENGTH = 500;
 const MIN_LOCALE_LENGTH = 2;
-const MAX_LOCALE_LENGTH = 10;
+const MAX_LOCALE_LENGTH = 20;
+const AVATAR_STORAGE_REGEX = /^avatars\/[a-zA-Z0-9/_-]+\.(?:jpg|jpeg|png|webp)$/i;
+const AVATAR_URL_REGEX = /^https?:\/\/[^\s<>"']+$/i;
+
+export function isValidAvatarPath(value) {
+  if (typeof value !== 'string' || value.includes('..')) {
+    return false;
+  }
+  return AVATAR_STORAGE_REGEX.test(value) || AVATAR_URL_REGEX.test(value);
+}
 
 export class UpdateProfileUseCase {
   /**
@@ -27,12 +36,20 @@ export class UpdateProfileUseCase {
   async execute(input) {
     const dto =
       input instanceof UpdateProfileRequestDTO ? input : new UpdateProfileRequestDTO(input);
-    const { userId, updates } = dto;
+    const { userId, targetUserId, requestingUserId, updates } = dto;
+    const resolvedTargetId = targetUserId || userId;
 
-    if (!userId) {
+    if (!resolvedTargetId || !requestingUserId) {
       const err = new Error('Authentication failed');
       err.code = 'UNAUTHORIZED';
       err.statusCode = 401;
+      throw err;
+    }
+
+    if (requestingUserId !== resolvedTargetId) {
+      const err = new Error('You do not have permission to update this profile');
+      err.code = 'FORBIDDEN';
+      err.statusCode = 403;
       throw err;
     }
 
@@ -64,13 +81,15 @@ export class UpdateProfileUseCase {
       if (updates.avatar_path !== null && typeof updates.avatar_path !== 'string') {
         throw this._createValidationError('Avatar path must be a string.');
       }
-      if (
-        typeof updates.avatar_path === 'string' &&
-        updates.avatar_path.length > MAX_AVATAR_PATH_LENGTH
-      ) {
-        throw this._createValidationError(
-          `Avatar path must be at most ${MAX_AVATAR_PATH_LENGTH} characters long.`
-        );
+      if (typeof updates.avatar_path === 'string') {
+        if (updates.avatar_path.length > MAX_AVATAR_PATH_LENGTH) {
+          throw this._createValidationError(
+            `Avatar path must be at most ${MAX_AVATAR_PATH_LENGTH} characters long.`
+          );
+        }
+        if (!isValidAvatarPath(updates.avatar_path)) {
+          throw this._createValidationError('Avatar path must be a valid storage path or URL.');
+        }
       }
       validatedUpdates.avatar_path = updates.avatar_path;
     }
@@ -92,7 +111,7 @@ export class UpdateProfileUseCase {
       throw this._createValidationError('At least one profile field must be provided');
     }
 
-    const updatedProfile = await this.profileRepository.update(userId, validatedUpdates);
+    const updatedProfile = await this.profileRepository.update(resolvedTargetId, validatedUpdates);
     if (!updatedProfile) {
       const err = new Error('Profile not found');
       err.code = 'NOT_FOUND';
