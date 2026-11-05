@@ -4,6 +4,7 @@ import { ProfileController } from '../ProfileController.js';
 describe('ProfileController', () => {
   let mockGetProfileByIdUseCase;
   let mockUpdateProfileUseCase;
+  let mockUploadAvatarUseCase;
   let controller;
   let req;
   let res;
@@ -14,7 +15,6 @@ describe('ProfileController', () => {
       id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
       username: 'john_doe',
       full_name: 'John Doe',
-      email: 'john@example.com',
       avatar_path: null,
       bio: 'Artisan collector.',
       locale: 'en',
@@ -33,9 +33,13 @@ describe('ProfileController', () => {
     mockUpdateProfileUseCase = {
       execute: vi.fn().mockResolvedValue(sampleProfileEnvelope),
     };
+    mockUploadAvatarUseCase = {
+      execute: vi.fn().mockResolvedValue(sampleProfileEnvelope),
+    };
     controller = new ProfileController({
       getProfileByIdUseCase: mockGetProfileByIdUseCase,
       updateProfileUseCase: mockUpdateProfileUseCase,
+      uploadAvatarUseCase: mockUploadAvatarUseCase,
     });
 
     req = {
@@ -121,6 +125,41 @@ describe('ProfileController', () => {
 
       await controller.updateMe(req, res, next);
       expect(next).toHaveBeenCalledWith(err);
+    });
+  });
+
+  describe('uploadAvatar', () => {
+    it('should return 200 with updated profile data when avatar upload succeeds', async () => {
+      req.file = {
+        buffer: Buffer.from('png-bytes'),
+        mimeType: 'image/png',
+        originalName: 'avatar.png',
+        size: 9,
+      };
+
+      await controller.uploadAvatar(req, res, next);
+
+      expect(mockUploadAvatarUseCase.execute).toHaveBeenCalledTimes(1);
+      const dto = mockUploadAvatarUseCase.execute.mock.calls[0][0];
+      expect(dto.userId).toBe('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11');
+      expect(dto.requestingUserId).toBe('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11');
+      expect(dto.mimeType).toBe('image/png');
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(sampleProfileEnvelope);
+    });
+
+    it('should call next with 401 UNAUTHORIZED when req.user is missing', async () => {
+      req.user = null;
+
+      await controller.uploadAvatar(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'UNAUTHORIZED',
+          statusCode: 401,
+        })
+      );
+      expect(mockUploadAvatarUseCase.execute).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,5 +1,18 @@
 import Joi from 'joi';
 
+const AVATAR_STORAGE_REGEX = /^avatars\/[a-zA-Z0-9/_-]+\.(?:jpg|jpeg|png|webp)$/i;
+const AVATAR_URL_REGEX = /^https?:\/\/[^\s<>"']+$/i;
+
+function validateAvatarPathFormat(value, helpers) {
+  if (
+    value.includes('..') ||
+    (!AVATAR_STORAGE_REGEX.test(value) && !AVATAR_URL_REGEX.test(value))
+  ) {
+    return helpers.error('string.pattern.base');
+  }
+  return value;
+}
+
 export const updateProfileSchema = Joi.object({
   full_name: Joi.string().trim().min(2).max(100).optional().messages({
     'string.base': 'full_name must be a string',
@@ -11,15 +24,22 @@ export const updateProfileSchema = Joi.object({
     'string.base': 'bio must be a string',
     'string.max': 'bio must be at most 500 characters',
   }),
-  avatar_path: Joi.string().trim().max(500).allow('', null).optional().messages({
-    'string.base': 'avatar_path must be a string',
-    'string.max': 'avatar_path must be at most 500 characters',
-  }),
-  locale: Joi.string().trim().min(2).max(10).optional().messages({
+  avatar_path: Joi.string()
+    .trim()
+    .max(500)
+    .custom(validateAvatarPathFormat)
+    .allow('', null)
+    .optional()
+    .messages({
+      'string.base': 'avatar_path must be a string',
+      'string.max': 'avatar_path must be at most 500 characters',
+      'string.pattern.base': 'avatar_path must be a valid storage path or URL',
+    }),
+  locale: Joi.string().trim().min(2).max(20).optional().messages({
     'string.base': 'locale must be a string',
     'string.empty': 'locale cannot be empty',
-    'string.min': 'locale must be between 2 and 10 characters long',
-    'string.max': 'locale must be between 2 and 10 characters long',
+    'string.min': 'locale must be between 2 and 20 characters long',
+    'string.max': 'locale must be between 2 and 20 characters long',
   }),
 })
   .min(1)

@@ -75,4 +75,22 @@ describe('updateProfileSchema', () => {
     expect(error).toBeDefined();
     expect(error.details[0].message).toBe('At least one profile field must be provided');
   });
+
+  it('should accept valid Supabase Storage avatar_path and reject invalid formats', () => {
+    const validStorage = updateProfileSchema.validate(
+      { avatar_path: 'avatars/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/avatar.webp' },
+      { abortEarly: false }
+    );
+    expect(validStorage.error).toBeUndefined();
+
+    const invalidFormat = updateProfileSchema.validate(
+      { avatar_path: 'avatars/invalid.exe' },
+      { abortEarly: false }
+    );
+    expect(invalidFormat.error).toBeDefined();
+    expect(invalidFormat.error.details[0].path).toEqual(['avatar_path']);
+    expect(invalidFormat.error.details[0].message).toBe(
+      'avatar_path must be a valid storage path or URL'
+    );
+  });
 });
