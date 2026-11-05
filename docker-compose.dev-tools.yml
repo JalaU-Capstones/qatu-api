@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Qatu API — Docker Compose DEV TOOLS override (optional)
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.dev-tools.yml up
+#
+# Adds admin/management UIs that MUST NOT run in production:
+#   - pgAdmin (DB inspection) — exposes 8080 on host.
+#   - No RabbitMQ Management service is added here because rabbitmq:4.1-
+#     management-alpine already ships the management UI on 15672 (exposed in
+#     docker-compose.dev.yml).
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  pgadmin:
+    image: dpage/pgadmin4:9
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@qatu.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - qatu-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - '8080:80'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+
+volumes:
+  pgadmin_data:
+    driver: local

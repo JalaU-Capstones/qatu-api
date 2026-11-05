@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Qatu API — Docker Compose DEV override
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Mode B (fully containerized for API + DB + Broker). Auth uses Supabase CLI
+# on host via `host.docker.internal` (see .env.example Mode A).
+#
+# Differences from base:
+#   - api runs `pnpm dev` (nodemon) with source bind-mount for hot reload.
+#   - api is exposed on host:3000 for frontend dev.
+#   - rabbitmq management UI is exposed on host:15672.
+#   - postgres is NOT exposed to host (matches the US-36 AC: "postgres is
+#     reachable only via pgAdmin at http://localhost:8080").
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  rabbitmq:
+    ports:
+      - '15672:15672'
+
+  api:
+    build:
+      context: .
+      target: build
+    command: sh -c "pnpm install --frozen-lockfile && pnpm dev"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      # Containerized API → host Supabase CLI for auth (Mode A).
+      # On Linux hosts, `extra_hosts` below maps host.docker.internal.
+      SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
+      # Override the DB URL to point to the containerized postgres.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/postgres}
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/dist
+    ports:
+      - '3000:3000'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
