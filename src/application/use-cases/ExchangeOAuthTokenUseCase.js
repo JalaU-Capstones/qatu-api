@@ -26,8 +26,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * @param {string} part
  * @returns {string}
  */
-const sanitizeUsernamePart = (part) =>
-  (part || '').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
+const sanitizeUsernamePart = (part) => (part || '').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
 
 /**
  * Generates a short random hex string for username suffixes.
@@ -114,9 +113,7 @@ export class ExchangeOAuthTokenUseCase {
 
     const profile = await this.lookupProfile(verified.user);
     if (!profile) {
-      const err = new Error(
-        'Account created but profile setup is in progress. Please try again.'
-      );
+      const err = new Error('Account created but profile setup is in progress. Please try again.');
       err.status = 503;
       err.statusCode = 503;
       err.code = 'PROFILE_SETUP_IN_PROGRESS';

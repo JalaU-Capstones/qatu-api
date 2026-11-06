@@ -69,9 +69,7 @@ describe('ExchangeOAuthTokenUseCase', () => {
       accessToken: 'at',
       refreshToken: 'rt',
     });
-    profileRepository.findById
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(profile);
+    profileRepository.findById.mockResolvedValueOnce(null).mockResolvedValueOnce(profile);
 
     const result = await useCase.execute({ accessToken: 'at', refreshToken: 'rt' });
 
