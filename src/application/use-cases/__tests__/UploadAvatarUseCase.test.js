@@ -8,6 +8,7 @@ describe('UploadAvatarUseCase', () => {
   let useCase;
 
   const userId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+  const publicAvatarUrl = `https://example.supabase.co/storage/v1/object/public/avatars/${userId}/550e8400-e29b-41d4-a716-446655440000.webp`;
   const validBuffer = Buffer.from('fake-image-binary-content');
 
   const updatedProfileEntity = new Profile({
@@ -15,7 +16,7 @@ describe('UploadAvatarUseCase', () => {
     username: 'john_doe',
     fullName: 'John Doe',
     email: 'john@example.com',
-    avatarPath: `avatars/${userId}/avatar.webp`,
+    avatarPath: publicAvatarUrl,
     bio: 'Artisan collector.',
     locale: 'en',
     createdAt: '2026-10-01T00:00:00.000Z',
@@ -28,7 +29,7 @@ describe('UploadAvatarUseCase', () => {
     };
     mockStorageService = {
       uploadAvatar: vi.fn().mockResolvedValue({
-        path: `avatars/${userId}/avatar.webp`,
+        path: publicAvatarUrl,
       }),
     };
     useCase = new UploadAvatarUseCase({
@@ -44,7 +45,7 @@ describe('UploadAvatarUseCase', () => {
     );
   });
 
-  it('should upload valid JPEG, PNG, or WebP image and update profile avatar_path', async () => {
+  it('should upload valid JPEG, PNG, or WebP image and update profile avatar_path with full public URL', async () => {
     const result = await useCase.execute({
       userId,
       requestingUserId: userId,
@@ -59,15 +60,17 @@ describe('UploadAvatarUseCase', () => {
       buffer: validBuffer,
       mimeType: 'image/webp',
       extension: 'webp',
+      originalName: 'avatar.webp',
+      size: validBuffer.length,
     });
     expect(mockProfileRepository.update).toHaveBeenCalledWith(userId, {
-      avatar_path: `avatars/${userId}/avatar.webp`,
+      avatar_path: publicAvatarUrl,
     });
     expect(result.data).toEqual({
       id: userId,
       username: 'john_doe',
       full_name: 'John Doe',
-      avatar_path: `avatars/${userId}/avatar.webp`,
+      avatar_path: publicAvatarUrl,
       bio: 'Artisan collector.',
       locale: 'en',
       created_at: '2026-10-01T00:00:00.000Z',

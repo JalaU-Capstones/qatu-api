@@ -83,7 +83,7 @@ describe('Profile Routes Integration (GET /v1/profiles/:id, PATCH /v1/profiles/m
 
     mockStorageService = {
       uploadAvatar: vi.fn().mockImplementation(async ({ userId: targetId, extension }) => ({
-        path: `avatars/${targetId}/avatar.${extension}`,
+        path: `https://example.supabase.co/storage/v1/object/public/avatars/${targetId}/550e8400-e29b-41d4-a716-446655440000.${extension}`,
       })),
     };
 
@@ -406,8 +406,8 @@ describe('Profile Routes Integration (GET /v1/profiles/:id, PATCH /v1/profiles/m
   });
 
   describe('POST /v1/profiles/me/avatar', () => {
-    it('Scenario: Upload valid WebP avatar -> stores in Supabase Storage, updates avatar_path, and returns 200', async () => {
-      const expectedStoragePath = `avatars/${userId}/avatar.webp`;
+    it('Scenario: Upload valid WebP avatar -> stores in Supabase Storage, updates avatar_path with full public URL, and returns 200', async () => {
+      const expectedStoragePath = `https://example.supabase.co/storage/v1/object/public/avatars/${userId}/550e8400-e29b-41d4-a716-446655440000.webp`;
       const updatedEntity = new Profile({
         id: userId,
         username: 'john_doe',
@@ -434,6 +434,8 @@ describe('Profile Routes Integration (GET /v1/profiles/:id, PATCH /v1/profiles/m
         buffer: imageBuffer,
         mimeType: 'image/webp',
         extension: 'webp',
+        originalName: 'avatar.webp',
+        size: imageBuffer.length,
       });
       expect(mockProfileRepository.update).toHaveBeenCalledWith(userId, {
         avatar_path: expectedStoragePath,

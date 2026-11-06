@@ -80,6 +80,8 @@ export class UploadAvatarUseCase {
       buffer,
       mimeType,
       extension: mappedExt,
+      originalName,
+      size,
     });
 
     const updatedProfile = await this.profileRepository.update(resolvedTargetId, {

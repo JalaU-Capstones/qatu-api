@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MAX_AVATAR_SIZE_BYTES } from '../../../application/use-cases/UploadAvatarUseCase.js';
 import { SupabaseStorageService } from '../SupabaseStorageService.js';
 
 vi.mock('../../config/supabase.js', () => ({
@@ -11,54 +12,113 @@ vi.mock('../../config/supabase.js', () => ({
 
 describe('SupabaseStorageService', () => {
   let mockUpload;
+  let mockGetPublicUrl;
   let mockClient;
   let service;
 
   const userId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+  const fixedUuid = '550e8400-e29b-41d4-a716-446655440000';
   const sampleBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+  const storageBaseUrl = 'https://example.supabase.co/storage/v1/object/public';
 
   beforeEach(() => {
-    mockUpload = vi.fn().mockResolvedValue({ data: { path: `${userId}/avatar.png` }, error: null });
+    mockUpload = vi
+      .fn()
+      .mockResolvedValue({ data: { path: `${userId}/${fixedUuid}.png` }, error: null });
+    mockGetPublicUrl = vi.fn().mockImplementation((objectKey) => ({
+      data: {
+        publicUrl: `${storageBaseUrl}/avatars/${objectKey}`,
+      },
+    }));
     mockClient = {
       storage: {
         from: vi.fn().mockReturnValue({
           upload: mockUpload,
+          getPublicUrl: mockGetPublicUrl,
         }),
       },
     };
-    service = new SupabaseStorageService({ client: mockClient, bucket: 'avatars' });
+    service = new SupabaseStorageService({
+      client: mockClient,
+      bucket: 'avatars',
+      storageUrl: storageBaseUrl,
+      uuidGenerator: () => fixedUuid,
+    });
   });
 
-  it('should upload avatar to Supabase Storage bucket and return storage path', async () => {
+  it('should upload avatar with UUID filename and return full public URL', async () => {
     const result = await service.uploadAvatar({
       userId,
       buffer: sampleBuffer,
       mimeType: 'image/png',
       extension: 'png',
+      originalName: 'avatar.png',
+      size: sampleBuffer.length,
     });
 
     expect(mockClient.storage.from).toHaveBeenCalledWith('avatars');
-    expect(mockUpload).toHaveBeenCalledWith(`${userId}/avatar.png`, sampleBuffer, {
+    expect(mockUpload).toHaveBeenCalledWith(`${userId}/${fixedUuid}.png`, sampleBuffer, {
       contentType: 'image/png',
       upsert: true,
     });
+    expect(mockGetPublicUrl).toHaveBeenCalledWith(`${userId}/${fixedUuid}.png`);
     expect(result).toEqual({
-      path: `avatars/${userId}/avatar.png`,
+      path: `${storageBaseUrl}/avatars/${userId}/${fixedUuid}.png`,
     });
   });
 
-  it('should throw 400 VALIDATION_ERROR when required parameters are missing', async () => {
+  it('should throw 400 VALIDATION_ERROR when userId or buffer is missing', async () => {
     await expect(
       service.uploadAvatar({
         userId: '',
         buffer: sampleBuffer,
         mimeType: 'image/png',
-        extension: 'png',
       })
     ).rejects.toMatchObject({
       code: 'VALIDATION_ERROR',
       statusCode: 400,
     });
+    expect(mockUpload).not.toHaveBeenCalled();
+  });
+
+  it('should throw 422 FILE_TOO_LARGE before uploading when buffer exceeds 2 MB', async () => {
+    const oversized = Buffer.alloc(MAX_AVATAR_SIZE_BYTES + 1);
+
+    await expect(
+      service.uploadAvatar({
+        userId,
+        buffer: oversized,
+        mimeType: 'image/jpeg',
+        extension: 'jpg',
+      })
+    ).rejects.toMatchObject({
+      code: 'FILE_TOO_LARGE',
+      statusCode: 422,
+      message: 'The image exceeds the maximum size of 2 MB.',
+    });
+    expect(mockUpload).not.toHaveBeenCalled();
+  });
+
+  it('should throw 422 INVALID_FILE_FORMAT before uploading when MIME type or extension (.exe, .svg, .gif) is unsupported', async () => {
+    for (const badCase of [
+      { mimeType: 'image/gif', originalName: 'anim.gif' },
+      { mimeType: 'image/svg+xml', originalName: 'vector.svg' },
+      { mimeType: 'application/x-msdownload', originalName: 'malware.exe' },
+      { mimeType: 'image/png', originalName: 'disguised.exe' },
+    ]) {
+      await expect(
+        service.uploadAvatar({
+          userId,
+          buffer: sampleBuffer,
+          ...badCase,
+        })
+      ).rejects.toMatchObject({
+        code: 'INVALID_FILE_FORMAT',
+        statusCode: 422,
+        message: 'Only JPEG, PNG, and WebP images are accepted.',
+      });
+    }
+    expect(mockUpload).not.toHaveBeenCalled();
   });
 
   it('should throw 500 STORAGE_UPLOAD_ERROR when Supabase Storage returns an error', async () => {
@@ -81,8 +141,13 @@ describe('SupabaseStorageService', () => {
     });
   });
 
-  it('should still return computed storage path when client.storage is not available in test stub', async () => {
-    const fallbackService = new SupabaseStorageService({ client: {}, bucket: 'avatars' });
+  it('should construct full public URL from storageUrl when client.storage stub has no getPublicUrl', async () => {
+    const fallbackService = new SupabaseStorageService({
+      client: {},
+      bucket: 'avatars',
+      storageUrl: storageBaseUrl,
+      uuidGenerator: () => fixedUuid,
+    });
     const result = await fallbackService.uploadAvatar({
       userId,
       buffer: sampleBuffer,
@@ -91,7 +156,7 @@ describe('SupabaseStorageService', () => {
     });
 
     expect(result).toEqual({
-      path: `avatars/${userId}/avatar.jpg`,
+      path: `${storageBaseUrl}/avatars/${userId}/${fixedUuid}.jpg`,
     });
   });
 });
