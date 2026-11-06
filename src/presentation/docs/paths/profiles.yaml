@@ -86,7 +86,7 @@ updateMe:
               value:
                 full_name: 'Camila Morales'
                 bio: 'Coleccionista de textiles y cerámica andina.'
-                avatar_path: 'avatars/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/avatar.webp'
+                avatar_path: 'https://cdn.qatu.pe/avatars/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/avatar.webp'
                 locale: 'es-PE'
     responses:
       '200':
@@ -109,7 +109,7 @@ updateMe:
                     id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
                     username: 'camila_m'
                     full_name: 'Camila Morales'
-                    avatar_path: 'avatars/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/avatar.webp'
+                    avatar_path: 'https://cdn.qatu.pe/avatars/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/avatar.webp'
                     bio: 'Coleccionista de textiles y cerámica andina.'
                     locale: 'es-PE'
                     created_at: '2026-10-01T00:00:00.000Z'
