@@ -15,13 +15,13 @@ export class SupabaseStorageService extends IStorageService {
    * @param {Object} [options]
    * @param {import('@supabase/supabase-js').SupabaseClient} [options.client=supabase]
    * @param {string} [options.bucket=DEFAULT_AVATAR_BUCKET]
-   * @param {string} [options.storageUrl=env.SUPABASE_STORAGE_URL]
+   * @param {string} [options.storageUrl=env.SUPABASE_STORAGE_PUBLIC_URL]
    * @param {Function} [options.uuidGenerator=uuidv4]
    */
   constructor({
     client = supabase,
     bucket = DEFAULT_AVATAR_BUCKET,
-    storageUrl = env.SUPABASE_STORAGE_URL,
+    storageUrl = env.SUPABASE_STORAGE_PUBLIC_URL,
     uuidGenerator = uuidv4,
   } = {}) {
     super();
@@ -29,6 +29,7 @@ export class SupabaseStorageService extends IStorageService {
     this.bucket = bucket;
     this.storageUrl =
       storageUrl ||
+      env.SUPABASE_STORAGE_PUBLIC_URL ||
       `${(env.SUPABASE_URL || 'http://localhost:54321').replace(/\/$/, '')}/storage/v1/object/public`;
     this.uuidGenerator = uuidGenerator;
   }
@@ -82,8 +83,6 @@ export class SupabaseStorageService extends IStorageService {
     const fileUuid = this.uuidGenerator();
     const objectKey = `${userId}/${fileUuid}.${cleanExt}`;
 
-    let publicUrl = '';
-
     if (this.client?.storage && typeof this.client.storage.from === 'function') {
       const bucketClient = this.client.storage.from(this.bucket);
       const { error } = await bucketClient.upload(objectKey, buffer, {
@@ -97,17 +96,10 @@ export class SupabaseStorageService extends IStorageService {
         err.statusCode = 500;
         throw err;
       }
-
-      if (typeof bucketClient.getPublicUrl === 'function') {
-        const publicUrlResult = bucketClient.getPublicUrl(objectKey);
-        publicUrl = publicUrlResult?.data?.publicUrl || '';
-      }
     }
 
-    if (!publicUrl) {
-      const cleanBase = this.storageUrl.replace(/\/$/, '');
-      publicUrl = `${cleanBase}/${this.bucket}/${objectKey}`;
-    }
+    const cleanBase = this.storageUrl.replace(/\/$/, '');
+    const publicUrl = `${cleanBase}/${this.bucket}/${objectKey}`;
 
     return { path: publicUrl };
   }

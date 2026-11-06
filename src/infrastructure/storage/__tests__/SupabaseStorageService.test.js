@@ -2,6 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_AVATAR_SIZE_BYTES } from '../../../application/use-cases/UploadAvatarUseCase.js';
 import { SupabaseStorageService } from '../SupabaseStorageService.js';
 
+vi.mock('../../config/env.js', () => ({
+  env: {
+    SUPABASE_URL: 'http://host.docker.internal:54321',
+    SUPABASE_STORAGE_PUBLIC_URL: 'http://localhost:54321/storage/v1/object/public',
+    SUPABASE_STORAGE_BUCKET: 'avatars',
+  },
+}));
+
 vi.mock('../../config/supabase.js', () => ({
   supabase: {
     storage: {
@@ -12,7 +20,6 @@ vi.mock('../../config/supabase.js', () => ({
 
 describe('SupabaseStorageService', () => {
   let mockUpload;
-  let mockGetPublicUrl;
   let mockClient;
   let service;
 
@@ -25,16 +32,10 @@ describe('SupabaseStorageService', () => {
     mockUpload = vi
       .fn()
       .mockResolvedValue({ data: { path: `${userId}/${fixedUuid}.png` }, error: null });
-    mockGetPublicUrl = vi.fn().mockImplementation((objectKey) => ({
-      data: {
-        publicUrl: `${storageBaseUrl}/avatars/${objectKey}`,
-      },
-    }));
     mockClient = {
       storage: {
         from: vi.fn().mockReturnValue({
           upload: mockUpload,
-          getPublicUrl: mockGetPublicUrl,
         }),
       },
     };
@@ -61,10 +62,31 @@ describe('SupabaseStorageService', () => {
       contentType: 'image/png',
       upsert: true,
     });
-    expect(mockGetPublicUrl).toHaveBeenCalledWith(`${userId}/${fixedUuid}.png`);
     expect(result).toEqual({
       path: `${storageBaseUrl}/avatars/${userId}/${fixedUuid}.png`,
     });
+  });
+
+  it('should use env.SUPABASE_STORAGE_PUBLIC_URL to construct final URL, not env.SUPABASE_URL', async () => {
+    const defaultUrlService = new SupabaseStorageService({
+      client: mockClient,
+      bucket: 'avatars',
+      uuidGenerator: () => fixedUuid,
+    });
+
+    const result = await defaultUrlService.uploadAvatar({
+      userId,
+      buffer: sampleBuffer,
+      mimeType: 'image/png',
+      extension: 'png',
+      originalName: 'avatar.png',
+      size: sampleBuffer.length,
+    });
+
+    expect(result.path).toBe(
+      `http://localhost:54321/storage/v1/object/public/avatars/${userId}/${fixedUuid}.png`
+    );
+    expect(result.path).not.toContain('host.docker.internal');
   });
 
   it('should throw 400 VALIDATION_ERROR when userId or buffer is missing', async () => {
@@ -141,7 +163,7 @@ describe('SupabaseStorageService', () => {
     });
   });
 
-  it('should construct full public URL from storageUrl when client.storage stub has no getPublicUrl', async () => {
+  it('should construct full public URL from storageUrl when client.storage is not available', async () => {
     const fallbackService = new SupabaseStorageService({
       client: {},
       bucket: 'avatars',

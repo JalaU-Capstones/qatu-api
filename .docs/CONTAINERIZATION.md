@@ -113,6 +113,18 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api \
   npx sequelize-cli db:migrate
 ```
 
+### Database Seeding (`RUN_SEEDS`)
+
+The container entrypoint (`docker/entrypoint.sh`) supports database seeding via the `RUN_SEEDS` environment variable:
+
+- **Recommended usage:** Set `RUN_SEEDS=true` for the first production deploy on a fresh database so initial data (roles, categories, admin user) is seeded. Keep it set to `false` (default) for subsequent restarts. docker-compose.dev.yml sets RUN_SEEDS=true automatically, so development environments always have the base seed data without manual intervention.
+- **Manual seeding:** Seeds can also be run on-demand inside the running container:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api \
+  npx sequelize-cli db:seed:all
+```
+
 ### Stop and clean
 
 ```bash
@@ -346,6 +358,7 @@ docker compose exec api npx sequelize-cli db:migrate:status
 | `PGADMIN_PASSWORD`             | `admin123`                                              | n/a (dev only)          | pgAdmin password (dev-tools override only). pgAdmin v9 requires ≥ 6 chars.     |
 | `POSTGRES_WAIT_TRIES`          | `30`                                                    | no                      | Number of `pg_isready` attempts before failing (entrypoint.sh).                |
 | `RUN_MIGRATIONS`               | `true`                                                  | no                      | Set to `false` to skip migrations on startup (useful for one-shot containers). |
+| `RUN_SEEDS`                    | `false`                                                 | no                      | Set to `true` to run `db:seed:all` on startup (recommended on first deploy).   |
 
 ---
 

@@ -28,6 +28,7 @@ services:
     environment:
       NODE_ENV: production
       RUN_MIGRATIONS: 'true'
+      RUN_SEEDS: ${RUN_SEEDS:-false}
       # In prod, .env MUST point to Supabase Cloud (Mode C) or a real
       # postgres with auth schema. Do NOT override here.
     healthcheck:

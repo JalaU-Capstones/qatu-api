@@ -24,6 +24,9 @@ describe('Environment & Supabase Configuration', () => {
     expect(customConfig.PORT).toBe(8080);
     expect(customConfig.DATABASE_URL).toBe('postgresql://user:pass@remote:5432/db');
     expect(customConfig.SUPABASE_URL).toBe('https://custom.supabase.co');
+    expect(customConfig.SUPABASE_STORAGE_PUBLIC_URL).toBe(
+      'https://custom.supabase.co/storage/v1/object/public'
+    );
     expect(customConfig.SUPABASE_SERVICE_ROLE_KEY).toBe('custom-service-key');
     expect(customConfig.ALLOWED_ORIGINS).toEqual([
       'https://qatu.example.com',
@@ -34,6 +37,36 @@ describe('Environment & Supabase Configuration', () => {
   it('should fallback to default PORT if invalid number provided', () => {
     const config = createEnvConfig({ PORT: 'not-a-number' });
     expect(config.PORT).toBe(3000);
+  });
+
+  describe('storage public URL configuration', () => {
+    it('defaults to ${SUPABASE_URL}/storage/v1/object/public when unset', () => {
+      const config = createEnvConfig({ SUPABASE_URL: 'http://localhost:54321' });
+      expect(config.SUPABASE_STORAGE_PUBLIC_URL).toBe(
+        'http://localhost:54321/storage/v1/object/public'
+      );
+      expect(config.SUPABASE_STORAGE_URL).toBe(config.SUPABASE_STORAGE_PUBLIC_URL);
+    });
+
+    it('uses custom SUPABASE_STORAGE_PUBLIC_URL when provided', () => {
+      const config = createEnvConfig({
+        SUPABASE_URL: 'http://host.docker.internal:54321',
+        SUPABASE_STORAGE_PUBLIC_URL: 'http://localhost:54321/storage/v1/object/public',
+      });
+      expect(config.SUPABASE_URL).toBe('http://host.docker.internal:54321');
+      expect(config.SUPABASE_STORAGE_PUBLIC_URL).toBe(
+        'http://localhost:54321/storage/v1/object/public'
+      );
+    });
+
+    it('falls back to SUPABASE_STORAGE_URL when SUPABASE_STORAGE_PUBLIC_URL is not set', () => {
+      const config = createEnvConfig({
+        SUPABASE_STORAGE_URL: 'https://cdn.example.com/storage/v1/object/public',
+      });
+      expect(config.SUPABASE_STORAGE_PUBLIC_URL).toBe(
+        'https://cdn.example.com/storage/v1/object/public'
+      );
+    });
   });
 
   it('should throw an error in createSupabaseClient if URL is missing', () => {

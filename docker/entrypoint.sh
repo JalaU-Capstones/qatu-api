@@ -42,5 +42,10 @@ else
   log "RUN_MIGRATIONS=false; skipping migrations"
 fi
 
+if [ "${RUN_SEEDS}" = "true" ]; then
+  echo "[entrypoint] running seeds..."
+  npx sequelize-cli db:seed:all
+fi
+
 # ── Hand off to CMD (dumb-init already wraps us) ───────────────────────────
 exec "$@"

@@ -20,8 +20,10 @@ function createEnvConfig(source = process.env) {
     source.SUPABASE_SERVICE_ROLE_KEY ||
     source.SUPABASE_ANON_KEY ||
     'dummy-supabase-service-role-key';
-  const supabaseStorageUrl =
-    source.SUPABASE_STORAGE_URL || `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public`;
+  const supabaseStoragePublicUrl =
+    source.SUPABASE_STORAGE_PUBLIC_URL ||
+    source.SUPABASE_STORAGE_URL ||
+    `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public`;
   const supabaseStorageBucket = source.SUPABASE_STORAGE_BUCKET || 'avatars';
 
   const frontendUrl = source.FRONTEND_URL || 'http://localhost:5173';
@@ -37,7 +39,8 @@ function createEnvConfig(source = process.env) {
     SUPABASE_URL: supabaseUrl,
     SUPABASE_ANON_KEY: supabaseAnonKey,
     SUPABASE_SERVICE_ROLE_KEY: supabaseServiceRoleKey,
-    SUPABASE_STORAGE_URL: supabaseStorageUrl,
+    SUPABASE_STORAGE_PUBLIC_URL: supabaseStoragePublicUrl,
+    SUPABASE_STORAGE_URL: supabaseStoragePublicUrl,
     SUPABASE_STORAGE_BUCKET: supabaseStorageBucket,
     RABBITMQ_URL: source.RABBITMQ_URL || 'amqp://qatu:qatu_dev_password@localhost:5672',
     // Off unless enabled, so tests and CI never need a broker.

@@ -110,8 +110,8 @@ Configure the following variables in `api/.env`:
 SUPABASE_URL=http://localhost:54321
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-SUPABASE_STORAGE_URL=http://localhost:54321/storage/v1/object/public
+SUPABASE_STORAGE_PUBLIC_URL=http://localhost:54321/storage/v1/object/public
 SUPABASE_STORAGE_BUCKET=avatars
 ```
 
-If `SUPABASE_STORAGE_URL` is left empty, the backend automatically derives `${SUPABASE_URL}/storage/v1/object/public`.
+If `SUPABASE_STORAGE_PUBLIC_URL` is left empty, the backend automatically derives `${SUPABASE_URL}/storage/v1/object/public`.

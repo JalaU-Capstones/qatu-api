@@ -29,10 +29,13 @@ services:
     command: sh -c "pnpm install --frozen-lockfile && pnpm dev"
     environment:
       NODE_ENV: development
+      # Seeds run automatically in dev (idempotent). Override in .env with RUN_SEEDS=false if needed.
+      RUN_SEEDS: 'true'
       PORT: 3000
       # Containerized API → host Supabase CLI for auth (Mode A).
       # On Linux hosts, `extra_hosts` below maps host.docker.internal.
       SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
+      SUPABASE_STORAGE_PUBLIC_URL: ${SUPABASE_STORAGE_PUBLIC_URL:-http://localhost:54321/storage/v1/object/public}
       # Override the DB URL to point to the containerized postgres.
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/postgres}
     volumes:
