@@ -5,3 +5,35 @@ coverage/
 dist/
 *.log
 .docs/
+
+# pnpm store cache
+.pnpm-store/
+
+# Environment files (never ship secrets; .env.example is documentation only)
+.env.*
+!.env.example
+
+# Version control metadata
+.gitignore
+
+# CI / VCS platform configs
+.github/
+.gitlab/
+
+# Docs and meta at repo root
+README.md
+LICENSE
+*.md
+!src/**/*.md
+
+# Tests
+__tests__/
+*.test.js
+*.spec.js
+
+# Local editor configs
+.vscode/
+.idea/
+
+# Supabase local dev (CLI state, not part of the container)
+supabase/
