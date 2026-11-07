@@ -371,7 +371,7 @@ Two workflows publish the image on every `v*` tag:
 Workflow: `.github/workflows/publish-image.yml`
 
 - **Triggers:** `push: tags: ['v*']` and `workflow_dispatch` (manual).
-- **Image:** `ghcr.io/jala-university1/qatu-api`.
+- **Image:** `ghcr.io/jalau-capstones/qatu-api`.
 - **Tags:** `:${VERSION}` (immutable) and `:latest` (mutable).
 - **Platforms:** `linux/amd64`, `linux/arm64` (Mac M1/M2 pull natively).
 - **Auth:** `${{ secrets.GITHUB_TOKEN }}` (built-in, no manual secret setup).
@@ -380,7 +380,7 @@ Workflow: `.github/workflows/publish-image.yml`
 Pull:
 
 ```bash
-docker pull ghcr.io/jala-university1/qatu-api:v0.1.0
+docker pull ghcr.io/jalau-capstones/qatu-api:v0.1.0
 ```
 
 ### 2. GitLab CI → Container Registry
