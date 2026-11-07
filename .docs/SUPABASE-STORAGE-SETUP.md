@@ -19,10 +19,10 @@ Storing the complete public URL ensures that browsers can render `<img src={prof
 > [!NOTE]
 > **As of Sprint 5**, the `avatars` bucket and its RLS policies are created **automatically** by:
 >
-> - `supabase/config.toml` → `[storage.buckets.avatars]` (bucket created on `npx supabase start` / `npx supabase db reset`)
-> - Migration `20261108000001-create-avatars-bucket-policies.js` (RLS policies applied when the storage schema is present)
+> - `supabase/config.toml` → `[storage.buckets.avatars]` (bucket)
+> - `supabase/migrations/20261108120000_avatars_bucket_policies.sql` (RLS policies)
 >
-> The manual steps below are kept for reference — e.g. when using **Supabase Cloud** without running local migrations, or if you need to recreate the bucket from the Dashboard.
+> Both are applied by `npx supabase start` and `npx supabase db reset` against the **Supabase DB** (`supabase_db_api`, port 54322) — not the App DB. The manual steps below are kept for reference (e.g. Supabase Cloud without running local migrations, or Dashboard recreation).
 
 ### Using the Supabase Dashboard (Cloud or Studio at `http://localhost:54323`)
 

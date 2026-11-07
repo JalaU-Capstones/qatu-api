@@ -186,10 +186,18 @@ npx supabase db pull            # pull Cloud schema changes into migrations
 
 The `avatars` bucket and its RLS policies are created automatically by:
 
-- `supabase/config.toml` → `[storage.buckets.avatars]`
-- Migration `20261108000001-create-avatars-bucket-policies.js`
+- `supabase/config.toml` → `[storage.buckets.avatars]` (bucket)
+- `supabase/migrations/20261108120000_avatars_bucket_policies.sql` (RLS policies)
 
-After `make supabase-start` or `npx supabase db reset`, the bucket is ready. No manual Dashboard step is required locally. For Supabase Cloud (no local migrations), follow the manual steps in [`SUPABASE-STORAGE-SETUP.md`](../SUPABASE-STORAGE-SETUP.md).
+Both are applied by `make supabase-start` or `npx supabase db reset` against the **Supabase DB** (`supabase_db_api`, port 54322). They are NOT in `src/infrastructure/persistence/migrations/` because that runs against the **App DB** (`api-postgres-1`, port 5432) which has no `storage` schema.
+
+To verify after startup:
+
+```bash
+docker exec supabase_db_api psql -U postgres -d postgres \
+  -c "SELECT policyname FROM pg_policies WHERE schemaname='storage' AND tablename='objects';"
+# Expected: 4 rows
+```
 
 ## 3.10 References
 

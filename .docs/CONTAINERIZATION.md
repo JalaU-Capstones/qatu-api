@@ -482,6 +482,9 @@ Notes:
 - `RUN_SEEDS=true` seeds roles/categories/admin on a fresh DB. Skip on subsequent runs.
 - `--env-file .env` loads Supabase/Storage/JWT/etc.; `-e DATABASE_URL` and `-e RABBITMQ_URL` override to point at the standalone containers, not the compose service names.
 
+> [!NOTE]
+> **Storage policies live in Supabase, not the App DB.** This standalone flow only spins up the App DB (`qatu-postgres-local`). If you want to test avatar uploads end-to-end, also run `npx supabase start` on the host (auth + storage) and set `SUPABASE_URL=http://host.docker.internal:54321` in the api container's env. The avatar RLS policies are applied automatically by `npx supabase start` via `supabase/migrations/`.
+
 ### 6. Verify
 
 ```bash
