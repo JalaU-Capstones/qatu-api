@@ -210,4 +210,90 @@ describe('ProfileRepository', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('update', () => {
+    it('should partially update allowed profile fields using parameterized replacements', async () => {
+      const updatedRow = {
+        ...sampleDbRow,
+        full_name: 'Updated Name',
+        bio: 'Updated bio text',
+        avatar_path: 'avatars/new-pic.webp',
+        locale: 'es',
+      };
+      mockDb.query.mockResolvedValueOnce([[updatedRow]]);
+
+      const result = await repository.update(sampleDbRow.id, {
+        full_name: 'Updated Name',
+        bio: 'Updated bio text',
+        avatar_path: 'avatars/new-pic.webp',
+        locale: 'es',
+      });
+
+      expect(mockDb.query).toHaveBeenCalledTimes(1);
+      const [sql, options] = mockDb.query.mock.calls[0];
+      expect(sql).toContain('UPDATE profiles');
+      expect(sql).toContain('full_name = :full_name');
+      expect(sql).toContain('bio = :bio');
+      expect(sql).toContain('avatar_path = :avatar_path');
+      expect(sql).toContain('locale = :locale');
+      expect(sql).toContain('WHERE id = :id');
+      expect(options.replacements).toEqual({
+        id: sampleDbRow.id,
+        full_name: 'Updated Name',
+        bio: 'Updated bio text',
+        avatar_path: 'avatars/new-pic.webp',
+        locale: 'es',
+      });
+
+      expect(result).toBeInstanceOf(Profile);
+      expect(result.fullName).toBe('Updated Name');
+      expect(result.bio).toBe('Updated bio text');
+      expect(result.avatarPath).toBe('avatars/new-pic.webp');
+      expect(result.locale).toBe('es');
+    });
+
+    it('should support camelCase fullName and avatarPath in update', async () => {
+      const updatedRow = {
+        ...sampleDbRow,
+        full_name: 'Camel Name',
+        avatar_path: 'avatars/camel.webp',
+      };
+      mockDb.query.mockResolvedValueOnce([[updatedRow]]);
+
+      const result = await repository.update(sampleDbRow.id, {
+        fullName: 'Camel Name',
+        avatarPath: 'avatars/camel.webp',
+      });
+
+      const [, options] = mockDb.query.mock.calls[0];
+      expect(options.replacements).toEqual({
+        id: sampleDbRow.id,
+        full_name: 'Camel Name',
+        avatar_path: 'avatars/camel.webp',
+      });
+      expect(result.fullName).toBe('Camel Name');
+      expect(result.avatarPath).toBe('avatars/camel.webp');
+    });
+
+    it('should bind SQL-injection-like bio as replacement and never interpolate', async () => {
+      const maliciousBio = "bio'); DROP TABLE profiles;--";
+      mockDb.query.mockResolvedValueOnce([[{ ...sampleDbRow, bio: maliciousBio }]]);
+
+      await repository.update(sampleDbRow.id, { bio: maliciousBio });
+
+      const [sql, options] = mockDb.query.mock.calls[0];
+      expect(sql).toContain('bio = :bio');
+      expect(sql).not.toContain('DROP TABLE');
+      expect(options.replacements.bio).toBe(maliciousBio);
+    });
+
+    it('should return null when profile to update does not exist', async () => {
+      mockDb.query.mockResolvedValueOnce([[]]);
+
+      const result = await repository.update('00000000-0000-0000-0000-000000000000', {
+        bio: 'No user',
+      });
+      expect(result).toBeNull();
+    });
+  });
 });

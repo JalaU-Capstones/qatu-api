@@ -105,4 +105,42 @@ describe('ProfileRepository (integration)', () => {
     expect(found.roles[0].name).toBe('buyer');
     expect(found.roles[0].created_at).toEqual(expect.any(String));
   });
+
+  it('update modifies full_name, bio, avatar_path, and locale in the database', async () => {
+    const userId = '00000000-0000-0000-0000-000000000098';
+
+    await sequelize.query(`insert into auth.users (id, email) values (:id, 'update@example.com')`, {
+      replacements: { id: userId },
+    });
+
+    const profile = new Profile({
+      id: userId,
+      username: 'update_user',
+      fullName: 'Initial Name',
+      email: 'update@example.com',
+    });
+
+    await repository.create(profile);
+
+    const updated = await repository.update(userId, {
+      full_name: 'Updated Buyer Name',
+      bio: 'Updated buyer biography.',
+      avatar_path: 'avatars/00000000-0000-0000-0000-000000000098/avatar.webp',
+      locale: 'es',
+    });
+
+    expect(updated).toBeInstanceOf(Profile);
+    expect(updated.id).toBe(userId);
+    expect(updated.username).toBe('update_user');
+    expect(updated.fullName).toBe('Updated Buyer Name');
+    expect(updated.bio).toBe('Updated buyer biography.');
+    expect(updated.avatarPath).toBe('avatars/00000000-0000-0000-0000-000000000098/avatar.webp');
+    expect(updated.locale).toBe('es');
+
+    const persisted = await repository.findById(userId);
+    expect(persisted.fullName).toBe('Updated Buyer Name');
+    expect(persisted.bio).toBe('Updated buyer biography.');
+    expect(persisted.avatarPath).toBe('avatars/00000000-0000-0000-0000-000000000098/avatar.webp');
+    expect(persisted.locale).toBe('es');
+  });
 });

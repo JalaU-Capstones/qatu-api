@@ -11,6 +11,7 @@ import { cartRouter } from './presentation/routes/cartRoutes.js';
 import { categoryRouter } from './presentation/routes/categoryRoutes.js';
 import { orderRouter } from './presentation/routes/orderRoutes.js';
 import { productRouter } from './presentation/routes/productRoutes.js';
+import { profileRouter } from './presentation/routes/profileRoutes.js';
 
 export function createApp({
   authRoutes = authRouter,
@@ -18,6 +19,7 @@ export function createApp({
   categoryRoutes = categoryRouter,
   cartRoutes = cartRouter,
   orderRoutes = orderRouter,
+  profileRoutes = profileRouter,
 } = {}) {
   const app = express();
 
@@ -120,6 +122,7 @@ export function createApp({
   app.use('/v1/categories', publicLimiter, categoryRoutes);
   app.use('/v1/cart', cartLimiter, cartRoutes);
   app.use('/v1/orders', orderLimiter, orderRoutes);
+  app.use('/v1/profiles', publicLimiter, profileRoutes);
 
   // Global Error Handler
   app.use(errorHandler);

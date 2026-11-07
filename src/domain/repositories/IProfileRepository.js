@@ -25,4 +25,13 @@ export class IProfileRepository {
   async findByUsername(username) {
     throw new Error(`Method not implemented with ${username}`);
   }
+
+  /**
+   * @param {string} id
+   * @param {Object} fields
+   * @returns {Promise<import('../entities/Profile.js').Profile|null>}
+   */
+  async update(id, fields) {
+    throw new Error(`Method not implemented with ${id} and ${fields}`);
+  }
 }

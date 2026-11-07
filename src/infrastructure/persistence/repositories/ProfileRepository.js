@@ -21,11 +21,12 @@ export class ProfileRepository extends IProfileRepository {
    */
   toDomain(row, roles) {
     if (!row) return null;
+    const resolvedFullName = row.full_name || row.username;
     return new Profile({
       id: row.id,
       username: row.username,
-      fullName: row.full_name,
-      full_name: row.full_name,
+      fullName: resolvedFullName,
+      full_name: resolvedFullName,
       email: row.email || null,
       avatarPath: row.avatar_path || null,
       avatar_path: row.avatar_path || null,
@@ -182,6 +183,67 @@ export class ProfileRepository extends IProfileRepository {
 
     const [rows] = await this.db.query(query, {
       replacements: { username },
+      transaction,
+    });
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    return this.toDomain(rows[0]);
+  }
+
+  /**
+   * Partially updates a Profile by primary key (id) with the allowed fields.
+   *
+   * @param {string} id
+   * @param {Object} [fields={}]
+   * @param {string} [fields.full_name]
+   * @param {string} [fields.fullName]
+   * @param {string|null} [fields.bio]
+   * @param {string|null} [fields.avatar_path]
+   * @param {string|null} [fields.avatarPath]
+   * @param {string} [fields.locale]
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Profile|null>}
+   */
+  async update(id, fields = {}, { transaction } = {}) {
+    const setClauses = [];
+    const replacements = { id };
+
+    if (fields.full_name !== undefined || fields.fullName !== undefined) {
+      setClauses.push('full_name = :full_name');
+      replacements.full_name = fields.full_name !== undefined ? fields.full_name : fields.fullName;
+    }
+
+    if (fields.bio !== undefined) {
+      setClauses.push('bio = :bio');
+      replacements.bio = fields.bio;
+    }
+
+    if (fields.avatar_path !== undefined || fields.avatarPath !== undefined) {
+      setClauses.push('avatar_path = :avatar_path');
+      replacements.avatar_path =
+        fields.avatar_path !== undefined ? fields.avatar_path : fields.avatarPath;
+    }
+
+    if (fields.locale !== undefined) {
+      setClauses.push('locale = :locale');
+      replacements.locale = fields.locale;
+    }
+
+    setClauses.push('updated_at = now()');
+
+    const query = `
+      UPDATE profiles
+      SET ${setClauses.join(', ')}
+      WHERE id = :id
+      RETURNING id, username, full_name, email, avatar_path, bio, locale, created_at, updated_at
+    `;
+
+    const [rows] = await this.db.query(query, {
+      replacements,
       transaction,
     });
 

@@ -30,7 +30,6 @@ getById:
                     id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
                     username: 'john_doe'
                     full_name: 'John Doe'
-                    email: null
                     avatar_path: null
                     bio: 'Artisan collector.'
                     locale: 'en'
@@ -65,16 +64,30 @@ updateMe:
             properties:
               full_name:
                 type: string
+                minLength: 2
                 maxLength: 100
                 description: Display full name.
               bio:
-                type: string
+                type: [string, 'null']
                 maxLength: 500
                 description: Short profile biography.
+              avatar_path:
+                type: [string, 'null']
+                maxLength: 500
+                description: Storage path of the user's avatar image in Supabase Storage.
               locale:
                 type: string
+                maxLength: 20
                 description: Preferred locale code.
             additionalProperties: false
+          examples:
+            default:
+              summary: Update full name, bio, and avatar
+              value:
+                full_name: 'Camila Morales'
+                bio: 'Coleccionista de textiles y cerámica andina.'
+                avatar_path: 'https://cdn.qatu.pe/avatars/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/avatar.webp'
+                locale: 'es-PE'
     responses:
       '200':
         description: Profile updated successfully.
@@ -88,10 +101,27 @@ updateMe:
                   $ref: '../components/schemas/Profile.yaml'
                 meta:
                   $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              default:
+                summary: Updated profile
+                value:
+                  data:
+                    id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+                    username: 'camila_m'
+                    full_name: 'Camila Morales'
+                    avatar_path: 'https://cdn.qatu.pe/avatars/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/avatar.webp'
+                    bio: 'Coleccionista de textiles y cerámica andina.'
+                    locale: 'es-PE'
+                    created_at: '2026-10-01T00:00:00.000Z'
+                    updated_at: '2026-10-14T12:00:00.000Z'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '400':
         $ref: '../components/responses/errors.yaml#/BadRequest'
       '401':
         $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
       '429':
         $ref: '../components/responses/errors.yaml#/TooManyRequests'
       '500':
