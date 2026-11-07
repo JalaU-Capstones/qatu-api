@@ -21,8 +21,18 @@ services:
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
       PGADMIN_CONFIG_SERVER_MODE: 'False'
       PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+      # pgAdmin v9 auto-imports servers.json on first boot when this env var
+      # points to it, pre-registering the postgres server so team members do
+      # not need to click "Add Server" manually. Update docker/pgadmin/pgpass
+      # if you change POSTGRES_PASSWORD.
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
     volumes:
       - pgadmin_data:/var/lib/pgadmin
+      # pgAdmin v9 auto-imports servers.json on first boot (PGADMIN_SERVER_JSON_FILE above).
+      # pgpass supplies the password so the connection works without manual entry.
+      # If you change POSTGRES_PASSWORD in .env, update docker/pgadmin/pgpass to match.
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./docker/pgadmin/pgpass:/var/lib/pgadmin/pgpass:ro
     networks:
       - qatu-net
     depends_on:

@@ -125,6 +125,15 @@ file_size_limit = "50MiB"
 # allowed_mime_types = ["image/png", "image/jpeg"]
 # objects_path = "./images"
 
+# ── Qatu bucket: avatars ──────────────────────────────────────────────────────
+# Created automatically on `npx supabase start` and `npx supabase db reset`
+# (US-36 / ADR-016, Sprint 5). RLS policies are applied by migration
+# 20261108000001-create-avatars-bucket-policies.js.
+[storage.buckets.avatars]
+public = true
+file_size_limit = "2MiB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/webp"]
+
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]
 enabled = true

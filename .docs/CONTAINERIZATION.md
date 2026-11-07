@@ -102,6 +102,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose
 # → http://localhost:8080 (admin@qatu.com / admin123)
 ```
 
+pgAdmin already has the `postgres` server pre-registered (no manual 'Add server' needed). If you change `POSTGRES_PASSWORD`, update `docker/pgadmin/pgpass` too.
+
 Hot reload works: edit `src/**/*.js` and nodemon restarts the container automatically. Migrations do not re-run on restart by default — if you add a migration, restart the api service (which re-runs entrypoint.sh):
 
 ```bash
@@ -418,6 +420,101 @@ GitHub repo → Actions → "Publish Container Image" → Run workflow → enter
 ```
 
 For GitLab: tags only (no manual trigger). Use `git tag manual-$(git rev-parse --short HEAD) && git push origin manual-<short-sha>`.
+
+---
+
+## Test the production image locally (no compose)
+
+This section simulates production locally with three standalone `docker run` containers on `qatu-net`, no `docker-compose`. This exercises the runtime image + migrations + broker connectivity the way a real deployment would.
+
+### 1. Create the shared network (idempotent)
+
+```bash
+docker network inspect qatu-net >/dev/null 2>&1 || docker network create qatu-net
+```
+
+### 2. Start Postgres (standalone, no host port exposure)
+
+```bash
+docker run -d --name qatu-postgres-local \
+  --network qatu-net \
+  -e POSTGRES_USER=${POSTGRES_USER:-postgres} \
+  -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres} \
+  -e POSTGRES_DB=${POSTGRES_DB:-postgres} \
+  -v qatu_postgres_local:/var/lib/postgresql/data \
+  postgres:17-alpine
+```
+
+### 3. Start RabbitMQ (standalone)
+
+```bash
+docker run -d --name qatu-rabbitmq-local \
+  --network qatu-net \
+  -e RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER:-qatu} \
+  -e RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS:-qatu_dev_password} \
+  rabbitmq:4.1-management-alpine
+```
+
+### 4. Build the runtime image
+
+```bash
+docker build --target runtime -t qatu-api:local-prod .
+```
+
+### 5. Run the API against those two containers
+
+```bash
+docker run -d --name qatu-api-local \
+  --network qatu-net \
+  -p 3000:3000 \
+  --env-file .env \
+  -e NODE_ENV=production \
+  -e RUN_MIGRATIONS=true \
+  -e RUN_SEEDS=true \
+  -e DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@qatu-postgres-local:5432/${POSTGRES_DB:-postgres} \
+  -e RABBITMQ_URL=amqp://${RABBITMQ_DEFAULT_USER:-qatu}:${RABBITMQ_DEFAULT_PASS:-qatu_dev_password}@qatu-rabbitmq-local:5672 \
+  qatu-api:local-prod
+```
+
+Notes:
+
+- `RUN_MIGRATIONS=true` triggers the entrypoint's migration step, same as prod.
+- `RUN_SEEDS=true` seeds roles/categories/admin on a fresh DB. Skip on subsequent runs.
+- `--env-file .env` loads Supabase/Storage/JWT/etc.; `-e DATABASE_URL` and `-e RABBITMQ_URL` override to point at the standalone containers, not the compose service names.
+
+### 6. Verify
+
+```bash
+# Wait for the entrypoint to run migrations, then:
+sleep 15
+curl -s http://localhost:3000/health
+# → {"status":"ok"}
+
+# Query the DB from another container on the network
+docker run --rm --network qatu-net postgres:17-alpine \
+  psql "postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@qatu-postgres-local:5432/${POSTGRES_DB:-postgres}" \
+  -c "SELECT COUNT(*) FROM profiles;"
+
+# Check the container is healthy
+docker ps --filter name=qatu-api-local --format '{{.Status}}'
+# → Up X seconds (healthy)
+```
+
+### 7. Tear down
+
+```bash
+docker stop qatu-api-local qatu-rabbitmq-local qatu-postgres-local
+docker rm qatu-api-local qatu-rabbitmq-local qatu-postgres-local
+docker volume rm qatu_postgres_local
+# Optional: docker rmi qatu-api:local-prod
+```
+
+### 8. Why use this flow instead of compose?
+
+- Proves the image is self-contained (no compose magic).
+- Exercises the exact same entrypoint a Kubernetes/ECS deployment would use.
+- Lets you verify migrations + seeds run cleanly before publishing a v* tag.
+- Useful for rollback drills: `docker run` a previous image tag, point it at a fresh volume, verify migrations apply.
 
 ---
 

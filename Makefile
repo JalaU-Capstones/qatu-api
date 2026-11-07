@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help install dev start lint lint-fix format format-check test test-watch test-coverage test-integration build docker-up docker-down docker-logs db-migrate db-migrate-undo db-migrate-undo-all db-migrate-status db-seed db-seed-undo clean openapi-bundle openapi-lint openapi-validate openapi-preview docker-build docker-build-prod docker-up-dev docker-up-prod docker-up-tools docker-ps docker-shell docker-migrate docker-seed docker-logs-api docker-clean docker-config publish-check tag tag-push
+.PHONY: help install dev start lint lint-fix format format-check test test-watch test-coverage test-integration build docker-up docker-down docker-logs db-migrate db-migrate-undo db-migrate-undo-all db-migrate-status db-seed db-seed-undo clean openapi-bundle openapi-lint openapi-validate openapi-preview docker-build docker-build-prod docker-up-dev docker-up-prod docker-up-tools docker-ps docker-shell docker-migrate docker-seed docker-logs-api docker-clean docker-config publish-check tag tag-push supabase-start supabase-stop supabase-stop-no-backup supabase-status
 
 help:
 	@echo "Qatu API - Available targets:"
@@ -48,6 +48,12 @@ help:
 	@echo "  publish-check      Sanity check registry paths before tagging"
 	@echo "  tag                Create annotated v0.1.0 tag (do NOT push from here)"
 	@echo "  tag-push           Push the most recent v* tag (triggers both registries)"
+	@echo ""
+	@echo "Supabase:"
+	@echo "  supabase-start          Start the local Supabase stack (npx supabase start)"
+	@echo "  supabase-stop           Stop local Supabase, keeping data volumes"
+	@echo "  supabase-stop-no-backup Stop local Supabase and WIPE volumes (destructive)"
+	@echo "  supabase-status         Print local Supabase URLs and keys"
 
 install:
 	pnpm install
@@ -187,3 +193,17 @@ tag-push:                      # Push the most recent v* tag (triggers both regi
 	@tag=$$(git describe --tags --abbrev=0) && \
 	git push origin "$$tag" && \
 	echo "Pushed $$tag — GHCR + GitLab Registry workflows are now running."
+
+# ── Supabase CLI ──
+
+supabase-start:                # Start the local Supabase stack (npx supabase start)
+	npx supabase start
+
+supabase-stop:                 # Stop local Supabase, keeping data volumes
+	npx supabase stop
+
+supabase-stop-no-backup:       # Stop local Supabase and WIPE volumes (destructive)
+	npx supabase stop --no-backup
+
+supabase-status:               # Print local Supabase URLs and keys
+	npx supabase status

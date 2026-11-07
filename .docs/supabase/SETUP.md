@@ -146,6 +146,51 @@ A middleware in the Presentation layer verifies the token on every protected req
 
 To switch between environments, simply swap out the variables in your `.env` file. We recommend creating separate `.env.development` and `.env.production` templates if needed.
 
+## 3.11 Updating Supabase (migrations & schema changes)
+
+### Local workflow (Supabase CLI on host)
+
+```bash
+# 1. Start local stack (idempotent)
+make supabase-start
+
+# 2. Create a new migration after editing a schema file
+npx supabase migration new <descriptive-name>
+#    → creates supabase/migrations/<ts>_<name>.sql
+#    → commit this file
+
+# 3. Apply pending migrations without wiping the DB
+npx supabase migration up
+
+# 4. Reset the DB and re-apply every migration + seed.sql (destructive)
+npx supabase db reset
+#    → use this when the schema drifts or you want a clean slate
+
+# 5. Inspect status
+make supabase-status
+
+# 6. Stop the stack
+make supabase-stop              # keeps volumes
+make supabase-stop-no-backup    # wipes volumes (fresh next start)
+```
+
+### Cloud workflow (Supabase Cloud project)
+
+```bash
+npx supabase link --project-ref <project-ref>
+npx supabase db push            # push local migrations to Cloud
+npx supabase db pull            # pull Cloud schema changes into migrations
+```
+
+### Auto-created Storage bucket
+
+The `avatars` bucket and its RLS policies are created automatically by:
+
+- `supabase/config.toml` → `[storage.buckets.avatars]`
+- Migration `20261108000001-create-avatars-bucket-policies.js`
+
+After `make supabase-start` or `npx supabase db reset`, the bucket is ready. No manual Dashboard step is required locally. For Supabase Cloud (no local migrations), follow the manual steps in [`SUPABASE-STORAGE-SETUP.md`](../SUPABASE-STORAGE-SETUP.md).
+
 ## 3.10 References
 
 - [Supabase Local Development](https://supabase.com/docs/guides/local-development)
