@@ -128,7 +128,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 **Images:**
 
-- `ghcr.io/jala-university1/qatu-api:latest` (GHCR, via GitHub Actions)
+- `ghcr.io/jalau-capstones/qatu-api:latest` (GHCR, via GitHub Actions)
 - `$CI_REGISTRY_IMAGE:latest` (GitLab Container Registry, via GitLab CI)
 
 Publishing is triggered by pushing a `v*` tag (e.g. `git tag v0.1.0 && git push origin v0.1.0`).

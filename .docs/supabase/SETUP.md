@@ -146,6 +146,59 @@ A middleware in the Presentation layer verifies the token on every protected req
 
 To switch between environments, simply swap out the variables in your `.env` file. We recommend creating separate `.env.development` and `.env.production` templates if needed.
 
+## 3.11 Updating Supabase (migrations & schema changes)
+
+### Local workflow (Supabase CLI on host)
+
+```bash
+# 1. Start local stack (idempotent)
+make supabase-start
+
+# 2. Create a new migration after editing a schema file
+npx supabase migration new <descriptive-name>
+#    → creates supabase/migrations/<ts>_<name>.sql
+#    → commit this file
+
+# 3. Apply pending migrations without wiping the DB
+npx supabase migration up
+
+# 4. Reset the DB and re-apply every migration + seed.sql (destructive)
+npx supabase db reset
+#    → use this when the schema drifts or you want a clean slate
+
+# 5. Inspect status
+make supabase-status
+
+# 6. Stop the stack
+make supabase-stop              # keeps volumes
+make supabase-stop-no-backup    # wipes volumes (fresh next start)
+```
+
+### Cloud workflow (Supabase Cloud project)
+
+```bash
+npx supabase link --project-ref <project-ref>
+npx supabase db push            # push local migrations to Cloud
+npx supabase db pull            # pull Cloud schema changes into migrations
+```
+
+### Auto-created Storage bucket
+
+The `avatars` bucket and its RLS policies are created automatically by:
+
+- `supabase/config.toml` → `[storage.buckets.avatars]` (bucket)
+- `supabase/migrations/20261108120000_avatars_bucket_policies.sql` (RLS policies)
+
+Both are applied by `make supabase-start` or `npx supabase db reset` against the **Supabase DB** (`supabase_db_api`, port 54322). They are NOT in `src/infrastructure/persistence/migrations/` because that runs against the **App DB** (`api-postgres-1`, port 5432) which has no `storage` schema.
+
+To verify after startup:
+
+```bash
+docker exec supabase_db_api psql -U postgres -d postgres \
+  -c "SELECT policyname FROM pg_policies WHERE schemaname='storage' AND tablename='objects';"
+# Expected: 4 rows
+```
+
 ## 3.10 References
 
 - [Supabase Local Development](https://supabase.com/docs/guides/local-development)

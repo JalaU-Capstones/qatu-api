@@ -16,6 +16,14 @@ Storing the complete public URL ensures that browsers can render `<img src={prof
 
 ## 1. Step-by-Step Bucket Creation
 
+> [!NOTE]
+> **As of Sprint 5**, the `avatars` bucket and its RLS policies are created **automatically** by:
+>
+> - `supabase/config.toml` → `[storage.buckets.avatars]` (bucket)
+> - `supabase/migrations/20261108120000_avatars_bucket_policies.sql` (RLS policies)
+>
+> Both are applied by `npx supabase start` and `npx supabase db reset` against the **Supabase DB** (`supabase_db_api`, port 54322) — not the App DB. The manual steps below are kept for reference (e.g. Supabase Cloud without running local migrations, or Dashboard recreation).
+
 ### Using the Supabase Dashboard (Cloud or Studio at `http://localhost:54323`)
 
 1. Open **Storage** in the left sidebar and click **New bucket**.
