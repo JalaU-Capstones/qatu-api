@@ -1,29 +1,56 @@
 import { OrderListItemDTO } from '../dtos/OrderDTO.js';
 
 export class ListOrdersUseCase {
-  /**
-   * @param {Object} deps
-   * @param {import('../../domain/repositories/IOrderRepository.js').IOrderRepository} deps.orderRepository
-   */
-  constructor({ orderRepository } = {}) {
+  /** @param {{ orderRepository: object, profileRepository?: object }} deps */
+  constructor({ orderRepository, profileRepository } = {}) {
     if (!orderRepository) {
       throw new Error('orderRepository is required');
     }
     this.orderRepository = orderRepository;
+    this.profileRepository = profileRepository;
   }
 
-  /**
-   * @param {import('../dtos/OrderDTO.js').ListOrdersRequestDTO} requestDto
-   * @returns {Promise<{ data: Object[], meta: { page: number, per_page: number, total: number, total_pages: number } }>}
-   */
+  /** Lists orders for `view=buyer|seller|admin`. */
   async execute(requestDto) {
-    const { items, total } = await this.orderRepository.findByBuyerId({
-      buyerId: requestDto.buyerId,
-      page: requestDto.page,
-      limit: requestDto.limit,
-      status: requestDto.status,
-    });
+    const view = requestDto.view || 'buyer';
+    const roleNames = await this._resolveRoleNames(requestDto.userId, requestDto.roleHint);
 
+    let result;
+    if (view === 'admin') {
+      if (!roleNames.includes('admin')) {
+        const err = new Error('Admin role required');
+        err.code = 'FORBIDDEN';
+        err.statusCode = 403;
+        throw err;
+      }
+      result = await this.orderRepository.findAll({
+        page: requestDto.page,
+        limit: requestDto.limit,
+        status: requestDto.status,
+      });
+    } else if (view === 'seller') {
+      if (!roleNames.includes('seller') && !roleNames.includes('admin')) {
+        const err = new Error('Seller role required');
+        err.code = 'FORBIDDEN';
+        err.statusCode = 403;
+        throw err;
+      }
+      result = await this.orderRepository.findBySellerId({
+        sellerId: requestDto.userId,
+        page: requestDto.page,
+        limit: requestDto.limit,
+        status: requestDto.status,
+      });
+    } else {
+      result = await this.orderRepository.findByBuyerId({
+        buyerId: requestDto.userId,
+        page: requestDto.page,
+        limit: requestDto.limit,
+        status: requestDto.status,
+      });
+    }
+
+    const { items, total } = result;
     const totalPages = total === 0 ? 0 : Math.ceil(total / requestDto.limit);
 
     return {
@@ -35,5 +62,20 @@ export class ListOrdersUseCase {
         total_pages: totalPages,
       },
     };
+  }
+
+  /** @private */
+  async _resolveRoleNames(userId, roleHint) {
+    const names = new Set();
+    if (typeof roleHint === 'string' && roleHint.trim()) {
+      names.add(roleHint.trim());
+    }
+    if (this.profileRepository?.findById) {
+      const profile = await this.profileRepository.findById(userId);
+      for (const role of profile?.roles || []) {
+        if (role?.name) names.add(role.name);
+      }
+    }
+    return [...names];
   }
 }
