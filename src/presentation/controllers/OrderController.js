@@ -2,22 +2,23 @@ import { CreateOrderRequestDTO } from '../../application/dtos/CreateOrderDTO.js'
 import { ListOrdersRequestDTO } from '../../application/dtos/OrderDTO.js';
 
 export class OrderController {
-  /**
-   * @param {Object} deps
-   * @param {import('../../application/use-cases/ListOrdersUseCase.js').ListOrdersUseCase} deps.listOrdersUseCase
-   * @param {import('../../application/use-cases/GetOrderByIdUseCase.js').GetOrderByIdUseCase} [deps.getOrderByIdUseCase]
-   * @param {import('../../application/use-cases/CreateOrderUseCase.js').CreateOrderUseCase} [deps.createOrderUseCase]
-   */
-  constructor({ listOrdersUseCase, getOrderByIdUseCase, createOrderUseCase } = {}) {
+  /** @param {{ listOrdersUseCase: object, getOrderByIdUseCase?: object, createOrderUseCase?: object, updateOrderStatusUseCase?: object }} deps */
+  constructor({
+    listOrdersUseCase,
+    getOrderByIdUseCase,
+    createOrderUseCase,
+    updateOrderStatusUseCase,
+  } = {}) {
     if (!listOrdersUseCase) {
       throw new Error('listOrdersUseCase is required');
     }
     this.listOrdersUseCase = listOrdersUseCase;
     this.getOrderByIdUseCase = getOrderByIdUseCase;
     this.createOrderUseCase = createOrderUseCase;
+    this.updateOrderStatusUseCase = updateOrderStatusUseCase;
   }
 
-  /** POST /v1/orders. The buyer comes only from the session, never from the body. */
+  /** POST /v1/orders — buyer from session only. */
   async createOrder(req, res, next) {
     try {
       const userId = req.user?.id;
@@ -49,12 +50,7 @@ export class OrderController {
     }
   }
 
-  /**
-   * Handles GET /v1/orders
-   * @param {import('express').Request} req
-   * @param {import('express').Response} res
-   * @param {import('express').NextFunction} next
-   */
+  /** GET /v1/orders */
   async listOrders(req, res, next) {
     try {
       const userId = req.user?.id;
@@ -67,10 +63,12 @@ export class OrderController {
 
       const query = req.validatedQuery || req.query || {};
       const requestDto = new ListOrdersRequestDTO({
-        buyerId: userId,
+        userId,
         page: query.page,
         limit: query.limit,
         status: query.status,
+        view: query.view,
+        roleHint: req.user?.role,
       });
 
       const result = await this.listOrdersUseCase.execute(requestDto);
@@ -80,12 +78,7 @@ export class OrderController {
     }
   }
 
-  /**
-   * Handles GET /v1/orders/:id
-   * @param {import('express').Request} req
-   * @param {import('express').Response} res
-   * @param {import('express').NextFunction} next
-   */
+  /** GET /v1/orders/:id */
   async getOrderById(req, res, next) {
     try {
       const userId = req.user?.id;
@@ -106,6 +99,37 @@ export class OrderController {
       const result = await this.getOrderByIdUseCase.execute({
         orderId,
         userId,
+        userRole: req.user?.role,
+      });
+
+      return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  /** PATCH /v1/orders/:id/status */
+  async updateOrderStatus(req, res, next) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        const err = new Error('Authentication failed');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+
+      if (!this.updateOrderStatusUseCase) {
+        const err = new Error('updateOrderStatusUseCase is not configured');
+        err.statusCode = 500;
+        throw err;
+      }
+
+      const body = req.validatedBody || req.body || {};
+      const result = await this.updateOrderStatusUseCase.execute({
+        orderId: req.params.id,
+        userId,
+        nextStatus: body.status,
         userRole: req.user?.role,
       });
 

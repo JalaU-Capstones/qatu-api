@@ -21,8 +21,7 @@ listOrCreate:
       `GET /v1/profiles/{buyer_id}` separately. Keeping the payload lean avoids
       cross-aggregate expansion in list views.
 
-      **Query parameters:** `page`, `limit`, `status` (one of `pending`, `confirmed`,
-      `shipped`, `delivered`, `cancelled`).
+      **Query parameters:** `page`, `limit`, `status`, `view` (`buyer`|`seller`|`admin`, default `buyer`; ADR-017).
     tags:
       - orders
     parameters:
@@ -34,6 +33,13 @@ listOrCreate:
         schema:
           type: string
           enum: [pending, confirmed, shipped, delivered, cancelled]
+      - name: view
+        in: query
+        description: List scope (`seller`/`admin` require that role). Default `buyer`.
+        schema:
+          type: string
+          enum: [buyer, seller, admin]
+          default: buyer
     responses:
       '200':
         description: Paginated list of orders.
@@ -307,9 +313,8 @@ updateStatus:
 
       `delivered` and `cancelled` are terminal — no further transitions are allowed.
 
-      **Access control (enforced by RLS):** a seller may only update orders that
-      contain at least one of their products. Attempting to update another seller's
-      order returns `403 FORBIDDEN`.
+      **Access (ADR-017):** seller needs ≥1 own product on the order (`403` otherwise).
+      Status is order-level; success enqueues `order.status_changed` via outbox.
     tags:
       - orders
     parameters:
