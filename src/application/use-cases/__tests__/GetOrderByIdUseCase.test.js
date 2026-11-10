@@ -85,4 +85,25 @@ describe('GetOrderByIdUseCase', () => {
     });
     expect(result.data.id).toBe(orderId);
   });
+
+  it('allows a seller to view an order that contains their products (filtered items)', async () => {
+    const sellerId = 'c2aad099-7c2b-5ef8-bb6d-7bb9bd380c33';
+    const sellerOrder = new Order({
+      id: orderId,
+      orderNumber: 'ORD-00100042',
+      buyerId,
+      status: 'pending',
+      currency: 'USD',
+      total: 265,
+    });
+    const mockRepo = {
+      findById: vi.fn().mockResolvedValue(mockOrder),
+      findByIdForSeller: vi.fn().mockResolvedValue(sellerOrder),
+    };
+    const useCase = new GetOrderByIdUseCase({ orderRepository: mockRepo });
+
+    const result = await useCase.execute({ orderId, userId: sellerId });
+    expect(result.data.id).toBe(orderId);
+    expect(mockRepo.findByIdForSeller).toHaveBeenCalledWith(orderId, sellerId);
+  });
 });
