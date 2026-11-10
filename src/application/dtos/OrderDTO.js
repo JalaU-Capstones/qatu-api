@@ -1,27 +1,36 @@
 export class ListOrdersRequestDTO {
-  /**
-   * @param {Object} params
-   * @param {string} params.buyerId
-   * @param {number|string} [params.page=1]
-   * @param {number|string} [params.limit=20]
-   * @param {string} [params.status]
-   */
-  constructor({ buyerId, page = 1, limit = 20, status } = {}) {
-    if (!buyerId || typeof buyerId !== 'string') {
-      throw new TypeError('buyerId is required');
+  /** @param {{ userId?: string, buyerId?: string, page?: number|string, limit?: number|string, status?: string, view?: string, roleHint?: string|null }} [params] */
+  constructor({
+    userId,
+    buyerId,
+    page = 1,
+    limit = 20,
+    status,
+    view = 'buyer',
+    roleHint = null,
+  } = {}) {
+    const resolvedUserId = userId || buyerId;
+    if (!resolvedUserId || typeof resolvedUserId !== 'string') {
+      throw new TypeError('userId is required');
     }
 
-    this.buyerId = buyerId.trim();
+    const resolvedView = typeof view === 'string' && view.trim() !== '' ? view.trim() : 'buyer';
+    if (!['buyer', 'seller', 'admin'].includes(resolvedView)) {
+      throw new TypeError('view must be one of: buyer, seller, admin');
+    }
+
+    this.userId = resolvedUserId.trim();
+    this.buyerId = this.userId;
     this.page = page !== undefined && page !== null && page !== '' ? Number(page) : 1;
     this.limit = limit !== undefined && limit !== null && limit !== '' ? Number(limit) : 20;
     this.status = typeof status === 'string' && status.trim() !== '' ? status.trim() : undefined;
+    this.view = resolvedView;
+    this.roleHint = typeof roleHint === 'string' ? roleHint : null;
   }
 }
 
 export class OrderListItemDTO {
-  /**
-   * @param {import('../../domain/entities/Order.js').Order} order
-   */
+  /** @param {import('../../domain/entities/Order.js').Order} order */
   constructor(order) {
     if (!order) {
       throw new Error('Order entity is required');
@@ -56,9 +65,7 @@ export class OrderListItemDTO {
 }
 
 export class OrderDetailDTO {
-  /**
-   * @param {import('../../domain/entities/Order.js').Order} order
-   */
+  /** @param {import('../../domain/entities/Order.js').Order} order */
   constructor(order) {
     if (!order) {
       throw new Error('Order entity is required');

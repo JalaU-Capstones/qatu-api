@@ -15,4 +15,7 @@ export const listOrdersSchema = Joi.object({
   status: Joi.string().valid('pending', 'confirmed', 'shipped', 'delivered', 'cancelled').messages({
     'any.only': 'status must be one of: pending, confirmed, shipped, delivered, cancelled',
   }),
+  view: Joi.string().valid('buyer', 'seller', 'admin').default('buyer').messages({
+    'any.only': 'view must be one of: buyer, seller, admin',
+  }),
 });
