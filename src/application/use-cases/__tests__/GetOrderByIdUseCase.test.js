@@ -51,6 +51,7 @@ describe('GetOrderByIdUseCase', () => {
   it('Scenario: Cannot see other buyers orders - throws 403 Forbidden', async () => {
     const mockRepo = {
       findById: vi.fn().mockResolvedValue(mockOrder),
+      findByIdForSeller: vi.fn().mockResolvedValue(null),
     };
     const useCase = new GetOrderByIdUseCase({ orderRepository: mockRepo });
 
@@ -59,6 +60,7 @@ describe('GetOrderByIdUseCase', () => {
       code: 'FORBIDDEN',
       message: 'You do not have permission to access this order',
     });
+    expect(mockRepo.findByIdForSeller).toHaveBeenCalledWith(orderId, otherBuyerId);
   });
 
   it('returns order details when user is the owner', async () => {
