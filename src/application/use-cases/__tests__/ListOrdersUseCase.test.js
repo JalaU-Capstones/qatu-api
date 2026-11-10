@@ -88,4 +88,49 @@ describe('ListOrdersUseCase', () => {
     const result = await useCase.execute(requestDto);
     expect(result.meta.total_pages).toBe(3);
   });
+
+  it('Scenario: seller view lists only orders with own products', async () => {
+    const sellerId = 'b1ffcd88-8b1a-4fe7-aa5c-5aa8ac270b22';
+    const mockOrder = new Order({
+      id: '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a',
+      orderNumber: 'ORD-00100042',
+      buyerId,
+      status: 'pending',
+      currency: 'USD',
+      total: 265,
+    });
+    const mockOrderRepo = {
+      findBySellerId: vi.fn().mockResolvedValue({ items: [mockOrder], total: 1 }),
+      findByBuyerId: vi.fn(),
+    };
+    const profileRepository = {
+      findById: vi.fn().mockResolvedValue({ roles: [{ name: 'seller' }] }),
+    };
+
+    const useCase = new ListOrdersUseCase({ orderRepository: mockOrderRepo, profileRepository });
+    const result = await useCase.execute(
+      new ListOrdersRequestDTO({ userId: sellerId, view: 'seller', page: 1, limit: 10 })
+    );
+
+    expect(mockOrderRepo.findBySellerId).toHaveBeenCalledWith({
+      sellerId,
+      page: 1,
+      limit: 10,
+      status: undefined,
+    });
+    expect(mockOrderRepo.findByBuyerId).not.toHaveBeenCalled();
+    expect(result.data).toHaveLength(1);
+  });
+
+  it('rejects seller view without seller role', async () => {
+    const mockOrderRepo = { findBySellerId: vi.fn() };
+    const profileRepository = {
+      findById: vi.fn().mockResolvedValue({ roles: [{ name: 'buyer' }] }),
+    };
+    const useCase = new ListOrdersUseCase({ orderRepository: mockOrderRepo, profileRepository });
+
+    await expect(
+      useCase.execute(new ListOrdersRequestDTO({ userId: buyerId, view: 'seller' }))
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', statusCode: 403 });
+  });
 });
