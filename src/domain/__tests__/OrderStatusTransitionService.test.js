@@ -31,6 +31,19 @@ describe('OrderStatusTransitionService', () => {
     expect(canTransition('delivered', 'shipped', 'admin')).toBe(false);
   });
 
+  it('terminal states (delivered, cancelled) are immutable for EVERY actor and target', () => {
+    const statuses = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
+    for (const terminal of ['delivered', 'cancelled']) {
+      for (const actor of ['seller', 'buyer', 'admin']) {
+        for (const target of statuses) {
+          expect(canTransition(terminal, target, actor), `${actor}: ${terminal} → ${target}`).toBe(
+            false
+          );
+        }
+      }
+    }
+  });
+
   it('assertTransition throws 422 with AC message', () => {
     expect(() => assertTransition('delivered', 'pending', 'seller')).toThrow(
       expect.objectContaining({
