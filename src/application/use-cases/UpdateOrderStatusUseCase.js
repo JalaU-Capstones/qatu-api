@@ -18,7 +18,7 @@ export class UpdateOrderStatusUseCase {
   }
 
   /** Transition status, enqueue OrderStatusChanged in the same transaction. */
-  async execute({ orderId, userId, nextStatus, userRole = null } = {}) {
+  async execute({ orderId, userId, nextStatus } = {}) {
     if (!orderId || typeof orderId !== 'string') {
       const err = new Error('orderId is required');
       err.code = 'VALIDATION_ERROR';
@@ -46,7 +46,7 @@ export class UpdateOrderStatusUseCase {
       throw err;
     }
 
-    const roleNames = await this._resolveRoleNames(userId, userRole);
+    const roleNames = await this._resolveRoleNames(userId);
     const actorRole = await this._resolveActorRole({ order, userId, roleNames });
 
     const fromStatus = order.status;
@@ -59,6 +59,8 @@ export class UpdateOrderStatusUseCase {
         orderId,
         status: nextStatus,
         timestampColumn,
+        // A seller must not see other sellers' line items in the response (ADR-017).
+        itemsSellerId: actorRole === 'seller' ? userId : null,
         transaction,
       });
 
@@ -88,19 +90,15 @@ export class UpdateOrderStatusUseCase {
     };
   }
 
-  /** @private */
-  async _resolveRoleNames(userId, roleHint) {
-    const names = new Set();
-    if (typeof roleHint === 'string' && roleHint.trim()) {
-      names.add(roleHint.trim());
-    }
-    if (this.profileRepository?.findById) {
-      const profile = await this.profileRepository.findById(userId);
-      for (const role of profile?.roles || []) {
-        if (role?.name) names.add(role.name);
-      }
-    }
-    return [...names];
+  /**
+   * Roles come ONLY from `user_roles` (database). Never from the request or from
+   * JWT `user_metadata`, which the user can edit. Without a repository: no roles (fail closed).
+   * @private
+   */
+  async _resolveRoleNames(userId) {
+    if (!this.profileRepository?.findById) return [];
+    const profile = await this.profileRepository.findById(userId);
+    return (profile?.roles || []).map((role) => role?.name).filter(Boolean);
   }
 
   /** @private Resolve admin | seller | buyer and enforce ownership. */

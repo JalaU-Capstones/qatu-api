@@ -45,11 +45,21 @@ export class IOrderRepository {
     throw new Error('Method not implemented: findByIdForSeller');
   }
 
-  /** Persist status (+ timestamp column) and return the order. */
-  // eslint-disable-next-line no-unused-vars
-  async updateStatus({ orderId, status, timestampColumn = null, transaction } = {}) {
+  /**
+   * Persist status (+ timestamp column) and return the order.
+   * With `itemsSellerId`, the returned order only carries that seller's items.
+   */
+  /* eslint-disable no-unused-vars */
+  async updateStatus({
+    orderId,
+    status,
+    timestampColumn = null,
+    itemsSellerId = null,
+    transaction,
+  } = {}) {
     throw new Error('Method not implemented: updateStatus');
   }
+  /* eslint-enable no-unused-vars */
 
   /** Insert pending order + items. */
   // eslint-disable-next-line no-unused-vars

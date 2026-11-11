@@ -162,6 +162,148 @@ describe('OrderRepository', () => {
     expect(result).toBeNull();
   });
 
+  describe('seller visibility (ADR-017: own line items only, full-order totals)', () => {
+    const sellerId = 'c2aad099-7c2b-5ef8-bb6d-7bb9bd380c33';
+    const sellerOrderRow = {
+      id: orderId,
+      order_number: 'ORD-00100042',
+      buyer_id: buyerId,
+      status: 'confirmed',
+      currency: 'USD',
+      subtotal: '265.00',
+      shipping_cost: '10.00',
+      tax: '0.00',
+      total: '275.00', // FULL order total, even though the seller owns only one line
+      created_at: new Date('2026-10-14T11:00:00.000Z'),
+      updated_at: new Date('2026-10-14T11:00:00.000Z'),
+    };
+    const ownItemRow = {
+      id: 'item-own',
+      order_id: orderId,
+      product_id: 'p-own',
+      product_name: 'Own product',
+      quantity: 1,
+      unit_price: '100.00',
+      subtotal: '100.00',
+      created_at: new Date('2026-10-14T11:00:00.000Z'),
+    };
+
+    /**
+     * The items query is the one that SELECTs item columns. The orders/count queries also
+     * mention `public.order_items` (inside EXISTS), so match on the select list instead.
+     */
+    const itemsQueryCall = (mockDb) =>
+      mockDb.query.mock.calls.find(([sql]) => sql.includes('SELECT oi.id, oi.order_id'));
+
+    it('findBySellerId restricts orders AND returned items to the seller (SQL + params)', async () => {
+      const mockDb = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([{ total: '1' }]) // COUNT
+          .mockResolvedValueOnce([sellerOrderRow]) // ORDERS
+          .mockResolvedValueOnce([ownItemRow]), // ITEMS (already filtered by SQL)
+      };
+      const repo = new OrderRepository({ db: mockDb });
+
+      const result = await repo.findBySellerId({ sellerId, page: 1, limit: 10 });
+
+      // Orders: only those that contain at least one of the seller's products.
+      for (const [sql, options] of mockDb.query.mock.calls.slice(0, 2)) {
+        expect(sql).toContain('p.seller_id = :sellerId');
+        expect(options.replacements.sellerId).toBe(sellerId);
+      }
+
+      // Items: joined to products and filtered, so another seller's lines never load.
+      const [itemsSql, itemsOptions] = itemsQueryCall(mockDb);
+      expect(itemsSql).toContain('INNER JOIN public.products p ON p.id = oi.product_id');
+      expect(itemsSql).toContain('p.seller_id = :sellerId');
+      expect(itemsOptions.replacements.sellerId).toBe(sellerId);
+
+      expect(result.items[0].items.map((i) => i.productName)).toEqual(['Own product']);
+      expect(result.items[0].total).toBe(275); // totals stay full-order
+    });
+
+    it('findByBuyerId and findAll do NOT filter items by seller (full order)', async () => {
+      const buyerDb = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([{ total: '1' }])
+          .mockResolvedValueOnce([sellerOrderRow])
+          .mockResolvedValueOnce([ownItemRow]),
+      };
+      await new OrderRepository({ db: buyerDb }).findByBuyerId({ buyerId });
+      const [buyerItemsSql, buyerItemsOptions] = itemsQueryCall(buyerDb);
+      expect(buyerItemsSql).not.toContain('seller_id');
+      expect(buyerItemsOptions.replacements).not.toHaveProperty('sellerId');
+
+      const adminDb = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([{ total: '1' }])
+          .mockResolvedValueOnce([sellerOrderRow])
+          .mockResolvedValueOnce([ownItemRow]),
+      };
+      await new OrderRepository({ db: adminDb }).findAll({});
+      expect(itemsQueryCall(adminDb)[0]).not.toContain('seller_id');
+    });
+
+    it('findByIdForSeller returns null without reading the order when the seller owns no item', async () => {
+      const mockDb = { query: vi.fn().mockResolvedValueOnce([]) }; // ownership check -> none
+      const repo = new OrderRepository({ db: mockDb });
+
+      const result = await repo.findByIdForSeller(orderId, sellerId);
+
+      expect(result).toBeNull();
+      expect(mockDb.query).toHaveBeenCalledTimes(1);
+      expect(mockDb.query.mock.calls[0][1].replacements).toEqual({ orderId, sellerId });
+    });
+
+    it('findByIdForSeller loads only the seller items of a multi-seller order', async () => {
+      const mockDb = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([{ ok: 1 }]) // ownership check
+          .mockResolvedValueOnce([sellerOrderRow]) // order
+          .mockResolvedValueOnce([ownItemRow]), // items filtered by SQL
+      };
+      const repo = new OrderRepository({ db: mockDb });
+
+      const order = await repo.findByIdForSeller(orderId, sellerId);
+
+      const [itemsSql, itemsOptions] = itemsQueryCall(mockDb);
+      expect(itemsSql).toContain('p.seller_id = :sellerId');
+      expect(itemsOptions.replacements).toMatchObject({ orderIds: [orderId], sellerId });
+      expect(order.items).toHaveLength(1);
+      expect(order.items[0].productName).toBe('Own product');
+      expect(order.total).toBe(275);
+    });
+
+    it('updateStatus scopes the returned items to itemsSellerId, and not otherwise', async () => {
+      const updatedRow = { ...sellerOrderRow, status: 'shipped' };
+
+      const scopedDb = {
+        query: vi.fn().mockResolvedValueOnce([updatedRow]).mockResolvedValueOnce([ownItemRow]),
+      };
+      const scoped = await new OrderRepository({ db: scopedDb }).updateStatus({
+        orderId,
+        status: 'shipped',
+        timestampColumn: 'shipped_at',
+        itemsSellerId: sellerId,
+      });
+      const [scopedSql, scopedOptions] = itemsQueryCall(scopedDb);
+      expect(scopedSql).toContain('p.seller_id = :sellerId');
+      expect(scopedOptions.replacements.sellerId).toBe(sellerId);
+      expect(scoped.status).toBe('shipped');
+      expect(scoped.items).toHaveLength(1);
+
+      const fullDb = {
+        query: vi.fn().mockResolvedValueOnce([updatedRow]).mockResolvedValueOnce([ownItemRow]),
+      };
+      await new OrderRepository({ db: fullDb }).updateStatus({ orderId, status: 'shipped' });
+      expect(itemsQueryCall(fullDb)[0]).not.toContain('seller_id');
+    });
+  });
+
   it('findById returns order with items when found', async () => {
     const mockDb = {
       query: vi

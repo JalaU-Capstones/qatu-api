@@ -410,7 +410,17 @@ export class OrderRepository extends IOrderRepository {
     return this._mapOrderRow(rows[0], itemsByOrderId.get(orderId) || []);
   }
 
-  async updateStatus({ orderId, status, timestampColumn = null, transaction } = {}) {
+  /**
+   * @param {Object} params
+   * @param {string|null} [params.itemsSellerId] When set, the returned order only carries that seller's items.
+   */
+  async updateStatus({
+    orderId,
+    status,
+    timestampColumn = null,
+    itemsSellerId = null,
+    transaction,
+  } = {}) {
     const allowedTs = new Set(['confirmed_at', 'shipped_at', 'delivered_at', 'cancelled_at']);
     const tsCol = allowedTs.has(timestampColumn) ? timestampColumn : null;
 
@@ -433,7 +443,9 @@ export class OrderRepository extends IOrderRepository {
       return null;
     }
 
-    const itemsByOrderId = await this._loadItemsByOrderIds([orderId]);
+    const itemsByOrderId = await this._loadItemsByOrderIds([orderId], {
+      sellerId: itemsSellerId,
+    });
     return this._mapOrderRow(rows[0], itemsByOrderId.get(orderId) || []);
   }
 }
