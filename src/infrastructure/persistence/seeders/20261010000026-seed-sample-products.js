@@ -1,5 +1,12 @@
 'use strict';
 
+/**
+ * Supabase Auth rejects non-routable domains such as `.local`, so a seller seeded with
+ * `seller@qatu.local` cannot sign in or reset its password. Keep this a real-looking domain.
+ * Compile-time constant (never user input), so it is safe to interpolate into the SQL below.
+ */
+const SELLER_EMAIL = 'seller@example.qatu.pe';
+
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
@@ -15,17 +22,19 @@ module.exports = {
         insert into auth.users (id, email, raw_user_meta_data)
         values (
           '00000000-0000-0000-0000-000000000002'::uuid,
-          'seller@qatu.local',
+          '${SELLER_EMAIL}',
           '{"username": "sample_seller", "full_name": "Sample Seller"}'::jsonb
         )
-        on conflict (id) do nothing;
+        -- Re-running the seeder also migrates DBs seeded with the old .local email.
+        -- (No backticks in this SQL comment: it lives inside a JS template literal.)
+        on conflict (id) do update set email = excluded.email;
 
         insert into public.profiles (id, username, full_name, email)
         values (
           '00000000-0000-0000-0000-000000000002'::uuid,
           'sample_seller',
           'Sample Seller',
-          'seller@qatu.local'
+          '${SELLER_EMAIL}'
         )
         on conflict (id) do update set
           username = excluded.username,
