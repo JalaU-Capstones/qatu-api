@@ -122,6 +122,35 @@ describe('ListOrdersUseCase', () => {
     expect(result.data).toHaveLength(1);
   });
 
+  it('rejects admin view for a non-admin even if the request claims admin (no escalation)', async () => {
+    const mockOrderRepo = { findAll: vi.fn() };
+    const profileRepository = {
+      findById: vi.fn().mockResolvedValue({ roles: [{ name: 'buyer' }] }),
+    };
+    const useCase = new ListOrdersUseCase({ orderRepository: mockOrderRepo, profileRepository });
+
+    // `roleHint` is no longer part of the DTO: a forged role claim is simply dropped.
+    const dto = new ListOrdersRequestDTO({ userId: buyerId, view: 'admin', roleHint: 'admin' });
+    expect(dto).not.toHaveProperty('roleHint');
+
+    await expect(useCase.execute(dto)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      statusCode: 403,
+    });
+    expect(mockOrderRepo.findAll).not.toHaveBeenCalled();
+  });
+
+  it('allows admin view when user_roles contains admin', async () => {
+    const mockOrderRepo = { findAll: vi.fn().mockResolvedValue({ items: [], total: 0 }) };
+    const profileRepository = {
+      findById: vi.fn().mockResolvedValue({ roles: [{ name: 'admin' }] }),
+    };
+    const useCase = new ListOrdersUseCase({ orderRepository: mockOrderRepo, profileRepository });
+
+    await useCase.execute(new ListOrdersRequestDTO({ userId: buyerId, view: 'admin' }));
+    expect(mockOrderRepo.findAll).toHaveBeenCalled();
+  });
+
   it('rejects seller view without seller role', async () => {
     const mockOrderRepo = { findBySellerId: vi.fn() };
     const profileRepository = {

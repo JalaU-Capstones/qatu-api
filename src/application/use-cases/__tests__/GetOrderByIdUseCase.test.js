@@ -74,18 +74,46 @@ describe('GetOrderByIdUseCase', () => {
     expect(result.data.order_number).toBe('ORD-00100042');
   });
 
-  it('allows admin to view another buyers order', async () => {
+  it('allows admin (role stored in user_roles) to view another buyers order', async () => {
     const mockRepo = {
       findById: vi.fn().mockResolvedValue(mockOrder),
     };
+    const profileRepository = {
+      findById: vi.fn().mockResolvedValue({ roles: [{ name: 'admin' }] }),
+    };
+    const useCase = new GetOrderByIdUseCase({ orderRepository: mockRepo, profileRepository });
+
+    const result = await useCase.execute({ orderId, userId: otherBuyerId });
+    expect(result.data.id).toBe(orderId);
+    expect(profileRepository.findById).toHaveBeenCalledWith(otherBuyerId);
+  });
+
+  it('ignores a caller-supplied role claim: only user_roles decides (no privilege escalation)', async () => {
+    const mockRepo = {
+      findById: vi.fn().mockResolvedValue(mockOrder),
+      findByIdForSeller: vi.fn().mockResolvedValue(null),
+    };
+    const profileRepository = {
+      findById: vi.fn().mockResolvedValue({ roles: [{ name: 'buyer' }] }),
+    };
+    const useCase = new GetOrderByIdUseCase({ orderRepository: mockRepo, profileRepository });
+
+    // e.g. a forged `user_metadata.role = 'admin'` must have no effect.
+    await expect(
+      useCase.execute({ orderId, userId: otherBuyerId, userRole: 'admin' })
+    ).rejects.toMatchObject({ statusCode: 403, code: 'FORBIDDEN' });
+  });
+
+  it('fails closed when no profile repository is wired: nobody is admin', async () => {
+    const mockRepo = {
+      findById: vi.fn().mockResolvedValue(mockOrder),
+      findByIdForSeller: vi.fn().mockResolvedValue(null),
+    };
     const useCase = new GetOrderByIdUseCase({ orderRepository: mockRepo });
 
-    const result = await useCase.execute({
-      orderId,
-      userId: otherBuyerId,
-      userRole: 'admin',
+    await expect(useCase.execute({ orderId, userId: otherBuyerId })).rejects.toMatchObject({
+      statusCode: 403,
     });
-    expect(result.data.id).toBe(orderId);
   });
 
   it('allows a seller to view an order that contains their products (filtered items)', async () => {

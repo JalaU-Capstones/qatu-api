@@ -11,7 +11,7 @@ export class GetOrderByIdUseCase {
   }
 
   /** Buyer, seller (own products), or admin. */
-  async execute({ orderId, userId, userRole = null } = {}) {
+  async execute({ orderId, userId } = {}) {
     if (!orderId || typeof orderId !== 'string') {
       const err = new Error('orderId is required');
       err.code = 'VALIDATION_ERROR';
@@ -26,7 +26,7 @@ export class GetOrderByIdUseCase {
       throw err;
     }
 
-    const roleNames = await this._resolveRoleNames(userId, userRole);
+    const roleNames = await this._resolveRoleNames(userId);
     const isAdmin = roleNames.includes('admin');
 
     if (isAdmin) {
@@ -72,18 +72,14 @@ export class GetOrderByIdUseCase {
     throw err;
   }
 
-  /** @private */
-  async _resolveRoleNames(userId, roleHint) {
-    const names = new Set();
-    if (typeof roleHint === 'string' && roleHint.trim()) {
-      names.add(roleHint.trim());
-    }
-    if (this.profileRepository?.findById) {
-      const profile = await this.profileRepository.findById(userId);
-      for (const role of profile?.roles || []) {
-        if (role?.name) names.add(role.name);
-      }
-    }
-    return [...names];
+  /**
+   * Roles come ONLY from `user_roles` (database). Never from the request or from
+   * JWT `user_metadata`, which the user can edit. Without a repository: no roles (fail closed).
+   * @private
+   */
+  async _resolveRoleNames(userId) {
+    if (!this.profileRepository?.findById) return [];
+    const profile = await this.profileRepository.findById(userId);
+    return (profile?.roles || []).map((role) => role?.name).filter(Boolean);
   }
 }

@@ -87,6 +87,71 @@ describe('OrderController', () => {
       })
     );
   });
+  describe('role claims are never forwarded to the use cases (ADR-017)', () => {
+    // `req.user.role` is derived from user_metadata, which the end user can edit.
+    const forgedUser = { id: userId, role: 'admin' };
+    const makeRes = () => ({ status: vi.fn().mockReturnThis(), json: vi.fn() });
+
+    it('listOrders passes only the user id and query, not the role', async () => {
+      const listOrdersUseCase = {
+        execute: vi.fn().mockResolvedValue({ data: [], meta: {} }),
+      };
+      const controller = new OrderController({ listOrdersUseCase });
+
+      await controller.listOrders(
+        { user: forgedUser, validatedQuery: { view: 'admin' } },
+        makeRes(),
+        vi.fn()
+      );
+
+      const [dto] = listOrdersUseCase.execute.mock.calls[0];
+      expect(dto.userId).toBe(userId);
+      expect(dto.view).toBe('admin'); // the use case still authorizes it against user_roles
+      expect(JSON.stringify(dto)).not.toContain('roleHint');
+    });
+
+    it('getOrderById passes only orderId and userId', async () => {
+      const getOrderByIdUseCase = { execute: vi.fn().mockResolvedValue({ data: {} }) };
+      const controller = new OrderController({
+        listOrdersUseCase: { execute: vi.fn() },
+        getOrderByIdUseCase,
+      });
+
+      await controller.getOrderById(
+        { user: forgedUser, params: { id: 'order-1' } },
+        makeRes(),
+        vi.fn()
+      );
+
+      expect(getOrderByIdUseCase.execute).toHaveBeenCalledWith({
+        orderId: 'order-1',
+        userId,
+      });
+    });
+
+    it('updateOrderStatus passes only orderId, userId and the requested status', async () => {
+      const updateOrderStatusUseCase = { execute: vi.fn().mockResolvedValue({ data: {} }) };
+      const controller = new OrderController({
+        listOrdersUseCase: { execute: vi.fn() },
+        updateOrderStatusUseCase,
+      });
+      const res = makeRes();
+
+      await controller.updateOrderStatus(
+        { user: forgedUser, params: { id: 'order-1' }, validatedBody: { status: 'shipped' } },
+        res,
+        vi.fn()
+      );
+
+      expect(updateOrderStatusUseCase.execute).toHaveBeenCalledWith({
+        orderId: 'order-1',
+        userId,
+        nextStatus: 'shipped',
+      });
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+  });
+
   describe('createOrder (US-10)', () => {
     const body = {
       shipping_address: {

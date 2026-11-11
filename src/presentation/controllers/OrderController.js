@@ -68,7 +68,6 @@ export class OrderController {
         limit: query.limit,
         status: query.status,
         view: query.view,
-        roleHint: req.user?.role,
       });
 
       const result = await this.listOrdersUseCase.execute(requestDto);
@@ -96,11 +95,7 @@ export class OrderController {
       }
 
       const orderId = req.params.id;
-      const result = await this.getOrderByIdUseCase.execute({
-        orderId,
-        userId,
-        userRole: req.user?.role,
-      });
+      const result = await this.getOrderByIdUseCase.execute({ orderId, userId });
 
       return res.status(200).json(result);
     } catch (error) {
@@ -130,7 +125,6 @@ export class OrderController {
         orderId: req.params.id,
         userId,
         nextStatus: body.status,
-        userRole: req.user?.role,
       });
 
       return res.status(200).json(result);

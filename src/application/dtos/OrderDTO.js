@@ -1,14 +1,6 @@
 export class ListOrdersRequestDTO {
-  /** @param {{ userId?: string, buyerId?: string, page?: number|string, limit?: number|string, status?: string, view?: string, roleHint?: string|null }} [params] */
-  constructor({
-    userId,
-    buyerId,
-    page = 1,
-    limit = 20,
-    status,
-    view = 'buyer',
-    roleHint = null,
-  } = {}) {
+  /** @param {{ userId?: string, buyerId?: string, page?: number|string, limit?: number|string, status?: string, view?: string }} [params] */
+  constructor({ userId, buyerId, page = 1, limit = 20, status, view = 'buyer' } = {}) {
     const resolvedUserId = userId || buyerId;
     if (!resolvedUserId || typeof resolvedUserId !== 'string') {
       throw new TypeError('userId is required');
@@ -25,7 +17,6 @@ export class ListOrdersRequestDTO {
     this.limit = limit !== undefined && limit !== null && limit !== '' ? Number(limit) : 20;
     this.status = typeof status === 'string' && status.trim() !== '' ? status.trim() : undefined;
     this.view = resolvedView;
-    this.roleHint = typeof roleHint === 'string' ? roleHint : null;
   }
 }
 

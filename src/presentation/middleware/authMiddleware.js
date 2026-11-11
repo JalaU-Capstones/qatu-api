@@ -70,7 +70,8 @@ export async function authMiddleware(req, res, next) {
 
     req.user = {
       id: data.user.id,
-      // App role lives in user_metadata; fall back to Supabase's "authenticated" role.
+      // INFORMATIONAL ONLY. `user_metadata` is editable by the end user, so this value
+      // must NEVER drive authorization. Resolve roles from `user_roles` (ProfileRepository).
       role: data.user.user_metadata?.role ?? data.user.role ?? null,
       email: data.user.email ?? null,
     };
