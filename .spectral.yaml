@@ -1,0 +1,28 @@
+extends:
+  - spectral:oas
+rules:
+  operation-operationId-casing:
+    description: Operation IDs must be camelCase.
+    given: $.paths[*][*].operationId
+    severity: error
+    then:
+      function: pattern
+      functionOptions:
+        match: ^[a-z][a-zA-Z0-9]*$
+  path-keys-kebab-case:
+    description: Path segments must be kebab-case.
+    given: $.paths
+    severity: warn
+    then:
+      function: pattern
+      functionOptions:
+        match: ^(\/[a-z0-9]+(-[a-z0-9]+)*|\/{[a-zA-Z]+})+$
+  operation-tags-required:
+    description: Every operation must have at least one tag.
+    given: $.paths[*][get,post,put,patch,delete]
+    severity: error
+    then:
+      field: tags
+      function: truthy
+  oas3-schema: 'off'
+  oas3-unused-component: 'off'

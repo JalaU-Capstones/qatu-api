@@ -1,0 +1,187 @@
+search:
+  name: search
+  in: query
+  description: |
+    Keyword search applied to the product name and description. Matching is
+    case-insensitive and accepts partial words (`phone` matches "Smartphone" and
+    "Headphones"). Multi-word terms also match in any order. Leading and trailing
+    whitespace is ignored and `%` / `_` are matched literally. The value is bound
+    as a SQL parameter. Quotes, comments, and statements such as `DROP TABLE`
+    are searched as text and are never executed. Maximum length is 200 characters.
+  required: false
+  schema:
+    type: string
+    maxLength: 200
+  examples:
+    searchExample:
+      summary: Search query
+      value: 'ergonomic chair'
+    partialWord:
+      summary: Partial word
+      value: 'phone'
+
+categoryId:
+  name: category_id
+  in: query
+  description: Filter items by category UUID identifier.
+  required: false
+  schema:
+    type: string
+    format: uuid
+  examples:
+    categoryExample:
+      summary: Category UUID
+      value: 'b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'
+
+filterCategoryId:
+  name: category_id
+  in: query
+  description: Filter items by category UUID identifier.
+  required: false
+  schema:
+    type: string
+    format: uuid
+  examples:
+    categoryExample:
+      summary: Category UUID
+      value: 'b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'
+
+minPrice:
+  name: min_price
+  in: query
+  description: Minimum price filter (inclusive).
+  required: false
+  schema:
+    type: number
+    format: double
+    minimum: 0
+  examples:
+    minPriceExample:
+      summary: Minimum price
+      value: 50.00
+
+maxPrice:
+  name: max_price
+  in: query
+  description: Maximum price filter (inclusive). Must be greater than or equal to `min_price` when both are provided.
+  required: false
+  schema:
+    type: number
+    format: double
+    minimum: 0
+  examples:
+    maxPriceExample:
+      summary: Maximum price
+      value: 500.00
+
+sellerId:
+  name: seller_id
+  in: query
+  description: Filter products or ratings by seller profile UUID.
+  required: false
+  schema:
+    type: string
+    format: uuid
+  examples:
+    sellerExample:
+      summary: Seller profile UUID
+      value: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f'
+
+filterSellerId:
+  name: seller_id
+  in: query
+  description: Filter products or ratings by seller profile UUID.
+  required: false
+  schema:
+    type: string
+    format: uuid
+  examples:
+    sellerExample:
+      summary: Seller profile UUID
+      value: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f'
+
+state:
+  name: state
+  in: query
+  description: Filter products by lifecycle state (for sellers and administrators).
+  required: false
+  schema:
+    type: string
+    enum:
+      - draft
+      - published
+      - unpublished
+      - archived
+  examples:
+    stateExample:
+      summary: Product state
+      value: 'published'
+
+sort:
+  name: sort
+  in: query
+  description: Field name to sort the result collection by.
+  required: false
+  schema:
+    type: string
+    default: 'created_at'
+  examples:
+    sortExample:
+      summary: Sort field
+      value: 'price'
+
+order:
+  name: order
+  in: query
+  description: Sort direction (ascending or descending).
+  required: false
+  schema:
+    type: string
+    enum:
+      - asc
+      - desc
+    default: 'asc'
+  examples:
+    orderExample:
+      summary: Ascending order
+      value: 'asc'
+
+status:
+  name: status
+  in: query
+  description: Filter items by status code (e.g., order status or application status).
+  required: false
+  schema:
+    type: string
+  examples:
+    statusExample:
+      summary: Filter status
+      value: 'pending'
+
+sortBy:
+  name: sort_by
+  in: query
+  description: Field to sort results by.
+  required: false
+  schema:
+    type: string
+    enum: [created_at, price, name, average_rating]
+    default: created_at
+  examples:
+    sortByPrice:
+      summary: Sort by price
+      value: price
+
+sortOrder:
+  name: sort_order
+  in: query
+  description: Sort direction (case-insensitive). Newest or highest values come first by default.
+  required: false
+  schema:
+    type: string
+    enum: [asc, desc]
+    default: desc
+  examples:
+    ascending:
+      summary: Ascending
+      value: asc

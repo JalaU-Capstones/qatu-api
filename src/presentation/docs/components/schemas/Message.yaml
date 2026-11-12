@@ -1,0 +1,65 @@
+type: object
+description: An individual message sent within a buyer-seller conversation thread.
+required:
+  - id
+  - conversation_id
+  - sender_id
+  - content
+  - created_at
+properties:
+  id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Unique identifier of the message.
+    examples:
+      - 'c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f'
+  conversation_id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Identifier of the conversation this message belongs to.
+    examples:
+      - 'b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e'
+  sender_id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Profile identifier of the user who sent the message.
+    examples:
+      - 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+  content:
+    type: string
+    minLength: 1
+    maxLength: 5000
+    description: Text body of the message.
+    examples:
+      - 'Hi! Is the chair still available in black?'
+  read_at:
+    type: [string, 'null']
+    format: date-time
+    description: Timestamp when the recipient viewed this message.
+    examples:
+      - null
+  edited_at:
+    type: [string, 'null']
+    format: date-time
+    readOnly: true
+    description: Timestamp when message content was last edited by sender.
+    examples:
+      - null
+  deleted_at:
+    type: [string, 'null']
+    format: date-time
+    readOnly: true
+    description: Soft-delete timestamp. Non-null indicates the message was removed.
+    examples:
+      - null
+  created_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Timestamp when the message was sent.
+    examples:
+      - '2026-10-14T13:30:00.000Z'
+additionalProperties: false

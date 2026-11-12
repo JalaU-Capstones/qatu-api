@@ -1,10 +1,12 @@
 image: node:26
 
 stages:
+  - helloworld
   - lint
   - test
   - build
   - security
+  - publish
 
 variables:
   PNPM_CACHE_FOLDER: '$CI_PROJECT_DIR/.pnpm-store'
@@ -18,6 +20,16 @@ before_script:
   - pnpm config set store-dir $PNPM_CACHE_FOLDER
   - pnpm install --frozen-lockfile
 
+helloworld:
+  stage: helloworld
+  before_script: []
+  script:
+    - echo "Hello World"
+  only:
+    - main
+    - develop
+    - merge_requests
+
 lint:
   stage: lint
   script:
@@ -28,8 +40,28 @@ lint:
     - develop
     - merge_requests
 
+openapi:lint:
+  stage: lint
+  script:
+    - pnpm openapi:bundle
+    - pnpm openapi:lint
+    - pnpm openapi:validate
+  only:
+    - main
+    - develop
+    - merge_requests
+
 test:
   stage: test
+  image: node:26
+  services:
+    - name: postgres:17-alpine
+      alias: postgres
+  variables:
+    POSTGRES_USER: test
+    POSTGRES_PASSWORD: test
+    POSTGRES_DB: qatu_test
+    TEST_DATABASE_URL: 'postgresql://test:test@postgres:5432/qatu_test'
   script:
     - pnpm test
   only:
@@ -50,3 +82,57 @@ security:
     - main
     - develop
     - merge_requests
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Publish the API image to the GitLab Container Registry.
+#
+# Runs only on v* tags. Pushes two tags per release:
+#   - $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG   (immutable, e.g. v0.1.0)
+#   - $CI_REGISTRY_IMAGE:latest           (mutable, always points to newest)
+#
+# Multi-arch: amd64 only (native runner). arm64 can be added later via QEMU
+# (add `docker run --privileged --rm tonistiigi/binfmt --install arm64` and
+# `--platform linux/amd64,linux/arm64`), but it's out of MVP scope.
+#
+# Pre-requisite: Container Registry must be enabled in the GitLab project
+# (Settings → General → Visibility, project features → Container Registry =
+# "Only project members"). See .docs/CONTAINERIZATION.md for details.
+# ─────────────────────────────────────────────────────────────────────────────
+publish:image:
+  stage: publish
+  image: docker:27-cli
+  services:
+    - name: docker:27-dind
+      alias: docker
+      command: ['--tls=false']
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ''
+    DOCKER_DRIVER: overlay2
+    IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
+    IMAGE_LATEST: $CI_REGISTRY_IMAGE:latest
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    - echo "Building image for tag $CI_COMMIT_TAG"
+    - docker build
+      --target runtime
+      --tag "$IMAGE_TAG"
+      --tag "$IMAGE_LATEST"
+      --label "org.opencontainers.image.source=$CI_PROJECT_URL"
+      --label "org.opencontainers.image.revision=$CI_COMMIT_SHA"
+      --label "org.opencontainers.image.title=Qatu API"
+      .
+    - docker push "$IMAGE_TAG"
+    - docker push "$IMAGE_LATEST"
+    - echo "Pushed $IMAGE_TAG and $IMAGE_LATEST"
+  after_script:
+    - docker logout "$CI_REGISTRY" || true
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v.*/
+      when: on_success
+    - when: never
+  needs:
+    - job: security
+      optional: true
+  allow_failure: false

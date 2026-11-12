@@ -1,0 +1,39 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Qatu API — Docker Compose PROD override
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Differences from base:
+#   - api builds the runtime stage (multi-stage, no dev deps).
+#   - No host port exposure for postgres or rabbitmq (they use `expose` only,
+#     per ADR-016 security requirement).
+#   - No host port exposure for api either — a future nginx service in the
+#     client repo's compose will proxy from a shared external network.
+#   - Migrations run automatically via entrypoint.sh (RUN_MIGRATIONS=true).
+#   - Restart policies active.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  postgres:
+    restart: unless-stopped
+
+  rabbitmq:
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      RUN_MIGRATIONS: 'true'
+      RUN_SEEDS: ${RUN_SEEDS:-false}
+      # In prod, .env MUST point to Supabase Cloud (Mode C) or a real
+      # postgres with auth schema. Do NOT override here.
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:3000/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s

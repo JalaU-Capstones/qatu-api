@@ -1,0 +1,31 @@
+type: object
+description: Standard error response envelope across all 4xx and 5xx API responses.
+required:
+  - error
+properties:
+  error:
+    type: object
+    description: Encapsulated error payload.
+    required:
+      - code
+      - message
+    properties:
+      code:
+        type: string
+        description: Machine-readable error code identifying the error condition.
+        examples:
+          - 'VALIDATION_ERROR'
+      message:
+        type: string
+        description: Human-readable error message explaining what went wrong.
+        examples:
+          - 'Invalid input data'
+      details:
+        type: array
+        description: Optional list of field-specific errors when validation fails.
+        items:
+          $ref: './shared.yaml#/ErrorDetail'
+    additionalProperties: false
+  meta:
+    $ref: './shared.yaml#/Meta'
+additionalProperties: false
