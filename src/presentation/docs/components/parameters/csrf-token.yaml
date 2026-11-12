@@ -1,0 +1,24 @@
+csrfToken:
+  name: X-CSRF-Token
+  in: header
+  required: true
+  description: |
+    CSRF token read from the `csrf_token` cookie (set on login, register, and
+    refresh). Every state-changing request (`POST`, `PATCH`, `DELETE`) MUST echo
+    this value in the `X-CSRF-Token` header. The backend rejects mismatches with
+    `403 { error: { code: 'INVALID_CSRF_TOKEN' } }`.
+
+    This is the standard **double-submit cookie** pattern: the cookie is
+    `SameSite=Strict` (not sent on cross-origin requests) AND the header must
+    match the cookie value, so a cross-site attacker cannot forge a valid
+    combination.
+
+    **Exempt endpoints** (do not require this header):
+    - `POST /v1/auth/login`
+    - `POST /v1/auth/register`
+    - `POST /v1/auth/refresh`
+    - `POST /v1/auth/logout` (uses the cookie-only session)
+  schema:
+    type: string
+    minLength: 32
+    example: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2'

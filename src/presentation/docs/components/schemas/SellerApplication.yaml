@@ -1,0 +1,97 @@
+type: object
+description: Application submitted by a buyer to request seller permissions on the marketplace.
+required:
+  - id
+  - profile_id
+  - business_name
+  - business_description
+  - status
+  - created_at
+  - updated_at
+properties:
+  id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Unique identifier of the seller application.
+    examples:
+      - '4f3c2b1a-0e9d-8c7b-6a5f-4e3d2c1b0a9f'
+  profile_id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Identifier of the buyer profile submitting the application.
+    examples:
+      - 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+  business_name:
+    type: string
+    minLength: 2
+    maxLength: 120
+    description: Commercial or legal trade name of the seller business.
+    examples:
+      - 'Andean Artisan Crafts'
+  business_description:
+    type: string
+    minLength: 20
+    maxLength: 2000
+    description: Detailed description of the business, catalog, and operations.
+    examples:
+      - 'We produce hand-woven alpaca wool textiles and ceramic homeware sourced directly from local cooperatives.'
+  contact_phone:
+    type: [string, 'null']
+    description: Direct telephone contact number for business inquiries.
+    examples:
+      - '+591 4 4123456'
+  contact_email:
+    type: [string, 'null']
+    format: email
+    description: Business email address for official notices.
+    examples:
+      - 'contact@andeanartisan.com'
+  status:
+    type: string
+    enum:
+      - pending
+      - approved
+      - rejected
+      - withdrawn
+    default: 'pending'
+    description: Current review state of the seller application.
+    examples:
+      - 'pending'
+  reviewed_by:
+    type: [string, 'null']
+    format: uuid
+    readOnly: true
+    description: Profile identifier of the administrator who reviewed the application.
+    examples:
+      - 'd1e2f3a4-b5c6-7d8e-9f0a-1b2c3d4e5f6a'
+  reviewed_at:
+    type: [string, 'null']
+    format: date-time
+    readOnly: true
+    description: Timestamp when the administrator decision was submitted.
+    examples:
+      - '2026-10-14T15:00:00.000Z'
+  rejection_reason:
+    type: [string, 'null']
+    maxLength: 1000
+    readOnly: true
+    description: Justification provided by administrator if application was rejected.
+    examples:
+      - 'Business documentation was incomplete.'
+  created_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Application submission timestamp.
+    examples:
+      - '2026-10-14T11:00:00.000Z'
+  updated_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Application last updated timestamp.
+    examples:
+      - '2026-10-14T11:00:00.000Z'
+additionalProperties: false

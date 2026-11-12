@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Qatu Postgres (dev)",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "postgres",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "Comment": "Auto-registered by docker-compose.dev-tools.yml"
+    }
+  }
+}

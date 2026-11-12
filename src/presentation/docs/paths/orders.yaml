@@ -1,0 +1,380 @@
+listOrCreate:
+  get:
+    operationId: listOrders
+    summary: List orders
+    description: |
+      Returns a paginated list of orders visible to the authenticated user.
+
+      **Visibility (enforced by RLS):**
+      - **Buyers:** see only the orders they placed.
+      - **Sellers:** see only orders that contain at least one of their products.
+        **Important:** the `items[]` array contains ONLY the seller's own items
+        (RLS filters `order_items` per seller). However, `subtotal`, `shipping_cost`,
+        `tax`, and `total` reflect the **full order** as created by the buyer, since
+        those fields were computed at checkout across all items. A seller dashboard
+        must compute the seller's own revenue from `items[]` (sum of `item.subtotal`),
+        not from the order's `total`.
+      - **Admins:** see all orders.
+
+      **Buyer identification:** the response includes `buyer_id` (UUID) but not the
+      buyer's profile. Frontends that need to display the buyer's name should fetch
+      `GET /v1/profiles/{buyer_id}` separately. Keeping the payload lean avoids
+      cross-aggregate expansion in list views.
+
+      **Query parameters:** `page`, `limit`, `status` (one of `pending`, `confirmed`,
+      `shipped`, `delivered`, `cancelled`).
+    tags:
+      - orders
+    parameters:
+      - $ref: '../components/parameters/pagination.yaml#/page'
+      - $ref: '../components/parameters/pagination.yaml#/limit'
+      - name: status
+        in: query
+        description: Filter orders by status.
+        schema:
+          type: string
+          enum: [pending, confirmed, shipped, delivered, cancelled]
+    responses:
+      '200':
+        description: Paginated list of orders.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: array
+                  items:
+                    $ref: '../components/schemas/Order.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/PaginationMeta'
+            examples:
+              orderList:
+                $ref: '../components/examples/orders.yaml#/orderList'
+              sellerOrderList:
+                summary: Seller view — only own items, full-order totals
+                value:
+                  data:
+                    - id: '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+                      order_number: 'ORD-00100042'
+                      buyer_id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+                      status: 'pending'
+                      currency: 'USD'
+                      subtotal: 250.00
+                      shipping_cost: 15.00
+                      tax: 0.00
+                      total: 265.00
+                      items:
+                        - id: 'e1f2a3b4-c5d6-7e8f-9a0b-1c2d3e4f5a6b'
+                          order_id: '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+                          product_id: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+                          product_name: 'Ergonomic Office Chair'
+                          product_image_path: 'product-images/chair.webp'
+                          quantity: 1
+                          unit_price: 199.99
+                          subtotal: 199.99
+                          created_at: '2026-10-14T11:00:00.000Z'
+                        - id: 'f2a3b4c5-d6e7-8f9a-0b1c-2d3e4f5a6b7c'
+                          order_id: '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+                          product_id: '8f3c0b7d-2e3e-4c7f-9d4b-0e6a2f3b5c8d'
+                          product_name: 'Adjustable Standing Desk'
+                          product_image_path: 'product-images/desk.webp'
+                          quantity: 1
+                          unit_price: 50.01
+                          subtotal: 50.01
+                          created_at: '2026-10-14T11:00:00.000Z'
+                      created_at: '2026-10-14T11:00:00.000Z'
+                      updated_at: '2026-10-14T11:00:00.000Z'
+                  meta:
+                    page: 1
+                    per_page: 20
+                    total: 1
+                    total_pages: 1
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+  post:
+    operationId: createOrder
+    summary: Create an order
+    description: |
+      Checkout: turns the authenticated buyer's cart into a `pending` order. The cart is read
+      server-side, so prices and quantities cannot be tampered with.
+
+      Everything runs in one transaction: order and items, atomic stock decrement, a `pending`
+      payment, an `OrderPlaced` event in the outbox (published to RabbitMQ asynchronously) and
+      the cart is cleared. If any step fails nothing is kept and the cart is **not** cleared.
+
+      Shipping is free from a 50.00 subtotal, otherwise a flat 4.99. No taxes yet.
+      Requires the session cookie plus the `X-CSRF-Token` header.
+    tags:
+      - orders
+    parameters:
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - shipping_address
+            properties:
+              shipping_address:
+                type: object
+                required:
+                  - full_name
+                  - phone
+                  - street
+                  - city
+                  - country
+                properties:
+                  full_name:
+                    type: string
+                    minLength: 2
+                    maxLength: 100
+                    example: 'Aaron Florez'
+                  phone:
+                    type: string
+                    description: Contact phone (digits, spaces, +, -, parentheses).
+                    pattern: '^[0-9+()\-\s]{6,20}$'
+                    example: '71234567'
+                  street:
+                    type: string
+                    minLength: 3
+                    maxLength: 200
+                    example: 'Av. Arce #123'
+                  city:
+                    type: string
+                    minLength: 2
+                    maxLength: 100
+                    example: 'La Paz'
+                  state:
+                    type: string
+                    maxLength: 100
+                    example: 'La Paz'
+                  postal_code:
+                    type: string
+                    maxLength: 20
+                    example: '0000'
+                  country:
+                    type: string
+                    description: ISO 3166-1 alpha-2 country code.
+                    minLength: 2
+                    maxLength: 2
+                    example: 'BO'
+              payment_method:
+                type: string
+                enum: [simulated, cash_on_delivery]
+                default: simulated
+                description: The payment is always created `pending`; no real charge is made.
+              notes:
+                type: string
+                maxLength: 500
+                description: Optional delivery instructions.
+                example: 'Please leave package at the front desk.'
+          examples:
+            createOrder:
+              $ref: '../components/examples/orders.yaml#/createOrder'
+    responses:
+      '201':
+        description: Order created successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Order.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              orderDetail:
+                $ref: '../components/examples/orders.yaml#/orderDetail'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        description: Forbidden — the `X-CSRF-Token` header is missing or does not match the `csrf_token` cookie.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              invalidCsrf:
+                summary: Invalid CSRF token
+                value:
+                  error:
+                    code: 'INVALID_CSRF_TOKEN'
+                    message: 'CSRF token missing or invalid'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+      '422':
+        description: |
+          Unprocessable Entity — the cart cannot become an order. The transaction is rolled back and
+          the cart is **not** cleared.
+
+          | `error.code` | When |
+          |---|---|
+          | `EMPTY_CART` | The buyer has no items in the cart. |
+          | `INSUFFICIENT_STOCK` | A product has less stock than requested (including the concurrent "last unit" case). `details[].field` is `items.<product_id>`. |
+          | `PRODUCT_UNAVAILABLE` | A product in the cart is no longer published. |
+          | `MIXED_CURRENCIES` | The cart mixes products priced in different currencies. |
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              emptyCart:
+                summary: Empty cart
+                value:
+                  error:
+                    code: 'EMPTY_CART'
+                    message: 'Your cart is empty'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+              insufficientStock:
+                summary: Not enough stock
+                value:
+                  error:
+                    code: 'INSUFFICIENT_STOCK'
+                    message: 'Insufficient stock for Ergonomic Office Chair'
+                    details:
+                      - field: 'items.7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+                        message: 'Insufficient stock for Ergonomic Office Chair'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+getById:
+  get:
+    operationId: getOrderById
+    summary: Get an order by ID
+    description: |
+      Returns a single order with its items. Buyers may only access their own orders.
+      Sellers may access orders containing their products. Admins may access all.
+    tags:
+      - orders
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/orderId'
+    responses:
+      '200':
+        description: Order details.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Order.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              orderDetail:
+                $ref: '../components/examples/orders.yaml#/orderDetail'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+updateStatus:
+  patch:
+    operationId: updateOrderStatus
+    summary: Update order status
+    description: |
+      Transitions an order to a new status.
+
+      **Valid transitions per role.** Any transition not listed below returns `422 INVALID_STATUS_TRANSITION`:
+
+      | Actor | From | To |
+      |-------|------|-----|
+      | Seller | `pending` | `confirmed` |
+      | Seller | `confirmed` | `shipped` |
+      | Seller | `shipped` | `delivered` |
+      | Seller | `confirmed` | `cancelled` |
+      | Buyer | `pending` | `cancelled` |
+      | Admin | any non-terminal state | any status |
+
+      `delivered` and `cancelled` are terminal — no further transitions are allowed.
+
+      **Access control (enforced by RLS):** a seller may only update orders that
+      contain at least one of their products. Attempting to update another seller's
+      order returns `403 FORBIDDEN`.
+    tags:
+      - orders
+    parameters:
+      - $ref: '../components/parameters/path-ids.yaml#/orderId'
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - status
+            properties:
+              status:
+                type: string
+                enum: [confirmed, shipped, delivered, cancelled]
+                example: confirmed
+          examples:
+            confirmOrder:
+              summary: Seller confirms the order
+              value:
+                status: confirmed
+            cancelOrder:
+              summary: Buyer cancels the order
+              value:
+                status: cancelled
+    responses:
+      '200':
+        description: Order status updated successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  $ref: '../components/schemas/Order.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
+      '404':
+        $ref: '../components/responses/errors.yaml#/NotFound'
+      '409':
+        $ref: '../components/responses/errors.yaml#/Conflict'
+      '422':
+        description: Invalid order status transition.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              invalidStatusTransition:
+                summary: Invalid order status transition
+                value:
+                  error:
+                    code: 'INVALID_STATUS_TRANSITION'
+                    message: 'Cannot transition the order to the requested status.'
+                    details: []
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'

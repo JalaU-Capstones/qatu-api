@@ -1,0 +1,76 @@
+type: object
+description: A rating submitted by a buyer for a product or seller after a delivered order.
+required:
+  - id
+  - buyer_id
+  - order_id
+  - rating
+  - created_at
+  - updated_at
+properties:
+  id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Unique identifier of the rating.
+    examples:
+      - 'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d'
+  buyer_id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Profile identifier of the buyer who submitted the rating.
+    examples:
+      - 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+  order_id:
+    type: string
+    format: uuid
+    description: Identifier of the delivered order that authorizes this rating.
+    examples:
+      - '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+  product_id:
+    type: [string, 'null']
+    format: uuid
+    description: Identifier of the rated product. Required when rating a product.
+    examples:
+      - '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+  seller_id:
+    type: [string, 'null']
+    format: uuid
+    description: Identifier of the rated seller profile. Required when rating a seller.
+    examples:
+      - null
+  rating:
+    type: integer
+    minimum: 1
+    maximum: 5
+    description: Numeric rating score between 1 (lowest) and 5 (highest).
+    examples:
+      - 5
+  title:
+    type: [string, 'null']
+    maxLength: 120
+    description: Short headline summary of the review.
+    examples:
+      - 'Excellent quality, very comfortable!'
+  comment:
+    type: [string, 'null']
+    maxLength: 2000
+    description: Detailed review text provided by the buyer.
+    examples:
+      - 'This chair exceeded my expectations. Assembly was straightforward and the lumbar support is perfect.'
+  created_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Timestamp when the rating was submitted.
+    examples:
+      - '2026-10-14T12:00:00.000Z'
+  updated_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Timestamp when the rating was last updated.
+    examples:
+      - '2026-10-14T12:00:00.000Z'
+additionalProperties: false

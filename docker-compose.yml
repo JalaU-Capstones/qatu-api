@@ -1,58 +1,93 @@
-version: '3.8'
+# ─────────────────────────────────────────────────────────────────────────────
+# Qatu API — Docker Compose BASE
+#
+# This file holds the shared service definitions. It is NOT meant to be run
+# on its own. Combine it with one of:
+#
+#   Development:  docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   Production:   docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+#   Dev tools:    docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.dev-tools.yml up
+#
+# Per ADR-016: postgres and rabbitmq use `expose` (internal only) in the base.
+# Overrides decide whether to open host ports.
+# ─────────────────────────────────────────────────────────────────────────────
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
-      POSTGRES_USER: qatu
-      POSTGRES_PASSWORD: qatu_dev_password
-      POSTGRES_DB: qatu_dev
-    ports:
-      - '5432:5432'
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - qatu-net
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U qatu -d qatu_dev']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}']
       interval: 5s
       timeout: 5s
-      retries: 5
-    networks:
-      - qatu-network
+      retries: 10
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    expose:
+      - '5432'
 
   rabbitmq:
-    image: rabbitmq:3-management-alpine
+    image: rabbitmq:4.1-management-alpine
     environment:
-      RABBITMQ_DEFAULT_USER: qatu
-      RABBITMQ_DEFAULT_PASS: qatu_dev_password
-    ports:
-      - '5672:5672'
-      - '15672:15672'
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-qatu}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-qatu_dev_password}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - qatu-net
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
-      interval: 5s
+      test: ['CMD', 'rabbitmq-diagnostics', 'ping']
+      interval: 10s
       timeout: 10s
       retries: 5
-    networks:
-      - qatu-network
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    expose:
+      - '5672'
 
-  pgadmin:
-    image: dpage/pgadmin4
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@qatu.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - '5050:80'
+  api:
+    build:
+      context: .
+      target: runtime
+    env_file:
+      - .env
     networks:
-      - qatu-network
+      - qatu-net
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    expose:
+      - '3000'
 
 volumes:
   postgres_data:
+    driver: local
   rabbitmq_data:
+    driver: local
 
 networks:
-  qatu-network:
+  qatu-net:
     driver: bridge
+    name: qatu-net

@@ -1,0 +1,70 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Qatu API — Docker Compose DEV TOOLS override (optional)
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.dev-tools.yml up
+#
+# Adds admin/management UIs that MUST NOT run in production:
+#   - pgAdmin (DB inspection) — exposes 8080 on host.
+#   - No RabbitMQ Management service is added here because rabbitmq:4.1-
+#     management-alpine already ships the management UI on 15672 (exposed in
+#     docker-compose.dev.yml).
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  pgadmin:
+    image: dpage/pgadmin4:9
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@qatu.com}
+      # pgAdmin v9 requires a password of at least 6 characters. The old
+      # default `admin` (5 chars) caused the container to reject logins
+      # silently. Use `admin123` unless overridden via PGADMIN_PASSWORD.
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+      # pgAdmin v9 auto-imports servers.json on first boot when this env var
+      # points to it, pre-registering the postgres server so team members do
+      # not need to click "Add Server" manually. Update docker/pgadmin/pgpass
+      # if you change POSTGRES_PASSWORD.
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      # pgAdmin v9 auto-imports servers.json on first boot (PGADMIN_SERVER_JSON_FILE above).
+      # pgpass supplies the password so the connection works without manual entry.
+      # If you change POSTGRES_PASSWORD in .env, update docker/pgadmin/pgpass to match.
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+      - ./docker/pgadmin/pgpass:/var/lib/pgadmin/pgpass:ro
+    networks:
+      - qatu-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # pgAdmin v9 with `no-new-privileges:true` internally changes
+      # PGADMIN_LISTEN_PORT from 80 to 8080 (avoiding CAP_NET_BIND_SERVICE).
+      # gunicorn listens on 8080 inside the container, so the host must
+      # forward to 8080, not 80. (Prompt 42 tried 8080:80 and got
+      # "Connection reset by peer".)
+      - '8080:8080'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    healthcheck:
+      # pgAdmin runs with SERVER_MODE=False (Desktop mode, no auth), so
+      # `/login` returns 401 and wget treats that as an error. The `/misc/ping`
+      # endpoint returns 200 OK with body `PING` in both Desktop and Server
+      # modes, so it's the reliable readiness probe.
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:8080/misc/ping || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
+volumes:
+  pgadmin_data:
+    driver: local

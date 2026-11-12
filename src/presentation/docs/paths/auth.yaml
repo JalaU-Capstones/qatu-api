@@ -1,0 +1,507 @@
+register:
+  post:
+    operationId: registerUser
+    summary: Register a new user
+    description: |
+      Creates a new user account via Supabase Auth and initializes the user profile
+      with the `buyer` role.
+
+      On success, the backend sets three cookies via `Set-Cookie` response headers:
+      - `access_token` — HttpOnly, Secure, SameSite=Strict (Supabase JWT)
+      - `refresh_token` — HttpOnly, Secure, SameSite=Strict (long-lived)
+      - `csrf_token` — SameSite=Strict, **NOT** HttpOnly (frontend must read it)
+
+      The JSON body returns only the user, profile, and roles — **no token**.
+      Subsequent authenticated requests rely on the cookie; no `Authorization`
+      header is required from the client.
+
+      See ADR-012 (wiki) for the full migration rationale.
+    tags:
+      - auth
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - email
+              - password
+              - username
+            properties:
+              email:
+                type: string
+                format: email
+                description: Primary email for the account.
+                examples:
+                  - 'buyer@example.com'
+              password:
+                type: string
+                format: password
+                minLength: 8
+                pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$'
+                description: |
+                  At least 8 characters, with one uppercase letter, one lowercase letter,
+                  one number, and one special character.
+                examples:
+                  - 'StrongPassword123!'
+              username:
+                type: string
+                minLength: 3
+                maxLength: 30
+                pattern: '^[a-zA-Z0-9_]{3,30}$'
+                description: Unique public username.
+                examples:
+                  - 'john_doe'
+              full_name:
+                type: string
+                maxLength: 100
+                description: |
+                  Optional display name. Empty is allowed. When non-empty, length is 2 to 100.
+                examples:
+                  - 'John Doe'
+            additionalProperties: false
+          examples:
+            default:
+              $ref: '../components/examples/auth.yaml#/RegisterRequest'
+    responses:
+      '201':
+        description: User registered successfully; cookies set; no token in body.
+        headers:
+          Set-Cookie:
+            description: |
+              Three cookies set: `access_token` (HttpOnly), `refresh_token` (HttpOnly),
+              `csrf_token` (readable). Backend enforces HttpOnly + Secure + SameSite=Strict
+              on the two token cookies.
+            schema:
+              type: string
+              example: 'access_token=eyJhbGciOi...; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600'
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  properties:
+                    user:
+                      $ref: '../components/schemas/User.yaml'
+                    profile:
+                      $ref: '../components/schemas/Profile.yaml'
+                    roles:
+                      type: array
+                      items:
+                        $ref: '../components/schemas/Role.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              default:
+                $ref: '../components/examples/auth.yaml#/RegisterResponse'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '409':
+        $ref: '../components/responses/errors.yaml#/Conflict'
+      '429':
+        $ref: '../components/responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+login:
+  post:
+    operationId: loginUser
+    summary: Authenticate and receive session cookies
+    description: |
+      Authenticates user credentials via Supabase Auth. On success, sets the same
+      three cookies as `POST /v1/auth/register`. Returns the user, profile, and
+      roles in the body — no token. Public endpoint.
+    tags:
+      - auth
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - email
+              - password
+            properties:
+              email:
+                type: string
+                format: email
+                description: Registered account email.
+                examples:
+                  - 'buyer@example.com'
+              password:
+                type: string
+                format: password
+                minLength: 1
+                description: Account password. Required and non-empty. It is not parsed as SQL.
+                examples:
+                  - 'StrongPassword123!'
+            additionalProperties: false
+          examples:
+            default:
+              $ref: '../components/examples/auth.yaml#/LoginRequest'
+    responses:
+      '200':
+        description: Login successful; cookies set; no token in body.
+        headers:
+          Set-Cookie:
+            description: |
+              Three cookies set: `access_token` (HttpOnly), `refresh_token` (HttpOnly),
+              `csrf_token` (readable). Same flags as register.
+            schema:
+              type: string
+              example: 'access_token=eyJhbGciOi...; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600'
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  properties:
+                    user:
+                      $ref: '../components/schemas/User.yaml'
+                    profile:
+                      $ref: '../components/schemas/Profile.yaml'
+                    roles:
+                      type: array
+                      items:
+                        $ref: '../components/schemas/Role.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              default:
+                $ref: '../components/examples/auth.yaml#/LoginResponse'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '429':
+        $ref: '../components/responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+refresh:
+  post:
+    operationId: refreshSession
+    summary: Refresh the access token using the refresh_token cookie
+    description: |
+      Reads the `refresh_token` cookie, calls `supabase.auth.refreshSession()`,
+      and sets fresh `access_token` + `refresh_token` cookies (rotated by Supabase).
+
+      **When the frontend should call this:** when an authenticated request
+      returns `401` with `error.code: 'REFRESH_REQUIRED'`, the frontend calls
+      this endpoint once, then retries the original request. If this endpoint
+      also fails (`401`), the frontend clears state and redirects to `/login`.
+
+      Public endpoint (no auth required) — the refresh token IS the auth.
+    tags:
+      - auth
+    security: []
+    responses:
+      '200':
+        description: New session cookies set.
+        headers:
+          Set-Cookie:
+            description: |
+              Fresh `access_token` and `refresh_token` (rotated). `csrf_token` is
+              re-issued as well to stay in sync.
+            schema:
+              type: string
+              example: 'access_token=eyJhbGciOi...; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600'
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  properties:
+                    user:
+                      $ref: '../components/schemas/User.yaml'
+                    profile:
+                      $ref: '../components/schemas/Profile.yaml'
+                    roles:
+                      type: array
+                      items:
+                        $ref: '../components/schemas/Role.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+      '401':
+        description: |
+          Refresh failed. The refresh token is expired, revoked, or missing.
+          Frontend must clear local state and redirect to `/login`.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+      '429':
+        $ref: '../components/responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+logout:
+  post:
+    operationId: logoutUser
+    summary: Logout current user and clear session cookies
+    description: |
+      Invalidates the current session on Supabase (calls `supabase.auth.signOut()`)
+      and clears all three cookies (`access_token`, `refresh_token`, `csrf_token`)
+      with `Set-Cookie: <name>=; Max-Age=0`. Returns `204 No Content`.
+
+      **Transitional dual authentication:** during the migration window, this
+      endpoint accepts either the `access_token` cookie OR the legacy
+      `Authorization: Bearer <token>` header. Bearer support is deprecated and
+      will be removed in Sprint 5.
+    tags:
+      - auth
+    security:
+      - cookieAuth: []
+      - bearerAuth: []
+    responses:
+      '204':
+        description: Logout successful; all session cookies cleared.
+        headers:
+          Set-Cookie:
+            description: |
+              Three cookies cleared (access_token, refresh_token, csrf_token)
+              via `Set-Cookie: <name>=; Max-Age=0; Path=/; HttpOnly`.
+            schema:
+              type: string
+              example: 'access_token=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '429':
+        $ref: '../components/responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+me:
+  get:
+    operationId: getCurrentUser
+    summary: Get current authenticated user (from session cookie)
+    description: |
+      Returns the authenticated user's Supabase account, profile, and roles,
+      extracted from the `access_token` cookie by the backend `authMiddleware`.
+      **No token is returned in the response body** — the session lives only
+      in the cookie.
+
+      Frontend calls this on application boot to restore user context.
+
+      **Transitional dual authentication:** during the migration window, this
+      endpoint accepts either the `access_token` cookie OR the legacy
+      `Authorization: Bearer <token>` header.
+    tags:
+      - auth
+    security:
+      - cookieAuth: []
+      - bearerAuth: []
+    responses:
+      '200':
+        description: Current user retrieved successfully.
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  properties:
+                    user:
+                      $ref: '../components/schemas/User.yaml'
+                    profile:
+                      $ref: '../components/schemas/Profile.yaml'
+                    roles:
+                      type: array
+                      items:
+                        $ref: '../components/schemas/Role.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              default:
+                $ref: '../components/examples/auth.yaml#/CurrentUserResponse'
+      '401':
+        description: |
+          No valid session. Cases:
+          - Missing `access_token` cookie (and no Bearer fallback) → `error.code: 'UNAUTHORIZED'`
+          - Expired access_token + valid refresh_token → `error.code: 'REFRESH_REQUIRED'` (frontend should call `/auth/refresh` once then retry)
+          - Invalid/revoked token → `error.code: 'UNAUTHORIZED'`
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+      '429':
+        $ref: '../components/responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+oauthExchange:
+  post:
+    operationId: exchangeOAuthTokens
+    summary: Exchange OAuth tokens for a session
+    description: |
+      Handles the OAuth callback handoff from the frontend. The frontend
+      completes the Supabase PKCE exchange on `/auth/callback` and holds a
+      valid `session.access_token` and `session.refresh_token`. It then calls
+      this endpoint with both tokens. The backend verifies the access token
+      server-side via `supabase.auth.getUser(token)` and sets the three
+      HttpOnly session cookies (access_token, refresh_token, csrf_token)
+      identical to `/auth/login`.
+
+      **Public endpoint:** the token in the body IS the auth. No cookie or
+      Bearer header is required.
+
+      **No token in the response body:** the session lives exclusively in the
+      cookies, per ADR-012.
+
+      **Implementation companion:** see `Architecture/OAuth-Flow.md` in the
+      Wiki for the full sequence diagram, the field mapping from Google, and
+      the frontend code sketch.
+    tags:
+      - auth
+    security: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - access_token
+              - refresh_token
+            properties:
+              access_token:
+                type: string
+                description: |
+                  Supabase access token returned by the PKCE exchange on the
+                  frontend. Verified server-side via `supabase.auth.getUser()`.
+                examples:
+                  - 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhMGVlYmM5OS05YzBiLTRlZjgtYmI2ZC02YmI5YmQzODBhMTEiLCJlbWFpbCI6ImJ1eWVyQGV4YW1wbGUuY29tIn0.signature'
+              refresh_token:
+                type: string
+                description: |
+                  Supabase refresh token returned by the PKCE exchange. Stored
+                  in the HttpOnly `refresh_token` cookie for `/auth/refresh`.
+                examples:
+                  - 'a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d'
+            additionalProperties: false
+          examples:
+            default:
+              $ref: '../components/examples/auth.yaml#/OAuthExchangeRequest'
+    responses:
+      '200':
+        description: OAuth session established; HttpOnly cookies set; no token in body.
+        headers:
+          Set-Cookie:
+            description: |
+              Three cookies set: `access_token` (HttpOnly, Secure in prod,
+              SameSite=Strict), `refresh_token` (same flags), and `csrf_token`
+              (readable, SameSite=Strict, NOT HttpOnly).
+            schema:
+              type: string
+              example: 'access_token=eyJhbGciOi...; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=3600'
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  properties:
+                    user:
+                      $ref: '../components/schemas/User.yaml'
+                    profile:
+                      $ref: '../components/schemas/Profile.yaml'
+                    roles:
+                      type: array
+                      items:
+                        $ref: '../components/schemas/Role.yaml'
+                meta:
+                  $ref: '../components/schemas/shared.yaml#/Meta'
+            examples:
+              default:
+                $ref: '../components/examples/auth.yaml#/OAuthExchangeResponse'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '429':
+        $ref: '../components/responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'
+
+changePassword:
+  patch:
+    operationId: changePassword
+    summary: Change authenticated user's password
+    description: |
+      Allows an authenticated user to change their password.
+      Required because the frontend cannot use the Supabase SDK directly (the session is in HttpOnly cookies).
+      The backend verifies the `current_password` before updating to `new_password`.
+    tags:
+      - auth
+    parameters:
+      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - current_password
+              - new_password
+            properties:
+              current_password:
+                type: string
+                format: password
+                description: The user's current password.
+              new_password:
+                type: string
+                format: password
+                minLength: 8
+                pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$'
+                description: The new password. Must meet complexity requirements.
+          examples:
+            changePassword:
+              summary: Update password
+              value:
+                current_password: 'OldPassword123!'
+                new_password: 'NewStrongPassword456!'
+    responses:
+      '204':
+        description: Password updated successfully.
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '422':
+        description: Password does not meet the complexity requirements.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              validation:
+                summary: Weak new password
+                value:
+                  error:
+                    code: 'VALIDATION_ERROR'
+                    message: 'Password must be at least 8 characters, with uppercase, lowercase, number, and special character.'
+                    details:
+                      - field: 'new_password'
+                        message: 'Password does not meet complexity requirements.'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+      '500':
+        $ref: '../components/responses/errors.yaml#/InternalServerError'

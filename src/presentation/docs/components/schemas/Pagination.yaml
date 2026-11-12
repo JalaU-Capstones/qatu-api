@@ -1,0 +1,34 @@
+type: object
+description: Pagination metadata envelope for list and search collection responses.
+required:
+  - page
+  - per_page
+  - total
+  - total_pages
+properties:
+  page:
+    type: integer
+    minimum: 1
+    description: Current page number (1-indexed).
+    examples:
+      - 1
+  per_page:
+    type: integer
+    minimum: 1
+    maximum: 100
+    description: Number of records per page.
+    examples:
+      - 20
+  total:
+    type: integer
+    minimum: 0
+    description: Total number of matching records found.
+    examples:
+      - 100
+  total_pages:
+    type: integer
+    minimum: 0
+    description: Total count of pages based on total records and per_page.
+    examples:
+      - 5
+additionalProperties: false

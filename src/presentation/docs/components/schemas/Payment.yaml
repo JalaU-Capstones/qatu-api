@@ -1,0 +1,99 @@
+type: object
+description: Payment record associated with a marketplace order.
+required:
+  - id
+  - order_id
+  - amount
+  - currency
+  - method
+  - status
+  - created_at
+  - updated_at
+properties:
+  id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Unique identifier of the payment record.
+    examples:
+      - 'f2a3b4c5-d6e7-8f9a-0b1c-2d3e4f5a6b7c'
+  order_id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Identifier of the order this payment belongs to.
+    examples:
+      - '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+  amount:
+    type: number
+    format: double
+    minimum: 0
+    description: Total amount charged for this payment.
+    examples:
+      - 214.99
+  currency:
+    type: string
+    enum:
+      - USD
+      - EUR
+      - BOB
+      - PEN
+      - ARS
+      - COP
+      - MXN
+      - BRL
+    description: ISO 4217 currency code for the payment amount.
+    examples:
+      - 'USD'
+  method:
+    type: string
+    enum:
+      - simulated
+      - stripe
+      - paypal
+      - cash_on_delivery
+    description: Payment method used to process the transaction.
+    examples:
+      - 'simulated'
+  provider:
+    type: [string, 'null']
+    description: External payment provider name if applicable.
+    examples:
+      - null
+  provider_payment_id:
+    type: [string, 'null']
+    description: External payment identifier assigned by the payment provider.
+    examples:
+      - null
+  status:
+    type: string
+    enum:
+      - pending
+      - processing
+      - completed
+      - failed
+      - refunded
+    description: Current processing state of the payment.
+    examples:
+      - 'pending'
+  metadata:
+    type: object
+    additionalProperties: true
+    description: Free-form provider-specific metadata associated with the payment.
+    examples:
+      - {}
+  created_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Payment record creation timestamp.
+    examples:
+      - '2026-10-14T11:00:00.000Z'
+  updated_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Payment record last update timestamp.
+    examples:
+      - '2026-10-14T11:00:00.000Z'
+additionalProperties: false

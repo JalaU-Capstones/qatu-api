@@ -1,0 +1,129 @@
+id:
+  name: id
+  in: path
+  description: Unique UUID identifier of the resource.
+  required: true
+  schema:
+    type: string
+    format: uuid
+  examples:
+    defaultId:
+      summary: Standard UUID
+      value: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+
+imageId:
+  name: imageId
+  in: path
+  description: Unique UUID identifier of the product image.
+  required: true
+  schema:
+    type: string
+    format: uuid
+  examples:
+    imageUuid:
+      summary: Image UUID
+      value: '8f3c0b7d-2e3e-4c7f-9d4b-0e6a2f3b5c8d'
+
+productId:
+  name: productId
+  in: path
+  description: Unique UUID identifier of the product.
+  required: true
+  schema:
+    type: string
+    format: uuid
+  examples:
+    productUuid:
+      summary: Product UUID
+      value: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+
+categoryId:
+  name: categoryId
+  in: path
+  description: Unique UUID identifier of the category.
+  required: true
+  schema:
+    type: string
+    format: uuid
+  examples:
+    categoryUuid:
+      summary: Category UUID
+      value: 'b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'
+
+applicationId:
+  name: applicationId
+  in: path
+  description: Unique UUID identifier of the seller application.
+  required: true
+  schema:
+    type: string
+    format: uuid
+  examples:
+    applicationUuid:
+      summary: Application UUID
+      value: '4f3c2b1a-0e9d-8c7b-6a5f-4e3d2c1b0a9f'
+
+orderId:
+  name: orderId
+  in: path
+  description: Unique UUID identifier of the order.
+  required: true
+  schema:
+    type: string
+    format: uuid
+  examples:
+    orderUuid:
+      summary: Order UUID
+      value: '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+
+cartItemId:
+  name: cartItemId
+  in: path
+  description: Unique UUID identifier of the cart item.
+  required: true
+  schema:
+    type: string
+    format: uuid
+  examples:
+    cartItemUuid:
+      summary: Cart item UUID
+      value: '5b4a3c2d-1e0f-9a8b-7c6d-5e4f3a2b1c0d'
+
+conversationId:
+  name: conversationId
+  in: path
+  description: Unique UUID identifier of the conversation.
+  required: true
+  schema:
+    type: string
+    format: uuid
+  examples:
+    conversationUuid:
+      summary: Conversation UUID
+      value: 'b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e'
+
+notificationId:
+  name: notificationId
+  in: path
+  description: Unique UUID identifier of the notification.
+  required: true
+  schema:
+    type: string
+    format: uuid
+  examples:
+    notificationUuid:
+      summary: Notification UUID
+      value: 'd4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a'
+
+sellerId:
+  name: sellerId
+  in: path
+  description: Unique UUID identifier of the seller (user).
+  required: true
+  schema:
+    type: string
+    format: uuid
+  examples:
+    sellerUuid:
+      summary: Seller UUID
+      value: 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f'

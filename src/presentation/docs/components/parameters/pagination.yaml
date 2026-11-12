@@ -1,0 +1,43 @@
+page:
+  name: page
+  in: query
+  description: Page number for paginated results (1-indexed).
+  required: false
+  schema:
+    type: integer
+    minimum: 1
+    default: 1
+  examples:
+    firstPage:
+      summary: First page
+      value: 1
+
+perPage:
+  name: per_page
+  in: query
+  description: Number of items to return per page (maximum 100).
+  required: false
+  schema:
+    type: integer
+    minimum: 1
+    maximum: 100
+    default: 20
+  examples:
+    defaultSize:
+      summary: Default page size
+      value: 20
+
+limit:
+  name: limit
+  in: query
+  description: Number of items to return per page (maximum 100).
+  required: false
+  schema:
+    type: integer
+    minimum: 1
+    maximum: 100
+    default: 20
+  examples:
+    defaultLimit:
+      summary: Default limit
+      value: 20

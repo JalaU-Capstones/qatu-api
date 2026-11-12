@@ -1,0 +1,68 @@
+type: object
+description: Public and private profile information for a marketplace user.
+required:
+  - id
+  - username
+  - locale
+  - created_at
+  - updated_at
+properties:
+  id:
+    type: string
+    format: uuid
+    readOnly: true
+    description: Unique identifier referencing auth.users(id).
+    examples:
+      - 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+  username:
+    type: string
+    minLength: 3
+    maxLength: 30
+    pattern: '^[a-zA-Z0-9_]{3,30}$'
+    description: Unique public username for the profile.
+    examples:
+      - 'john_doe'
+  full_name:
+    type: [string, 'null']
+    maxLength: 100
+    description: Display full name of the user.
+    examples:
+      - 'John Doe'
+  email:
+    type: [string, 'null']
+    format: email
+    description: Contact email address synced from user account.
+    examples:
+      - 'john@example.com'
+  avatar_path:
+    type: [string, 'null']
+    description: Storage path to the profile avatar in Supabase Storage.
+    examples:
+      - 'avatars/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/avatar.webp'
+  bio:
+    type: [string, 'null']
+    maxLength: 500
+    description: Short biography or description of the user or seller store.
+    examples:
+      - 'Passionate artisan and vintage collector.'
+  locale:
+    type: string
+    default: 'en'
+    description: Preferred user interface language and locale code.
+    examples:
+      - 'en'
+  created_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Profile creation timestamp.
+    examples:
+      - '2026-10-14T10:00:00.000Z'
+  updated_at:
+    type: string
+    format: date-time
+    readOnly: true
+    description: Profile last modification timestamp.
+    examples:
+      - '2026-10-14T10:00:00.000Z'
+additionalProperties: false
