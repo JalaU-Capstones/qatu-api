@@ -5,11 +5,11 @@ listOrCreate:
     description: |
       Returns a paginated list of orders visible to the authenticated user.
 
-      **Visibility (enforced by RLS):**
+      **Visibility (enforced by the API, ADR-017; RLS is defense in depth):**
       - **Buyers:** see only the orders they placed.
       - **Sellers:** see only orders that contain at least one of their products.
         **Important:** the `items[]` array contains ONLY the seller's own items
-        (RLS filters `order_items` per seller). However, `subtotal`, `shipping_cost`,
+        (the API joins `order_items` to `products.seller_id`). However, `subtotal`, `shipping_cost`,
         `tax`, and `total` reflect the **full order** as created by the buyer, since
         those fields were computed at checkout across all items. A seller dashboard
         must compute the seller's own revenue from `items[]` (sum of `item.subtotal`),
@@ -21,8 +21,11 @@ listOrCreate:
       `GET /v1/profiles/{buyer_id}` separately. Keeping the payload lean avoids
       cross-aggregate expansion in list views.
 
-      **Query parameters:** `page`, `limit`, `status` (one of `pending`, `confirmed`,
-      `shipped`, `delivered`, `cancelled`).
+      **Query parameters:** `page`, `limit`, `status`, `view` (`buyer`|`seller`|`admin`, default `buyer`; ADR-017).
+
+      **Roles are resolved server-side** from the authenticated user's stored roles (`user_roles`).
+      The client cannot assert a role: nothing in the request (query, body, headers, token metadata)
+      can grant `seller` or `admin`. Asking for a `view` the user's roles do not allow returns `403`.
     tags:
       - orders
     parameters:
@@ -34,6 +37,13 @@ listOrCreate:
         schema:
           type: string
           enum: [pending, confirmed, shipped, delivered, cancelled]
+      - name: view
+        in: query
+        description: List scope (`seller`/`admin` require that role). Default `buyer`.
+        schema:
+          type: string
+          enum: [buyer, seller, admin]
+          default: buyer
     responses:
       '200':
         description: Paginated list of orders.
@@ -257,7 +267,12 @@ getById:
     summary: Get an order by ID
     description: |
       Returns a single order with its items. Buyers may only access their own orders.
-      Sellers may access orders containing their products. Admins may access all.
+      Sellers may access orders containing their products and receive **only their own
+      `items[]`** (totals stay full-order). Admins may access all. Roles come from the
+      server-side `user_roles`, never from the client.
+
+      Errors: `404 NOT_FOUND` when the order does not exist; `403 FORBIDDEN` when it exists
+      but the user may not see it.
     tags:
       - orders
     parameters:
@@ -307,9 +322,13 @@ updateStatus:
 
       `delivered` and `cancelled` are terminal — no further transitions are allowed.
 
-      **Access control (enforced by RLS):** a seller may only update orders that
-      contain at least one of their products. Attempting to update another seller's
-      order returns `403 FORBIDDEN`.
+      **Access (ADR-017):** seller needs ≥1 own product on the order (`403` otherwise).
+      Status is order-level; success enqueues `order.status_changed` via outbox.
+      The actor (`seller`/`buyer`/`admin`) is resolved server-side, never from the client.
+      A seller's response contains only their own `items[]` (totals stay full-order).
+
+      Errors: `404 NOT_FOUND` (no such order), `403 FORBIDDEN` (not allowed on this order),
+      `422 INVALID_STATUS_TRANSITION` (transition not allowed, including any change from a terminal state).
     tags:
       - orders
     parameters:

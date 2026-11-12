@@ -77,6 +77,40 @@ describe('CreateNotificationFromEventUseCase', () => {
     expect(notificationRepository.createFromEvent).not.toHaveBeenCalled();
   });
 
+  it('creates an order_status_changed notification for the buyer', async () => {
+    const statusPayload = {
+      order_id: payload.order_id,
+      order_number: payload.order_number,
+      buyer_id: payload.buyer_id,
+      from_status: 'confirmed',
+      to_status: 'shipped',
+      changed_by: 'seller-1',
+    };
+
+    const result = await useCase.execute({
+      eventId: EVENT_ID,
+      routingKey: 'order.status_changed',
+      payload: statusPayload,
+    });
+
+    expect(result).toEqual({ status: 'created' });
+    expect(notificationRepository.createFromEvent).toHaveBeenCalledWith({
+      eventId: EVENT_ID,
+      profileId: payload.buyer_id,
+      type: 'order_status_changed',
+      title: 'Estado del pedido actualizado',
+      body: 'Tu pedido ORD-00100042 ahora está enviado.',
+      actionUrl: '/orders',
+      payload: {
+        order_id: payload.order_id,
+        order_number: payload.order_number,
+        from_status: 'confirmed',
+        to_status: 'shipped',
+        changed_by: 'seller-1',
+      },
+    });
+  });
+
   it.each([
     ['missing event id', { routingKey: 'order.placed', payload }],
     ['missing payload', { eventId: EVENT_ID, routingKey: 'order.placed' }],

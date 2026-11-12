@@ -51,6 +51,7 @@ describe('GetOrderByIdUseCase', () => {
   it('Scenario: Cannot see other buyers orders - throws 403 Forbidden', async () => {
     const mockRepo = {
       findById: vi.fn().mockResolvedValue(mockOrder),
+      findByIdForSeller: vi.fn().mockResolvedValue(null),
     };
     const useCase = new GetOrderByIdUseCase({ orderRepository: mockRepo });
 
@@ -59,6 +60,7 @@ describe('GetOrderByIdUseCase', () => {
       code: 'FORBIDDEN',
       message: 'You do not have permission to access this order',
     });
+    expect(mockRepo.findByIdForSeller).toHaveBeenCalledWith(orderId, otherBuyerId);
   });
 
   it('returns order details when user is the owner', async () => {
@@ -72,17 +74,66 @@ describe('GetOrderByIdUseCase', () => {
     expect(result.data.order_number).toBe('ORD-00100042');
   });
 
-  it('allows admin to view another buyers order', async () => {
+  it('allows admin (role stored in user_roles) to view another buyers order', async () => {
     const mockRepo = {
       findById: vi.fn().mockResolvedValue(mockOrder),
     };
+    const profileRepository = {
+      findById: vi.fn().mockResolvedValue({ roles: [{ name: 'admin' }] }),
+    };
+    const useCase = new GetOrderByIdUseCase({ orderRepository: mockRepo, profileRepository });
+
+    const result = await useCase.execute({ orderId, userId: otherBuyerId });
+    expect(result.data.id).toBe(orderId);
+    expect(profileRepository.findById).toHaveBeenCalledWith(otherBuyerId);
+  });
+
+  it('ignores a caller-supplied role claim: only user_roles decides (no privilege escalation)', async () => {
+    const mockRepo = {
+      findById: vi.fn().mockResolvedValue(mockOrder),
+      findByIdForSeller: vi.fn().mockResolvedValue(null),
+    };
+    const profileRepository = {
+      findById: vi.fn().mockResolvedValue({ roles: [{ name: 'buyer' }] }),
+    };
+    const useCase = new GetOrderByIdUseCase({ orderRepository: mockRepo, profileRepository });
+
+    // e.g. a forged `user_metadata.role = 'admin'` must have no effect.
+    await expect(
+      useCase.execute({ orderId, userId: otherBuyerId, userRole: 'admin' })
+    ).rejects.toMatchObject({ statusCode: 403, code: 'FORBIDDEN' });
+  });
+
+  it('fails closed when no profile repository is wired: nobody is admin', async () => {
+    const mockRepo = {
+      findById: vi.fn().mockResolvedValue(mockOrder),
+      findByIdForSeller: vi.fn().mockResolvedValue(null),
+    };
     const useCase = new GetOrderByIdUseCase({ orderRepository: mockRepo });
 
-    const result = await useCase.execute({
-      orderId,
-      userId: otherBuyerId,
-      userRole: 'admin',
+    await expect(useCase.execute({ orderId, userId: otherBuyerId })).rejects.toMatchObject({
+      statusCode: 403,
     });
+  });
+
+  it('allows a seller to view an order that contains their products (filtered items)', async () => {
+    const sellerId = 'c2aad099-7c2b-5ef8-bb6d-7bb9bd380c33';
+    const sellerOrder = new Order({
+      id: orderId,
+      orderNumber: 'ORD-00100042',
+      buyerId,
+      status: 'pending',
+      currency: 'USD',
+      total: 265,
+    });
+    const mockRepo = {
+      findById: vi.fn().mockResolvedValue(mockOrder),
+      findByIdForSeller: vi.fn().mockResolvedValue(sellerOrder),
+    };
+    const useCase = new GetOrderByIdUseCase({ orderRepository: mockRepo });
+
+    const result = await useCase.execute({ orderId, userId: sellerId });
     expect(result.data.id).toBe(orderId);
+    expect(mockRepo.findByIdForSeller).toHaveBeenCalledWith(orderId, sellerId);
   });
 });

@@ -1,9 +1,7 @@
 // eslint-disable-next-line no-unused-vars
 import { Order } from '../entities/Order.js';
 
-/**
- * @interface IOrderRepository
- */
+/** @interface IOrderRepository */
 export class IOrderRepository {
   constructor() {
     if (this.constructor === IOrderRepository || new.target === IOrderRepository) {
@@ -11,33 +9,59 @@ export class IOrderRepository {
     }
   }
 
-  /**
-   * Returns a paginated list of orders for a specific buyer.
-   *
-   * @param {Object} params
-   * @param {string} params.buyerId
-   * @param {number} [params.page=1]
-   * @param {number} [params.limit=20]
-   * @param {string} [params.status]
-   * @returns {Promise<{ items: Order[], total: number }>}
-   */
+  /** @returns {Promise<{ items: Order[], total: number }>} */
   // eslint-disable-next-line no-unused-vars
   async findByBuyerId({ buyerId, page = 1, limit = 20, status } = {}) {
     throw new Error('Method not implemented: findByBuyerId');
   }
 
-  /**
-   * Returns an order by its unique identifier, or null if not found.
-   *
-   * @param {string} orderId
-   * @returns {Promise<Order|null>}
-   */
+  /** Seller orders with items filtered to that seller. */
+  // eslint-disable-next-line no-unused-vars
+  async findBySellerId({ sellerId, page = 1, limit = 20, status } = {}) {
+    throw new Error('Method not implemented: findBySellerId');
+  }
+
+  /** Admin: all orders. */
+  // eslint-disable-next-line no-unused-vars
+  async findAll({ page = 1, limit = 20, status } = {}) {
+    throw new Error('Method not implemented: findAll');
+  }
+
+  /** @returns {Promise<Order|null>} */
   // eslint-disable-next-line no-unused-vars
   async findById(orderId) {
     throw new Error('Method not implemented: findById');
   }
 
-  /** Persists a `pending` order with its items (order_number comes from the DB sequence). */
+  /** True if the seller owns ≥1 line on the order. */
+  // eslint-disable-next-line no-unused-vars
+  async sellerHasItemsOnOrder(orderId, sellerId) {
+    throw new Error('Method not implemented: sellerHasItemsOnOrder');
+  }
+
+  /** Order detail with only that seller's items. */
+  // eslint-disable-next-line no-unused-vars
+  async findByIdForSeller(orderId, sellerId) {
+    throw new Error('Method not implemented: findByIdForSeller');
+  }
+
+  /**
+   * Persist status (+ timestamp column) and return the order.
+   * With `itemsSellerId`, the returned order only carries that seller's items.
+   */
+  /* eslint-disable no-unused-vars */
+  async updateStatus({
+    orderId,
+    status,
+    timestampColumn = null,
+    itemsSellerId = null,
+    transaction,
+  } = {}) {
+    throw new Error('Method not implemented: updateStatus');
+  }
+  /* eslint-enable no-unused-vars */
+
+  /** Insert pending order + items. */
   // eslint-disable-next-line no-unused-vars
   async createWithItems(params, { transaction } = {}) {
     throw new Error('Method not implemented: createWithItems');
