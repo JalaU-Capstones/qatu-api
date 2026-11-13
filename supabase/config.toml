@@ -134,6 +134,15 @@ public = true
 file_size_limit = "2MiB"
 allowed_mime_types = ["image/jpeg", "image/png", "image/webp"]
 
+# ── Qatu bucket: product-images ────────────────────────────────────────────────
+# Created automatically on `npx supabase start` and `npx supabase db reset`
+# (US-16 / ADR-020). RLS policies are applied by migration
+# 20261113130000_product_images_bucket_policies.sql.
+[storage.buckets.product-images]
+public = true
+file_size_limit = "5MiB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/webp"]
+
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]
 enabled = true
