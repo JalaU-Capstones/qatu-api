@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { CreateProductUseCase } from '../../application/use-cases/CreateProductUseCase.js';
 import { GetProductByIdUseCase } from '../../application/use-cases/GetProductByIdUseCase.js';
 import { ListProductsUseCase } from '../../application/use-cases/ListProductsUseCase.js';
+import { PublishProductUseCase } from '../../application/use-cases/PublishProductUseCase.js';
 import { ProductRepository } from '../../infrastructure/persistence/repositories/ProductRepository.js';
 import { ProductController } from '../controllers/ProductController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
@@ -15,6 +16,7 @@ export function createProductRouter({
   listProductsUseCase,
   getProductByIdUseCase,
   createProductUseCase,
+  publishProductUseCase,
   productController,
 } = {}) {
   const router = Router();
@@ -37,12 +39,19 @@ export function createProductRouter({
       productRepository,
     });
 
+  const publishUC =
+    publishProductUseCase ||
+    new PublishProductUseCase({
+      productRepository,
+    });
+
   const controller =
     productController ||
     new ProductController({
       listProductsUseCase: listUC,
       getProductByIdUseCase: getByIdUC,
       createProductUseCase: createUC,
+      publishProductUseCase: publishUC,
     });
 
   router.post(
@@ -58,6 +67,10 @@ export function createProductRouter({
   );
 
   router.get('/:id', (req, res, next) => controller.getById(req, res, next));
+
+  router.patch('/:id/publish', authMiddleware, requireSellerRole(), (req, res, next) =>
+    controller.publish(req, res, next)
+  );
 
   return router;
 }

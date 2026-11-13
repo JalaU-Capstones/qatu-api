@@ -95,6 +95,32 @@ export class ProductRepository extends IProductRepository {
     return rows[0];
   }
 
+  async publish({ productId, sellerId }, { transaction } = {}) {
+    const sql = `
+      UPDATE public.products
+      SET state = 'published', updated_at = now()
+      WHERE id = :productId
+        AND seller_id = :sellerId
+        AND state = 'draft'
+        AND deleted_at IS NULL
+      RETURNING *
+    `;
+
+    const queryResult = await this.db.query(sql, {
+      replacements: { productId, sellerId },
+      ...(transaction ? { transaction } : {}),
+    });
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    return rows[0] ?? null;
+  }
+
   /**
    * Maps a database row to a domain Product entity.
    *

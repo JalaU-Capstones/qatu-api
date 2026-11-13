@@ -6,6 +6,7 @@ describe('ProductController', () => {
   let useCaseMock;
   let getByIdUseCaseMock;
   let createProductUseCaseMock;
+  let publishProductUseCaseMock;
   let controller;
 
   beforeEach(() => {
@@ -18,10 +19,14 @@ describe('ProductController', () => {
     createProductUseCaseMock = {
       execute: vi.fn(),
     };
+    publishProductUseCaseMock = {
+      execute: vi.fn(),
+    };
     controller = new ProductController({
       listProductsUseCase: useCaseMock,
       getProductByIdUseCase: getByIdUseCaseMock,
       createProductUseCase: createProductUseCaseMock,
+      publishProductUseCase: publishProductUseCaseMock,
     });
   });
 
@@ -231,6 +236,72 @@ describe('ProductController', () => {
 
       expect(next).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'getProductByIdUseCase is required' })
+      );
+    });
+  });
+
+  describe('publish', () => {
+    const productId = '550e8400-e29b-41d4-a716-446655440000';
+
+    it('responds with 200 and passes product and seller IDs to the use case', async () => {
+      const result = {
+        data: { id: productId, state: 'published', published_at: '2026-10-15T10:00:00.000Z' },
+        meta: { timestamp: '2026-10-15T10:00:00.000Z' },
+      };
+      publishProductUseCaseMock.execute.mockResolvedValue(result);
+
+      const req = {
+        user: { id: 'seller-1', roles: ['seller'] },
+        params: { id: productId },
+      };
+      const json = vi.fn();
+      const status = vi.fn().mockReturnValue({ json });
+      const next = vi.fn();
+
+      await controller.publish(req, { status }, next);
+
+      expect(status).toHaveBeenCalledWith(200);
+      expect(json).toHaveBeenCalledWith(result);
+      expect(publishProductUseCaseMock.execute).toHaveBeenCalledWith({
+        productId,
+        sellerId: 'seller-1',
+      });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('passes use case errors to next without responding', async () => {
+      const error = Object.assign(new Error('You do not own this product'), {
+        code: 'FORBIDDEN',
+        statusCode: 403,
+      });
+      publishProductUseCaseMock.execute.mockRejectedValue(error);
+
+      const status = vi.fn();
+      const next = vi.fn();
+      await controller.publish(
+        { user: { id: 'seller-1' }, params: { id: productId } },
+        { status },
+        next
+      );
+
+      expect(next).toHaveBeenCalledWith(error);
+      expect(status).not.toHaveBeenCalled();
+    });
+
+    it('passes a missing dependency error to next', async () => {
+      const controllerWithoutPublish = new ProductController({
+        listProductsUseCase: useCaseMock,
+      });
+      const next = vi.fn();
+
+      await controllerWithoutPublish.publish(
+        { user: { id: 'seller-1' }, params: { id: productId } },
+        {},
+        next
+      );
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'publishProductUseCase is required' })
       );
     });
   });

@@ -59,6 +59,21 @@ export class IProductRepository {
   }
 
   /**
+   * Atomically transitions a product owned by the seller from 'draft' to
+   * 'published'. Returns the updated row, or null if no row matched (product
+   * not found, wrong seller, or wrong source state). The `handle_product_published_at`
+   * trigger sets `published_at = now()` on the transition.
+   *
+   * @param {{ productId: string, sellerId: string }} args
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object|null>}
+   */
+  async publish(args, options) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ args, options })}`);
+  }
+
+  /**
    * Find a single, non-deleted product with full relational details.
    *
    * @param {string} productId

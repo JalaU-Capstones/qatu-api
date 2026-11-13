@@ -8,14 +8,21 @@ export class ProductController {
     listSellerProductsUseCase,
     getProductByIdUseCase,
     createProductUseCase,
+    publishProductUseCase,
   } = {}) {
-    if (!listProductsUseCase && !listSellerProductsUseCase && !createProductUseCase) {
+    if (
+      !listProductsUseCase &&
+      !listSellerProductsUseCase &&
+      !createProductUseCase &&
+      !publishProductUseCase
+    ) {
       throw new Error('at least one product use case is required');
     }
     this.listProductsUseCase = listProductsUseCase || null;
     this.listSellerProductsUseCase = listSellerProductsUseCase || null;
     this.getProductByIdUseCase = getProductByIdUseCase || null;
     this.createProductUseCase = createProductUseCase || null;
+    this.publishProductUseCase = publishProductUseCase || null;
   }
 
   async list(req, res, next) {
@@ -96,6 +103,36 @@ export class ProductController {
 
       const result = await this.createProductUseCase.execute(requestDto);
       return res.status(201).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async publish(req, res, next) {
+    try {
+      if (!this.publishProductUseCase) {
+        const err = new Error('publishProductUseCase is required');
+        err.statusCode = 500;
+        throw err;
+      }
+
+      const userId = req.user?.id;
+      if (!userId) {
+        const err = new Error('Authentication failed');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+
+      const params = req.validatedParams || req.params || {};
+      const productId = params.id ?? params.productId;
+
+      const result = await this.publishProductUseCase.execute({
+        productId,
+        sellerId: userId,
+      });
+
+      return res.status(200).json(result);
     } catch (error) {
       return next(error);
     }

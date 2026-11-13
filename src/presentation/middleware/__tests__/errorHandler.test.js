@@ -49,6 +49,25 @@ describe('errorHandler Middleware', () => {
     );
   });
 
+  it('preserves the INVALID_STATE_TRANSITION code and message for product state conflicts', () => {
+    const res = createMockRes();
+    const err = Object.assign(new Error("Cannot publish a product in state 'published'"), {
+      code: 'INVALID_STATE_TRANSITION',
+      statusCode: 409,
+    });
+
+    errorHandler(err, mockReq, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({
+      error: {
+        code: 'INVALID_STATE_TRANSITION',
+        message: "Cannot publish a product in state 'published'",
+      },
+      meta: expect.objectContaining({ timestamp: expect.any(String) }),
+    });
+  });
+
   it('should handle domain Password validation errors with 400', () => {
     const res = createMockRes();
     const err = new Error('Password must be at least 8 characters long');

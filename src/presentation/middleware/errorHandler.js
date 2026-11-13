@@ -84,6 +84,16 @@ export function errorHandler(err, req, res, next) {
   }
 
   // CONFLICTS
+  if (err.code === 'INVALID_STATE_TRANSITION' && err.statusCode === 409) {
+    return res.status(409).json({
+      error: {
+        code: err.code,
+        message: err.message || 'Invalid state transition',
+      },
+      meta: { timestamp },
+    });
+  }
+
   if (err.code === 'EMAIL_ALREADY_EXISTS' || err.statusCode === 409) {
     return res.status(409).json({
       error: {
