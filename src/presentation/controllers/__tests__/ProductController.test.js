@@ -19,12 +19,12 @@ describe('ProductController', () => {
     });
   });
 
-  it('should throw if listProductsUseCase dependency is missing in constructor', () => {
-    expect(() => new ProductController({})).toThrow('listProductsUseCase is required');
+  it('should throw if neither product use case dependency is provided in constructor', () => {
+    expect(() => new ProductController({})).toThrow('at least one product use case is required');
   });
 
   it('should throw if no arguments are passed to constructor', () => {
-    expect(() => new ProductController()).toThrow('listProductsUseCase is required');
+    expect(() => new ProductController()).toThrow('at least one product use case is required');
   });
 
   describe('list', () => {

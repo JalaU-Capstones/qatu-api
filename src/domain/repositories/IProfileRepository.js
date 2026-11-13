@@ -19,6 +19,15 @@ export class IProfileRepository {
   }
 
   /**
+   * Returns role names assigned to the given user.
+   * @param {string} userId
+   * @returns {Promise<string[]>}
+   */
+  async getRoleNames(userId) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ userId })}`);
+  }
+
+  /**
    * @param {string} username
    * @returns {Promise<import('../entities/Profile.js').Profile|null>}
    */

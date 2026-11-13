@@ -236,6 +236,76 @@ export class ProductRepository extends IProductRepository {
   }
 
   /**
+   * Paginated list of products owned by a seller, optionally filtered by state.
+   *
+   * @param {string} sellerId
+   * @param {{ page?: number, limit?: number, status?: 'draft'|'published' }} [options]
+   * @returns {Promise<{ items: Product[], total: number, page: number, limit: number }>}
+   */
+  async listBySeller(sellerId, { page = 1, limit = 20, status } = {}) {
+    const pageNumber = Math.max(1, Number(page) || 1);
+    const limitNumber = Math.max(1, Number(limit) || 20);
+    const offsetNumber = (pageNumber - 1) * limitNumber;
+    const replacements = {
+      sellerId,
+      limit: limitNumber,
+      offset: offsetNumber,
+    };
+
+    const whereClauses = ['p.seller_id = :sellerId', 'p.deleted_at IS NULL'];
+    if (status) {
+      whereClauses.push('p.state = :status');
+      replacements.status = status;
+    }
+
+    const whereSql = whereClauses.join(' AND ');
+
+    const countResult = await this.db.query(
+      `SELECT COUNT(*) AS total
+       FROM public.products p
+       WHERE ${whereSql}`,
+      {
+        replacements,
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    const total = Number(countResult?.[0]?.total ?? 0);
+    if (total === 0) {
+      return { items: [], total, page: pageNumber, limit: limitNumber };
+    }
+
+    const queryResult = await this.db.query(
+      `SELECT
+        p.id, p.seller_id, p.category_id, p.name, p.slug, p.description,
+        p.price, p.currency, p.stock, p.attributes, p.primary_image_path,
+        p.state, p.average_rating, p.ratings_count, p.published_at,
+        p.created_at, p.updated_at
+      FROM public.products p
+      WHERE ${whereSql}
+      ORDER BY p.created_at DESC
+      LIMIT :limit OFFSET :offset`,
+      {
+        replacements,
+      }
+    );
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    return {
+      items: rows.map((row) => this.toDomain(row)),
+      total,
+      page: pageNumber,
+      limit: limitNumber,
+    };
+  }
+
+  /**
    * Find a single product with full relational details (seller, category, images).
    *
    * @param {string} productId

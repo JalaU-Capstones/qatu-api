@@ -37,6 +37,16 @@ export class IProductRepository {
   }
 
   /**
+   * Paginated list of products owned by a seller, optionally filtered by state.
+   * @param {string} sellerId
+   * @param {{ page?: number, limit?: number, status?: 'draft'|'published' }} options
+   * @returns {Promise<{ items: Object[], total: number, page: number, limit: number }>}
+   */
+  async listBySeller(sellerId, options = {}) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ sellerId, options })}`);
+  }
+
+  /**
    * Find a single, non-deleted product with full relational details.
    *
    * @param {string} productId
