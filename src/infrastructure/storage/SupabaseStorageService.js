@@ -90,6 +90,12 @@ export class SupabaseStorageService extends IStorageService {
    * @param {string} [params.originalName]
    * @param {number} [params.size]
    * @returns {Promise<{ path: string }>}
+   *
+   * ⚠️ ADR-019 phased rollout: the returned path respects `env.PUBLIC_APP_URL`.
+   * When unset (default), returns the Supabase direct URL. When set, returns
+   * `{PUBLIC_APP_URL}/avatars/...` which requires the frontend nginx proxy
+   * (Phase 2, deferred). Until Phase 2 ships, `PUBLIC_APP_URL` should stay
+   * empty in environments where avatars must render.
    */
   async uploadAvatar({ userId, buffer, mimeType, extension, originalName, size } = {}) {
     if (!userId || !Buffer.isBuffer(buffer) || buffer.length === 0) {
