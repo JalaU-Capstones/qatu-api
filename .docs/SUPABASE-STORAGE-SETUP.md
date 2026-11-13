@@ -123,3 +123,50 @@ SUPABASE_STORAGE_BUCKET=avatars
 ```
 
 If `SUPABASE_STORAGE_PUBLIC_URL` is left empty, the backend automatically derives `${SUPABASE_URL}/storage/v1/object/public`.
+
+## Product Images Bucket (US-16)
+
+The `product-images` bucket was added alongside `avatars` (see `supabase/config.toml` and `supabase/migrations/20261113130000_product_images_bucket_policies.sql`). Configuration:
+
+| Property           | Value                                                             |
+| ------------------ | ----------------------------------------------------------------- |
+| Bucket             | `product-images`                                                  |
+| Visibility         | public (read), authenticated (write)                              |
+| Max file size      | 5 MB                                                              |
+| Allowed MIME types | `image/jpeg`, `image/png`, `image/webp`                           |
+| Path convention    | `product-images/{product_id}/{uuid}.{ext}`                        |
+| Upload policy      | Server-mediated via `SupabaseStorageService.uploadProductImage()` |
+
+**`SupabaseStorageService.uploadProductImage()`** returns:
+
+```js
+{
+  bucket: 'product-images',
+  path: 'product-images/{product_id}/{uuid}.{ext}',  // relative, per ADR-010
+  publicUrl: '<computed>'                              // per ADR-019 (see below)
+}
+```
+
+Callers (e.g. `UploadProductImageUseCase`, prompt 2D.2) must store `path` in the DB and use `publicUrl` in the API response.
+
+**`SupabaseStorageService.getPublicUrl(bucket, objectKey)`** builds the public URL for any stored object. It respects the `PUBLIC_APP_URL` env var (ADR-019):
+
+- **Empty `PUBLIC_APP_URL` (default):** returns the Supabase direct URL
+  `http://localhost:54321/storage/v1/object/public/{bucket}/{objectKey}`.
+- **Set `PUBLIC_APP_URL` (e.g. `http://localhost:5173` or `https://qatu.com`):** returns the SPA-origin URL `{PUBLIC_APP_URL}/{bucket}/{objectKey}`. Requires the client nginx proxy to forward `/avatars/*` and `/product-images/*` (frontend branch).
+
+> [!NOTE]
+> **Legacy inconsistency:** `uploadAvatar()` still returns `{ path: <fullSupabaseUrl> }` (not relative). `profiles.avatar_path` therefore contains full URLs today. Migration to relative paths (storing `avatar_path = 'avatars/{uuid}/xxx.webp'` and computing the URL via `getPublicUrl('avatars', avatar_path)`) is deferred to a future cleanup. New code paths (`uploadProductImage`) use the relative-path convention from day one.
+
+### Testing the bucket locally
+
+After `npx supabase start` (which applies the new migration), the bucket exists and is writable by authenticated users. Verify:
+
+```bash
+# List buckets (auth required)
+curl -s http://localhost:54321/storage/v1/bucket \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" | jq '.[].id'
+# Expected output includes: "avatars" and "product-images"
+```
+
+Uploads via the API (server-mediated) use `SERVICE_ROLE_KEY` and are not blocked by RLS. Direct uploads from a browser require a logged-in session; the simplified bucket-level policy (`bucket_id = 'product-images'`) allows any authenticated user — application-layer ownership validation (in `UploadProductImageUseCase`, prompt 2D.2) enforces that a seller can only upload to their own products.
