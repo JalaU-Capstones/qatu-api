@@ -9,6 +9,8 @@
 #   - api runs `pnpm dev` (nodemon) with source bind-mount for hot reload.
 #   - api is exposed on host:3000 for frontend dev.
 #   - rabbitmq management UI is exposed on host:15672.
+#   - Runtime secrets/config from .env are re-declared as ${VAR} so they are
+#     overridable via shell env / compose without editing the file (Lab W3 #3).
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -27,15 +29,30 @@ services:
     environment:
       NODE_ENV: development
       # Seeds run automatically in dev (idempotent). Override in .env with RUN_SEEDS=false if needed.
-      RUN_SEEDS: 'true'
-      PORT: 3000
+      RUN_SEEDS: ${RUN_SEEDS:-true}
+      PORT: ${PORT:-3000}
       # Containerized API → host Supabase CLI for auth (Mode A).
       # On Linux hosts, `extra_hosts` below maps host.docker.internal.
       SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
       SUPABASE_STORAGE_PUBLIC_URL: ${SUPABASE_STORAGE_PUBLIC_URL:-http://localhost:54321/storage/v1/object/public}
+      SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-avatars}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      JWT_SECRET: ${JWT_SECRET}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-}
-      # Point to Supabase CLI DB (Mode A).
+      # Mode A (ADR-020): Supabase CLI DB on the host, not a compose postgres.
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@host.docker.internal:54322/postgres}
+      # Broker (ADR-014) — overridable without editing .env
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://qatu:qatu_dev_password@rabbitmq:5672}
+      RABBITMQ_ENABLED: ${RABBITMQ_ENABLED:-false}
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-qatu.events}
+      RABBITMQ_NOTIFICATIONS_QUEUE: ${RABBITMQ_NOTIFICATIONS_QUEUE:-qatu.notifications}
+      RABBITMQ_DLX: ${RABBITMQ_DLX:-qatu.dlx}
+      RABBITMQ_DLQ: ${RABBITMQ_DLQ:-qatu.notifications.dlq}
+      OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-2000}
+      OUTBOX_MAX_ATTEMPTS: ${OUTBOX_MAX_ATTEMPTS:-3}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
     volumes:
       - .:/app
       - /app/node_modules
