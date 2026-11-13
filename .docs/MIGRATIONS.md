@@ -208,7 +208,7 @@ npx supabase db reset
 pnpm db:migrate
 
 # 4. Seed public.profiles, roles, categories, and sample products
-pnpm db:seed:all
+pnpm db:seed
 
 # 5. Start the API
 pnpm dev
@@ -218,7 +218,7 @@ pnpm dev
 
 - `npx supabase db reset` creates `auth.users` and installs the `handle_new_user` trigger. The trigger is a no-op while `public.profiles` does not exist (defensive guard in `supabase/migrations/20261113120000_handle_new_user_trigger.sql`).
 - `pnpm db:migrate` creates `public.profiles` and `public.user_roles`.
-- `pnpm db:seed:all` inserts profiles and roles for the seeded seller/admin (whose `auth.users` rows already exist from step 2).
+- `pnpm db:seed` inserts profiles and roles for the seeded seller/admin (whose `auth.users` rows already exist from step 2).
 
 Running `pnpm db:migrate` before `npx supabase db reset` will fail because `public.profiles.id` has an FK to `auth.users.id`.
 
