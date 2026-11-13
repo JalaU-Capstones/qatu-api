@@ -128,6 +128,7 @@ export async function runMigrations(sequelize) {
       // Sequelize 6 misclassifies some PostgreSQL errors (e.g. 42704
       // "role does not exist") as UnknownConstraintError. Surface the real
       // code + message so future schema-shim gaps are diagnosable.
+      // eslint-disable-next-line no-console
       console.error(
         `[migration ${file}] failed: code=${err.parent?.code ?? 'n/a'} message=${err.parent?.message ?? err.message}`
       );
