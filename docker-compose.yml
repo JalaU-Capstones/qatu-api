@@ -18,6 +18,12 @@
 #
 # Per ADR-016: rabbitmq uses `expose` (internal only) in the base.
 # Overrides decide whether to open host ports.
+#
+# Per ADR-018 / DevOps Lab W3 (#3), adapted to ADR-020 (no local postgres):
+#   - `back-end`  → api + rabbitmq (broker stays off the cross-repo bridge)
+#   - `qatu-net`  → api only on this side (client reaches api:3000)
+#   Database is Supabase CLI on the host (:54322), not a compose service.
+#   rabbitmq NEVER joins qatu-net (client must not reach the broker).
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -29,7 +35,7 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
-      - qatu-net
+      - back-end
     healthcheck:
       test: ['CMD', 'rabbitmq-diagnostics', 'ping']
       interval: 10s
@@ -48,6 +54,7 @@ services:
     env_file:
       - .env
     networks:
+      - back-end
       - qatu-net
     depends_on:
       rabbitmq:
@@ -58,12 +65,23 @@ services:
       - ALL
     expose:
       - '3000'
+    # Base healthcheck (Lab W3 / #3): present here so every override inherits it,
+    # not only prod. Matches the Dockerfile HEALTHCHECK against /health.
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:3000/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
 
 volumes:
   rabbitmq_data:
     driver: local
 
 networks:
+  back-end:
+    driver: bridge
+    name: back-end
   qatu-net:
     driver: bridge
     name: qatu-net

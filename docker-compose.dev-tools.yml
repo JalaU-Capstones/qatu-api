@@ -33,6 +33,8 @@ services:
       # If you change POSTGRES_PASSWORD in .env, update docker/pgadmin/pgpass to match.
       - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
       - ./docker/pgadmin/pgpass:/var/lib/pgadmin/pgpass:ro
+    # No local postgres service (ADR-020). pgAdmin stays on qatu-net for the
+    # host port only; point it at Supabase CLI (host.docker.internal:54322).
     networks:
       - qatu-net
     ports:
