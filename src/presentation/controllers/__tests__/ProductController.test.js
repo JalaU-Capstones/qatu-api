@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { CreateProductRequestDTO } from '../../../application/dtos/CreateProductDTO.js';
 import { ProductController } from '../ProductController.js';
 
 describe('ProductController', () => {
   let useCaseMock;
   let getByIdUseCaseMock;
+  let createProductUseCaseMock;
   let controller;
 
   beforeEach(() => {
@@ -13,9 +15,13 @@ describe('ProductController', () => {
     getByIdUseCaseMock = {
       execute: vi.fn(),
     };
+    createProductUseCaseMock = {
+      execute: vi.fn(),
+    };
     controller = new ProductController({
       listProductsUseCase: useCaseMock,
       getProductByIdUseCase: getByIdUseCaseMock,
+      createProductUseCase: createProductUseCaseMock,
     });
   });
 
@@ -84,6 +90,73 @@ describe('ProductController', () => {
       await controller.list(req, res, next);
 
       expect(next).toHaveBeenCalledWith(error);
+    });
+  });
+
+  describe('create', () => {
+    it('should respond with 201 and pass the authenticated seller id into the DTO', async () => {
+      const mockResult = {
+        data: { id: 'p1', name: 'X', slug: 'x' },
+        meta: { timestamp: '2026-10-24T12:00:00.000Z' },
+      };
+      createProductUseCaseMock.execute.mockResolvedValue(mockResult);
+
+      const req = {
+        user: { id: 'seller-123', roles: ['seller'] },
+        body: { name: 'X', price: 10, category_id: '11111111-1111-4111-8111-111111111111' },
+      };
+      const json = vi.fn();
+      const status = vi.fn().mockReturnValue({ json });
+      const res = { status };
+      const next = vi.fn();
+
+      await controller.create(req, res, next);
+
+      expect(status).toHaveBeenCalledWith(201);
+      expect(json).toHaveBeenCalledWith(mockResult);
+      expect(createProductUseCaseMock.execute).toHaveBeenCalledTimes(1);
+      const dto = createProductUseCaseMock.execute.mock.calls[0][0];
+      expect(dto).toBeInstanceOf(CreateProductRequestDTO);
+      expect(dto.sellerId).toBe('seller-123');
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should call next with the thrown error when the use case fails', async () => {
+      const error = new Error('boom');
+      createProductUseCaseMock.execute.mockRejectedValue(error);
+
+      const req = {
+        user: { id: 'seller-123', roles: ['seller'] },
+        body: { name: 'X', price: 10, category_id: '11111111-1111-4111-8111-111111111111' },
+      };
+      const res = { status: vi.fn() };
+      const next = vi.fn();
+
+      await controller.create(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(error);
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    it('should call next with a missing dependency error when createProductUseCase is absent', async () => {
+      const controllerWithoutCreate = new ProductController({
+        listProductsUseCase: useCaseMock,
+      });
+
+      const req = {
+        user: { id: 'seller-123', roles: ['seller'] },
+        body: { name: 'X', price: 10, category_id: '11111111-1111-4111-8111-111111111111' },
+      };
+      const res = {};
+      const next = vi.fn();
+
+      await controllerWithoutCreate.create(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('createProductUseCase is required'),
+        })
+      );
     });
   });
 

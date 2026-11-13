@@ -47,6 +47,18 @@ export class IProductRepository {
   }
 
   /**
+   * Creates a new product row and returns the inserted record.
+   *
+   * @param {Object} data
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object>}
+   */
+  async create(data, options) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ data, options })}`);
+  }
+
+  /**
    * Find a single, non-deleted product with full relational details.
    *
    * @param {string} productId

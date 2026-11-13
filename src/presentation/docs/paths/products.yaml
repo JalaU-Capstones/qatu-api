@@ -128,6 +128,13 @@ create:
                 minimum: 0
                 default: 0
                 example: 25
+              attributes:
+                type: object
+                additionalProperties: true
+                default: {}
+                example:
+                  color: black
+                  material: mesh
               category_id:
                 type: string
                 format: uuid
@@ -157,6 +164,21 @@ create:
         $ref: '../components/responses/errors.yaml#/Unauthorized'
       '403':
         $ref: '../components/responses/errors.yaml#/Forbidden'
+      '409':
+        description: Product slug already exists for this seller.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              slugConflict:
+                summary: Duplicate slug
+                value:
+                  error:
+                    code: 'SLUG_ALREADY_EXISTS'
+                    message: 'Slug already exists'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '422':
         description: Product semantic validation failed.
         content:

@@ -32,6 +32,70 @@ export class ProductRepository extends IProductRepository {
   }
 
   /**
+   * Creates a new product row and returns the inserted record.
+   *
+   * @param {Object} data
+   * @param {string} data.sellerId
+   * @param {string} data.categoryId
+   * @param {string} data.name
+   * @param {string} data.slug
+   * @param {string} [data.description]
+   * @param {number} data.price
+   * @param {string} data.currency
+   * @param {number} data.stock
+   * @param {Object} [data.attributes]
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object>}
+   */
+  async create(
+    { sellerId, categoryId, name, slug, description, price, currency, stock, attributes },
+    { transaction } = {}
+  ) {
+    const sql = `
+      INSERT INTO public.products (
+        seller_id, category_id, name, slug, description, price, currency,
+        stock, attributes, state, published_at, primary_image_path,
+        average_rating, ratings_count, deleted_at
+      )
+      VALUES (
+        :sellerId, :categoryId, :name, :slug, :description, :price,
+        :currency, :stock, :attributes::jsonb, 'draft', NULL, NULL,
+        0, 0, NULL
+      )
+      RETURNING *
+    `;
+
+    const queryResult = await this.db.query(sql, {
+      replacements: {
+        sellerId,
+        categoryId: categoryId ?? null,
+        name,
+        slug,
+        description: description ?? null,
+        price,
+        currency: currency || 'USD',
+        stock: stock ?? 0,
+        attributes: JSON.stringify(attributes ?? {}),
+      },
+      ...(transaction ? { transaction } : {}),
+    });
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    return rows[0];
+  }
+
+  /**
    * Maps a database row to a domain Product entity.
    *
    * @param {Object} row
