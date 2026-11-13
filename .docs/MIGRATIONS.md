@@ -188,6 +188,44 @@ In production:
 2. **Seeders do NOT run** in production. Reference data (roles, categories) is seeded once during initial setup.
 3. The admin user must be created via Supabase Auth dashboard in production — never via the seeder.
 
+## Canonical bootstrap sequence (ADR-020)
+
+Qatu Marketplace uses a single Postgres per environment with two schema owners:
+
+- **Supabase** owns `auth.*` and `storage.*` (via `supabase/migrations/*.sql` and `supabase/seed.sql`).
+- **Sequelize** owns `public.*` (via `src/infrastructure/persistence/migrations/` and `seeders/`).
+
+The bootstrap sequence is **order-sensitive**:
+
+```bash
+# 1. Start Supabase CLI (Postgres on 54322, Auth, Storage)
+npx supabase start
+
+# 2. Apply Supabase-owned schemas, triggers, and seed auth.users
+npx supabase db reset
+
+# 3. Create public.* tables, RLS policies, and non-auth triggers
+pnpm db:migrate
+
+# 4. Seed public.profiles, roles, categories, and sample products
+pnpm db:seed:all
+
+# 5. Start the API
+pnpm dev
+```
+
+**Why this order matters:**
+
+- `npx supabase db reset` creates `auth.users` and installs the `handle_new_user` trigger. The trigger is a no-op while `public.profiles` does not exist (defensive guard in `supabase/migrations/20261113120000_handle_new_user_trigger.sql`).
+- `pnpm db:migrate` creates `public.profiles` and `public.user_roles`.
+- `pnpm db:seed:all` inserts profiles and roles for the seeded seller/admin (whose `auth.users` rows already exist from step 2).
+
+Running `pnpm db:migrate` before `npx supabase db reset` will fail because `public.profiles.id` has an FK to `auth.users.id`.
+
+See [SP-19](../Methodology/Spikes-and-PoC/SP-19-Supabase-Schema-Ownership) and [ADR-020](../Architecture/ADR/ADR-020-Database-Topology-and-Schema-Ownership) for rationale.
+
+---
+
 ## Troubleshooting
 
 ### `pgcrypto` extension not found

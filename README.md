@@ -4,6 +4,10 @@
 
 Qatu (Quechua word for "store") is an online digital marketplace where sellers can offer products to buyers.
 
+## Local development
+
+> **Bootstrap order matters.** See `.docs/MIGRATIONS.md` for the canonical sequence (`supabase start` → `supabase db reset` → `db:migrate` → `db:seed:all`).
+
 ## Tech Stack
 
 - **Language:** JavaScript (Node.js)

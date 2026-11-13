@@ -5,6 +5,13 @@ How to get a seller account that can log in and exercise US-12 / US-13 by hand
 
 ## What the seeder creates (and what it does not)
 
+## Test credentials
+
+| Role   | Email                    | Password     |
+| ------ | ------------------------ | ------------ |
+| admin  | `admin@example.qatu.pe`  | `Admin123!`  |
+| seller | `seller@example.qatu.pe` | `Seller123!` |
+
 `20261010000026-seed-sample-products.js` inserts a **catalog owner**, not a login:
 
 | Field    | Value                                                         |
