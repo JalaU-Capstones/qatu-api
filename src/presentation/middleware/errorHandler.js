@@ -84,21 +84,11 @@ export function errorHandler(err, req, res, next) {
   }
 
   // CONFLICTS
-  if (err.code === 'INVALID_STATE_TRANSITION' && err.statusCode === 409) {
+  if (err.statusCode === 409) {
     return res.status(409).json({
       error: {
-        code: err.code,
-        message: err.message || 'Invalid state transition',
-      },
-      meta: { timestamp },
-    });
-  }
-
-  if (err.code === 'EMAIL_ALREADY_EXISTS' || err.statusCode === 409) {
-    return res.status(409).json({
-      error: {
-        code: 'CONFLICT',
-        message: 'A resource with these attributes already exists',
+        code: err.code || 'CONFLICT',
+        message: err.message || 'A resource with these attributes already exists',
       },
       meta: { timestamp },
     });

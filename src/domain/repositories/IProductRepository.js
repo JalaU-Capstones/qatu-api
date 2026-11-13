@@ -74,6 +74,39 @@ export class IProductRepository {
   }
 
   /**
+   * Inserts a product image row.
+   *
+   * @param {{ productId: string, path: string, altText: string|null, position: number }} args
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object|null>}
+   */
+  async addImage(args, options) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ args, options })}`);
+  }
+
+  /**
+   * Counts non-deleted images for a product.
+   *
+   * @param {string} productId
+   * @returns {Promise<number>}
+   */
+  async countImages(productId) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ productId })}`);
+  }
+
+  /**
+   * Sets `products.primary_image_path` only if it is currently NULL.
+   * Atomic; returns true if the row was updated.
+   *
+   * @param {{ productId: string, path: string }} args
+   * @returns {Promise<boolean>}
+   */
+  async setPrimaryImageIfNull(args) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ args })}`);
+  }
+
+  /**
    * Find a single, non-deleted product with full relational details.
    *
    * @param {string} productId

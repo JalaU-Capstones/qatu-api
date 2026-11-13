@@ -96,6 +96,8 @@ export class ProductRepository extends IProductRepository {
   }
 
   async publish({ productId, sellerId }, { transaction } = {}) {
+    // The use case already requires a primary image before publish, but this invariant must also
+    // hold under concurrent image deletion between that check and the UPDATE.
     const sql = `
       UPDATE public.products
       SET state = 'published', updated_at = now()
@@ -103,6 +105,10 @@ export class ProductRepository extends IProductRepository {
         AND seller_id = :sellerId
         AND state = 'draft'
         AND deleted_at IS NULL
+        AND primary_image_path IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM public.product_images WHERE product_id = :productId
+        )
       RETURNING *
     `;
 
@@ -119,6 +125,73 @@ export class ProductRepository extends IProductRepository {
           : [];
 
     return rows[0] ?? null;
+  }
+
+  async addImage({ productId, path, altText = null, position = 0 }, { transaction } = {}) {
+    const sql = `
+      INSERT INTO public.product_images (product_id, path, alt_text, position)
+      VALUES (:productId, :path, :altText, :position)
+      RETURNING id, product_id, path, alt_text, position, created_at
+    `;
+
+    const queryResult = await this.db.query(sql, {
+      replacements: { productId, path, altText, position },
+      ...(transaction ? { transaction } : {}),
+    });
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    return rows[0] ?? null;
+  }
+
+  async countImages(productId, { transaction } = {}) {
+    const sql = `
+      SELECT COUNT(*)::int AS n
+      FROM public.product_images
+      WHERE product_id = :productId
+    `;
+
+    const queryResult = await this.db.query(sql, {
+      replacements: { productId },
+      ...(transaction ? { transaction } : {}),
+    });
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    return Number(rows[0]?.n ?? 0);
+  }
+
+  async setPrimaryImageIfNull({ productId, path }, { transaction } = {}) {
+    const sql = `
+      UPDATE public.products
+      SET primary_image_path = :path, updated_at = now()
+      WHERE id = :productId AND primary_image_path IS NULL
+      RETURNING id
+    `;
+
+    const queryResult = await this.db.query(sql, {
+      replacements: { productId, path },
+      ...(transaction ? { transaction } : {}),
+    });
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    return rows.length > 0;
   }
 
   /**
@@ -426,7 +499,7 @@ export class ProductRepository extends IProductRepository {
             SELECT json_agg(
               json_build_object(
                 'id', img.id,
-                'image_path', img.image_path,
+                'path', img.path,
                 'position', img.position
               ) ORDER BY img.position ASC
             )

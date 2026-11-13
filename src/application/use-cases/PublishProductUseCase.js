@@ -54,6 +54,13 @@ export class PublishProductUseCase {
 
     if (product.state !== 'draft') throw invalidStateError(product.state);
 
+    if (!product.primary_image_path) {
+      const err = new Error('A product must have at least one image before being published');
+      err.code = 'IMAGE_REQUIRED';
+      err.statusCode = 422;
+      throw err;
+    }
+
     const updated = await this.productRepository.publish({ productId, sellerId });
     if (!updated) {
       throw invalidStateError('published');

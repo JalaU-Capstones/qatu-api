@@ -128,6 +128,11 @@ describe('PublishProductUseCase (integration, real PostgreSQL)', { timeout: 30_0
   });
 
   it('publishes a draft, sets the trigger timestamp, and updates the row', async () => {
+    const repo = new ProductRepository({ db: sequelize });
+    const imagePath = `product-images/${PRODUCT_DRAFT}/cover.webp`;
+    await repo.addImage({ productId: PRODUCT_DRAFT, path: imagePath, altText: null, position: 0 });
+    await repo.setPrimaryImageIfNull({ productId: PRODUCT_DRAFT, path: imagePath });
+
     const before = await getProductRow(PRODUCT_DRAFT);
     const startTime = Date.now();
 
@@ -143,6 +148,18 @@ describe('PublishProductUseCase (integration, real PostgreSQL)', { timeout: 30_0
       new Date(before.updated_at).getTime()
     );
     expect(Math.abs(new Date(row.published_at).getTime() - startTime)).toBeLessThan(5_000);
+  });
+
+  it('rejects a draft without an image before publish', async () => {
+    await expect(
+      buildUseCase().execute({ productId: PRODUCT_DRAFT, sellerId: SELLER })
+    ).rejects.toMatchObject({
+      code: 'IMAGE_REQUIRED',
+      statusCode: 422,
+      message: 'A product must have at least one image before being published',
+    });
+
+    expect(await getProductRow(PRODUCT_DRAFT)).toMatchObject({ state: 'draft' });
   });
 
   it('returns PRODUCT_NOT_FOUND for an unknown product', async () => {
@@ -183,6 +200,11 @@ describe('PublishProductUseCase (integration, real PostgreSQL)', { timeout: 30_0
   });
 
   it('allows only one concurrent publish to succeed', async () => {
+    const repo = new ProductRepository({ db: sequelize });
+    const imagePath = `product-images/${PRODUCT_DRAFT}/cover.webp`;
+    await repo.addImage({ productId: PRODUCT_DRAFT, path: imagePath, altText: null, position: 0 });
+    await repo.setPrimaryImageIfNull({ productId: PRODUCT_DRAFT, path: imagePath });
+
     const useCase = buildUseCase();
     const results = await Promise.allSettled([
       useCase.execute({ productId: PRODUCT_DRAFT, sellerId: SELLER }),
@@ -203,14 +225,23 @@ describe('PublishProductUseCase (integration, real PostgreSQL)', { timeout: 30_0
 
   it('makes a published draft visible in the public listing', async () => {
     const repository = new ProductRepository({ db: sequelize });
+    const imagePath = `product-images/${PRODUCT_DRAFT}/cover.webp`;
+    await repository.addImage({
+      productId: PRODUCT_DRAFT,
+      path: imagePath,
+      altText: null,
+      position: 0,
+    });
+    await repository.setPrimaryImageIfNull({ productId: PRODUCT_DRAFT, path: imagePath });
+
     const before = await repository.findAll({});
 
     expect(before.items.map((item) => item.id)).toEqual([PRODUCT_PUBLISHED]);
 
     await buildUseCase().execute({ productId: PRODUCT_DRAFT, sellerId: SELLER });
 
-    const after = await repository.findAll({});
-    expect(after.items.map((item) => item.id)).toContain(PRODUCT_DRAFT);
-    expect(after.items).toHaveLength(2);
+    const after = repository.findAll({});
+    expect((await after).items.map((item) => item.id)).toContain(PRODUCT_DRAFT);
+    expect((await after).items).toHaveLength(2);
   });
 });

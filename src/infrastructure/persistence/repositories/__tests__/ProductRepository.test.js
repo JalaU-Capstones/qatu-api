@@ -93,7 +93,7 @@ describe('ProductRepository (unit)', () => {
           '{"id":"c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f","username":"john_seller","full_name":"John Seller"}',
         category:
           '{"id":"b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e","name":"Furniture","slug":"furniture"}',
-        images: '[{"id":"img-1","image_path":"product-images/chair-front.webp","position":0}]',
+        images: '[{"id":"img-1","path":"product-images/chair-front.webp","position":0}]',
       };
 
       mockDb.query.mockResolvedValueOnce([[detailedDbRow]]);
@@ -122,7 +122,7 @@ describe('ProductRepository (unit)', () => {
           name: 'Furniture',
           slug: 'furniture',
         },
-        images: [{ id: 'img-1', image_path: 'product-images/chair-front.webp', position: 0 }],
+        images: [{ id: 'img-1', path: 'product-images/chair-front.webp', position: 0 }],
       });
     });
 

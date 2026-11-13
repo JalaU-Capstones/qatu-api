@@ -313,7 +313,7 @@ publish:
     description: |
       Changes a product's status from `draft` to `published`, making it visible in the public catalog.
       Only the owning seller may publish it.
-      # Image-required enforcement lands in 2D.2 with the upload flow (see .docs/SELLER-PRODUCT.md).
+      The product must have at least one image uploaded.
     tags:
       - products
     parameters:
@@ -367,6 +367,21 @@ publish:
                   error:
                     code: 'INVALID_STATE_TRANSITION'
                     message: "Cannot publish a product in state 'published'"
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+      '422':
+        description: Publish is blocked until at least one product image is uploaded.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              imageRequired:
+                summary: No uploaded image yet
+                value:
+                  error:
+                    code: 'IMAGE_REQUIRED'
+                    message: 'A product must have at least one image before being published'
                   meta:
                     timestamp: '2026-10-14T12:00:00.000Z'
       '500':

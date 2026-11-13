@@ -9,12 +9,14 @@ export class ProductController {
     getProductByIdUseCase,
     createProductUseCase,
     publishProductUseCase,
+    uploadProductImageUseCase = null,
   } = {}) {
     if (
       !listProductsUseCase &&
       !listSellerProductsUseCase &&
       !createProductUseCase &&
-      !publishProductUseCase
+      !publishProductUseCase &&
+      !uploadProductImageUseCase
     ) {
       throw new Error('at least one product use case is required');
     }
@@ -23,6 +25,7 @@ export class ProductController {
     this.getProductByIdUseCase = getProductByIdUseCase || null;
     this.createProductUseCase = createProductUseCase || null;
     this.publishProductUseCase = publishProductUseCase || null;
+    this.uploadProductImageUseCase = uploadProductImageUseCase || null;
   }
 
   async list(req, res, next) {
@@ -133,6 +136,39 @@ export class ProductController {
       });
 
       return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async uploadImage(req, res, next) {
+    try {
+      if (!this.uploadProductImageUseCase) {
+        const err = new Error('uploadProductImageUseCase is required');
+        err.statusCode = 500;
+        throw err;
+      }
+
+      const userId = req.user?.id;
+      if (!userId) {
+        const err = new Error('Authentication failed');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+
+      const params = req.validatedParams || req.params || {};
+      const productId = params.id ?? params.productId;
+      const body = req.validatedBody || req.body || {};
+      const result = await this.uploadProductImageUseCase.execute({
+        productId,
+        sellerId: userId,
+        file: req.file,
+        altText: body.alt_text ?? body.altText ?? null,
+        position: body.position ?? null,
+      });
+      const { location, ...envelope } = result;
+      return res.status(201).location(location).json(envelope);
     } catch (error) {
       return next(error);
     }

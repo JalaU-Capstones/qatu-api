@@ -3,9 +3,12 @@ import { CreateProductUseCase } from '../../application/use-cases/CreateProductU
 import { GetProductByIdUseCase } from '../../application/use-cases/GetProductByIdUseCase.js';
 import { ListProductsUseCase } from '../../application/use-cases/ListProductsUseCase.js';
 import { PublishProductUseCase } from '../../application/use-cases/PublishProductUseCase.js';
+import { UploadProductImageUseCase } from '../../application/use-cases/UploadProductImageUseCase.js';
 import { ProductRepository } from '../../infrastructure/persistence/repositories/ProductRepository.js';
+import { SupabaseStorageService } from '../../infrastructure/storage/SupabaseStorageService.js';
 import { ProductController } from '../controllers/ProductController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
+import { multipartProductImageMiddleware } from '../middleware/multipartProductImageMiddleware.js';
 import { requireSellerRole } from '../middleware/requireSellerRole.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { createProductSchema } from '../validators/createProductSchema.js';
@@ -17,6 +20,8 @@ export function createProductRouter({
   getProductByIdUseCase,
   createProductUseCase,
   publishProductUseCase,
+  uploadProductImageUseCase,
+  storageService = new SupabaseStorageService(),
   productController,
 } = {}) {
   const router = Router();
@@ -45,6 +50,13 @@ export function createProductRouter({
       productRepository,
     });
 
+  const productImageUC =
+    uploadProductImageUseCase ||
+    new UploadProductImageUseCase({
+      productRepository,
+      storageService,
+    });
+
   const controller =
     productController ||
     new ProductController({
@@ -52,6 +64,7 @@ export function createProductRouter({
       getProductByIdUseCase: getByIdUC,
       createProductUseCase: createUC,
       publishProductUseCase: publishUC,
+      uploadProductImageUseCase: productImageUC,
     });
 
   router.post(
@@ -70,6 +83,14 @@ export function createProductRouter({
 
   router.patch('/:id/publish', authMiddleware, requireSellerRole(), (req, res, next) =>
     controller.publish(req, res, next)
+  );
+
+  router.post(
+    '/:id/images',
+    authMiddleware,
+    requireSellerRole(),
+    multipartProductImageMiddleware,
+    (req, res, next) => controller.uploadImage(req, res, next)
   );
 
   return router;

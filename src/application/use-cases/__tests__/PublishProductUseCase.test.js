@@ -108,9 +108,23 @@ describe('PublishProductUseCase', () => {
     }
   );
 
+  it('rejects a draft product without a primary image before publish', async () => {
+    productRepository.findById.mockResolvedValue(product({ primary_image_path: null }));
+
+    await expect(
+      useCase.execute({ productId: PRODUCT_ID, sellerId: SELLER_ID })
+    ).rejects.toMatchObject({
+      code: 'IMAGE_REQUIRED',
+      statusCode: 422,
+      message: 'A product must have at least one image before being published',
+    });
+    expect(productRepository.publish).not.toHaveBeenCalled();
+  });
+
   it('publishes the seller draft and returns product detail with metadata', async () => {
-    productRepository.findById.mockResolvedValue(product());
+    productRepository.findById.mockResolvedValue(product({ primary_image_path: '/something' }));
     const updated = product({
+      primary_image_path: '/something',
       state: 'published',
       published_at: '2026-10-15T10:00:00.000Z',
       updated_at: '2026-10-15T10:00:00.000Z',
@@ -130,7 +144,7 @@ describe('PublishProductUseCase', () => {
   });
 
   it('returns a conflict if the conditional update loses a race', async () => {
-    productRepository.findById.mockResolvedValue(product());
+    productRepository.findById.mockResolvedValue(product({ primary_image_path: '/something' }));
     productRepository.publish.mockResolvedValue(null);
 
     await expect(

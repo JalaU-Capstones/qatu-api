@@ -65,13 +65,26 @@ upload:
       '401':
         $ref: '../components/responses/errors.yaml#/Unauthorized'
       '403':
-        $ref: '../components/responses/errors.yaml#/Forbidden'
+        description: The authenticated seller does not own this product.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              forbidden:
+                summary: Seller does not own product
+                value:
+                  error:
+                    code: 'FORBIDDEN'
+                    message: 'You do not own this product'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '404':
         $ref: '../components/responses/errors.yaml#/NotFound'
       '409':
         $ref: '../components/responses/errors.yaml#/Conflict'
       '422':
-        description: The uploaded file is too large or has an unsupported format.
+        description: The uploaded file is too large, has an unsupported format, or exceeds the product image limit.
         content:
           application/json:
             schema:
@@ -92,6 +105,15 @@ upload:
                   error:
                     code: 'INVALID_FILE_FORMAT'
                     message: 'Only JPEG, PNG, and WebP images are accepted.'
+                    details: []
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+              imageLimitReached:
+                summary: Product already has five images
+                value:
+                  error:
+                    code: 'IMAGE_LIMIT_REACHED'
+                    message: 'A product can have at most 5 images'
                     details: []
                   meta:
                     timestamp: '2026-10-14T12:00:00.000Z'
