@@ -1,14 +1,14 @@
 {
   "Servers": {
     "1": {
-      "Name": "Qatu Postgres (dev)",
+      "Name": "Qatu Postgres (dev, Supabase CLI on host)",
       "Group": "Servers",
-      "Host": "postgres",
-      "Port": 5432,
+      "Host": "host.docker.internal",
+      "Port": 54322,
       "MaintenanceDB": "postgres",
       "Username": "postgres",
       "SSLMode": "prefer",
-      "Comment": "Auto-registered by docker-compose.dev-tools.yml"
+      "Comment": "Mode A (ADR-020): Supabase CLI on host :54322"
     }
   }
 }

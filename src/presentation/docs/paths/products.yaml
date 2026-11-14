@@ -203,6 +203,8 @@ create:
 update:
   patch:
     operationId: updateProduct
+    x-status: planned
+    x-status-reason: UpdateProductUseCase not yet implemented (Sprint 7)
     summary: Update a product
     description: |
       Updates a product by ID. Only the seller who owns the product may update it.
@@ -287,6 +289,8 @@ update:
 delete:
   delete:
     operationId: deleteProduct
+    x-status: planned
+    x-status-reason: DeleteProductUseCase not yet implemented (Sprint 7)
     summary: Delete a product
     description: Deletes a product by ID. Only the owning seller may delete it.
     tags:

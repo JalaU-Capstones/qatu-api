@@ -37,6 +37,8 @@ services:
     # host port only; point it at Supabase CLI (host.docker.internal:54322).
     networks:
       - qatu-net
+    extra_hosts:
+      - 'host.docker.internal:172.19.0.1'
     ports:
       # pgAdmin v9 with `no-new-privileges:true` internally changes
       # PGADMIN_LISTEN_PORT from 80 to 8080 (avoiding CAP_NET_BIND_SERVICE).

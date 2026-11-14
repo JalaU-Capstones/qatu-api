@@ -16,13 +16,15 @@ export class ProductController {
     createProductUseCase,
     publishProductUseCase,
     uploadProductImageUseCase = null,
+    listProductImagesUseCase = null,
   } = {}) {
     if (
       !listProductsUseCase &&
       !listSellerProductsUseCase &&
       !createProductUseCase &&
       !publishProductUseCase &&
-      !uploadProductImageUseCase
+      !uploadProductImageUseCase &&
+      !listProductImagesUseCase
     ) {
       throw new Error('at least one product use case is required');
     }
@@ -32,6 +34,7 @@ export class ProductController {
     this.createProductUseCase = createProductUseCase || null;
     this.publishProductUseCase = publishProductUseCase || null;
     this.uploadProductImageUseCase = uploadProductImageUseCase || null;
+    this.listProductImagesUseCase = listProductImagesUseCase || null;
   }
 
   async list(req, res, next) {
@@ -187,6 +190,22 @@ export class ProductController {
       });
       const { location, ...envelope } = result;
       return res.status(201).location(location).json(envelope);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async listImages(req, res, next) {
+    try {
+      if (!this.listProductImagesUseCase) {
+        const err = new Error('listProductImagesUseCase is required');
+        err.statusCode = 500;
+        throw err;
+      }
+      const params = req.validatedParams || req.params || {};
+      const productId = params.id ?? params.productId;
+      const result = await this.listProductImagesUseCase.execute({ productId });
+      return res.status(200).json(result);
     } catch (error) {
       return next(error);
     }

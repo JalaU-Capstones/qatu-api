@@ -149,6 +149,29 @@ export class ProductRepository extends IProductRepository {
     return rows[0] ?? null;
   }
 
+  async listImages(productId, { transaction } = {}) {
+    const sql = `
+      SELECT id, product_id, path, alt_text, position, created_at
+      FROM public.product_images
+      WHERE product_id = :productId
+      ORDER BY position ASC, created_at ASC
+    `;
+
+    const queryResult = await this.db.query(sql, {
+      replacements: { productId },
+      ...(transaction ? { transaction } : {}),
+    });
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    return rows;
+  }
+
   async countImages(productId, { transaction } = {}) {
     const sql = `
       SELECT COUNT(*)::int AS n

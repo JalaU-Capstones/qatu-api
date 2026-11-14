@@ -8,6 +8,7 @@ describe('ProductController', () => {
   let createProductUseCaseMock;
   let publishProductUseCaseMock;
   let uploadProductImageUseCaseMock;
+  let listProductImagesUseCaseMock;
   let controller;
 
   beforeEach(() => {
@@ -26,12 +27,16 @@ describe('ProductController', () => {
     uploadProductImageUseCaseMock = {
       execute: vi.fn(),
     };
+    listProductImagesUseCaseMock = {
+      execute: vi.fn(),
+    };
     controller = new ProductController({
       listProductsUseCase: useCaseMock,
       getProductByIdUseCase: getByIdUseCaseMock,
       createProductUseCase: createProductUseCaseMock,
       publishProductUseCase: publishProductUseCaseMock,
       uploadProductImageUseCase: uploadProductImageUseCaseMock,
+      listProductImagesUseCase: listProductImagesUseCaseMock,
     });
   });
 
@@ -443,6 +448,68 @@ describe('ProductController', () => {
 
       expect(next).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'uploadProductImageUseCase is required' })
+      );
+    });
+  });
+
+  describe('listImages', () => {
+    const productId = '550e8400-e29b-41d4-a716-446655440000';
+
+    it('responds with 200 and returns images from the use case', async () => {
+      const mockResult = {
+        data: [
+          {
+            id: 'img-1',
+            product_id: productId,
+            path: 'http://localhost:54321/storage/v1/object/public/product-images/abc/cover.webp',
+            alt_text: null,
+            position: 0,
+            created_at: '2026-10-24T12:00:00.000Z',
+          },
+        ],
+        meta: { timestamp: '2026-10-24T12:00:00.000Z' },
+      };
+      listProductImagesUseCaseMock.execute.mockResolvedValue(mockResult);
+
+      const req = { params: { id: productId } };
+      const json = vi.fn();
+      const status = vi.fn().mockReturnValue({ json });
+      const next = vi.fn();
+
+      await controller.listImages(req, { status }, next);
+
+      expect(status).toHaveBeenCalledWith(200);
+      expect(json).toHaveBeenCalledWith(mockResult);
+      expect(listProductImagesUseCaseMock.execute).toHaveBeenCalledWith({ productId });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('passes use case errors to next without responding', async () => {
+      const error = Object.assign(new Error('Product not found'), {
+        code: 'PRODUCT_NOT_FOUND',
+        statusCode: 404,
+      });
+      listProductImagesUseCaseMock.execute.mockRejectedValue(error);
+
+      const status = vi.fn();
+      const next = vi.fn();
+
+      await controller.listImages({ params: { id: productId } }, { status }, next);
+
+      expect(next).toHaveBeenCalledWith(error);
+      expect(status).not.toHaveBeenCalled();
+    });
+
+    it('passes a missing dependency error to next when listProductImagesUseCase is absent', async () => {
+      const controllerWithoutListImages = new ProductController({
+        listProductsUseCase: useCaseMock,
+      });
+      const next = vi.fn();
+
+      await controllerWithoutListImages.listImages({ params: { id: productId } }, {}, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'listProductImagesUseCase is required' })
       );
     });
   });

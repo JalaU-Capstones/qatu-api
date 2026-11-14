@@ -153,7 +153,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose
 # → http://localhost:8080 (admin@qatu.com / admin123)
 ```
 
-pgAdmin already has the `postgres` server pre-registered (no manual 'Add server' needed). If you change `POSTGRES_PASSWORD`, update `docker/pgadmin/pgpass` too.
+pgAdmin connects to the Supabase CLI on the host (`host.docker.internal:54322`, Mode A / ADR-020) and has the server pre-registered via `servers.json` (no manual 'Add server' needed). If you change `POSTGRES_PASSWORD`, update `docker/pgadmin/pgpass` too.
 
 Hot reload works: edit `src/**/*.js` and nodemon restarts the container automatically. Migrations do not re-run on restart by default — if you add a migration, restart the api service (which re-runs entrypoint.sh):
 

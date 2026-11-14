@@ -86,6 +86,18 @@ export class IProductRepository {
   }
 
   /**
+   * Lists all images for a product, ordered by position then created_at.
+   *
+   * @param {string} productId
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object[]>}
+   */
+  async listImages(productId, options) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ productId, options })}`);
+  }
+
+  /**
    * Counts non-deleted images for a product.
    *
    * @param {string} productId

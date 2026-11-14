@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { CreateProductUseCase } from '../../application/use-cases/CreateProductUseCase.js';
-import { GetProductByIdUseCase } from '../../application/use-cases/GetProductByIdUseCase.js';
+import { GetProductDetailUseCase } from '../../application/use-cases/GetProductDetailUseCase.js';
+import { ListProductImagesUseCase } from '../../application/use-cases/ListProductImagesUseCase.js';
 import { ListProductsUseCase } from '../../application/use-cases/ListProductsUseCase.js';
 import { PublishProductUseCase } from '../../application/use-cases/PublishProductUseCase.js';
 import { UploadProductImageUseCase } from '../../application/use-cases/UploadProductImageUseCase.js';
@@ -21,6 +22,7 @@ export function createProductRouter({
   createProductUseCase,
   publishProductUseCase,
   uploadProductImageUseCase,
+  listProductImagesUseCase,
   storageService = new SupabaseStorageService(),
   productController,
 } = {}) {
@@ -34,7 +36,7 @@ export function createProductRouter({
 
   const getByIdUC =
     getProductByIdUseCase ||
-    new GetProductByIdUseCase({
+    new GetProductDetailUseCase({
       productRepository,
     });
 
@@ -57,6 +59,12 @@ export function createProductRouter({
       storageService,
     });
 
+  const listImagesUC =
+    listProductImagesUseCase ||
+    new ListProductImagesUseCase({
+      productRepository,
+    });
+
   const controller =
     productController ||
     new ProductController({
@@ -65,6 +73,7 @@ export function createProductRouter({
       createProductUseCase: createUC,
       publishProductUseCase: publishUC,
       uploadProductImageUseCase: productImageUC,
+      listProductImagesUseCase: listImagesUC,
     });
 
   router.post(
@@ -92,6 +101,8 @@ export function createProductRouter({
     multipartProductImageMiddleware,
     (req, res, next) => controller.uploadImage(req, res, next)
   );
+
+  router.get('/:id/images', (req, res, next) => controller.listImages(req, res, next));
 
   return router;
 }

@@ -168,3 +168,18 @@ The affected DTOs include:
 ### Data Migration
 
 Existing rows that stored legacy full URLs were normalized to relative storage paths using migration [`20261114170000-fix-profile-avatar-paths.js`](file:///home/Botina/development-environment/JalaU-Capstones/Qatu Marketplace/api/src/infrastructure/persistence/migrations/20261114170000-fix-profile-avatar-paths.js). This one-time migration strips the Supabase storage prefix, ensuring all rows conform to the relative path convention.
+
+### GET /products/:id/images
+
+Public endpoint that returns all uploaded images for a product in the
+order they were stored (`position ASC, created_at ASC`). Each entry
+follows `ProductImage.yaml`:
+
+- `id`, `product_id`, `path` (resolved URL), `alt_text`, `position`, `created_at`
+
+The `path` field is resolved at read time by `ProductImageDTO` (never by
+the repository or the use case). The same `resolveImageUrl()` toggle
+applies: `PUBLIC_APP_URL` empty → Supabase URL; set → SPA-origin URL.
+
+Empty product (no images uploaded yet): returns `{ data: [], meta: { timestamp } }`.
+Unknown product: 404 `PRODUCT_NOT_FOUND`. Invalid UUID: 400 `VALIDATION_ERROR`.
