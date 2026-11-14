@@ -13,47 +13,51 @@ This document describes how the Qatu API is containerized: how to run it locally
 
 ---
 
-## Network topology (Lab W3 / ADR-018)
+## Network topology (Lab W3 / ADR-018 + ADR-020)
 
-The API compose project owns two networks:
+The API compose project owns two networks. There is **no** `postgres` service (ADR-020): the database is Supabase CLI on the host (`host.docker.internal:54322`).
 
-| Network    | Membership (API repo)                                    | Purpose                                                                        |
-| ---------- | -------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `back-end` | `api`, `postgres`, `rabbitmq` (+ `pgadmin` in dev-tools) | Data plane. Isolated: DB/broker are unreachable from the client.               |
-| `qatu-net` | `api` only                                               | Cross-repo bridge so `client` (separate Compose project) can reach `api:3000`. |
+| Network    | Membership (API repo) | Purpose                                                                        |
+| ---------- | --------------------- | ------------------------------------------------------------------------------ |
+| `back-end` | `api`, `rabbitmq`     | Broker stays off the cross-repo bridge.                                        |
+| `qatu-net` | `api` only            | Cross-repo bridge so `client` (separate Compose project) can reach `api:3000`. |
 
 ```mermaid
 flowchart TB
+    subgraph host["Host"]
+        Supa["Supabase CLI<br/>:54322"]
+    end
+
     subgraph qt["qatu-net (cross-repo bridge)"]
         Client["client<br/>(other compose project)"]
         ApiBridge["api"]
     end
 
-    subgraph be["back-end (isolated data plane)"]
+    subgraph be["back-end (broker isolation)"]
         Api["api<br/>:3000"]
-        Pg[("postgres<br/>volume: postgres_data")]
         Mq[("rabbitmq<br/>volume: rabbitmq_data")]
     end
 
     Client -->|HTTP /v1| ApiBridge
     ApiBridge -.->|same container| Api
-    Api -->|TCP 5432| Pg
+    Api -->|TCP 54322| Supa
     Api -->|AMQP 5672| Mq
 ```
 
-**Why `api` is on both networks:** postgres and rabbitmq stay on `back-end` only. The SPA never joins `back-end`, so a compromised frontend cannot open a socket to the database. `qatu-net` is the narrow bridge for `/v1` traffic only.
+**Why `api` is on both networks:** `rabbitmq` stays on `back-end` only, so the client cannot open a socket to the broker. The database is not on either Docker network; the API reaches it on the host. `qatu-net` is the narrow bridge for `/v1` traffic only.
 
 **Verify membership:**
 
 ```bash
 docker network inspect back-end --format '{{range .Containers}}{{.Name}} {{"\n"}}{{end}}'
-# expect: ...-api-1, ...-postgres-1, ...-rabbitmq-1  (+ pgadmin with dev-tools)
+# expect: ...-api-1, ...-rabbitmq-1
 
 docker network inspect qatu-net --format '{{range .Containers}}{{.Name}} {{"\n"}}{{end}}'
 # expect: ...-api-1  (and client when the client compose is up)
+# must NOT list rabbitmq
 ```
 
-**Volume persistence:** named volumes `postgres_data` and `rabbitmq_data` survive `docker compose down` (without `-v`). After `down` + `up`, data is still there — that is the Lab W3 persistence proof.
+**Volume persistence:** named volume `rabbitmq_data` survives `docker compose down` (without `-v`). Database persistence is the Supabase CLI volume, not a compose volume.
 
 ---
 
@@ -355,9 +359,9 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml exec postgres \
 docker network inspect back-end --format '{{range .Containers}}{{.Name}} {{.IPv4Address}}{{"\n"}}{{end}}'
 docker network inspect qatu-net --format '{{range .Containers}}{{.Name}} {{.IPv4Address}}{{"\n"}}{{end}}'
 
-# Check DNS resolution between containers (api must resolve DB/broker on back-end)
-docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api getent hosts postgres
+# Check DNS resolution (broker is on back-end; DB is Supabase on the host)
 docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api getent hosts rabbitmq
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api getent hosts host.docker.internal
 ```
 
 ### Verify migrations ran
