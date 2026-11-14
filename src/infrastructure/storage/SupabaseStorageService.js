@@ -89,7 +89,7 @@ export class SupabaseStorageService extends IStorageService {
    * @param {string} [params.extension]
    * @param {string} [params.originalName]
    * @param {number} [params.size]
-   * @returns {Promise<{ path: string }>}
+   * @returns {Promise<{ path: string, publicUrl: string }>}
    *
    * ⚠️ ADR-019 phased rollout: the returned path respects `env.PUBLIC_APP_URL`.
    * When unset (default), returns the Supabase direct URL. When set, returns
@@ -159,7 +159,10 @@ export class SupabaseStorageService extends IStorageService {
       uploadType: 'avatar',
     });
 
-    return { path: this.getPublicUrl(this.bucket, objectKey) };
+    return {
+      path: `${this.bucket}/${objectKey}`,
+      publicUrl: this.getPublicUrl(this.bucket, objectKey),
+    };
   }
 
   /**

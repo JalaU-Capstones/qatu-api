@@ -88,6 +88,8 @@ describe('CreateProductUseCase (integration, real PostgreSQL)', { timeout: 30_00
     const result = await useCase.execute(request({ name: 'Clean Code' }));
 
     expect(result.data.slug).toBe('clean-code');
+    expect(result.data.seller.id).toBe(SELLER);
+    expect(result.data.category.id).toBe(CATEGORY_ID);
     expect(result.meta.timestamp).toEqual(expect.any(String));
 
     const rows = await runQuery(

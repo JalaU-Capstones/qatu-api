@@ -32,6 +32,21 @@ describe('CreateProductUseCase', () => {
     const createdRow = createRow({ slug: 'premium-headphones' });
     const productRepository = {
       create: vi.fn().mockResolvedValue(createdRow),
+      findByIdWithDetails: vi.fn().mockResolvedValue({
+        ...createdRow,
+        images: [
+          {
+            id: 'img-1',
+            product_id: createdRow.id,
+            path: 'product-images/x/y.png',
+            alt_text: null,
+            position: 0,
+            created_at: '2026-11-14T12:00:00.000Z',
+          },
+        ],
+        seller: { id: 'seller-1', username: 's', full_name: 'S', avatar_path: null },
+        category: { id: 'cat-1', name: 'Cat', slug: 'cat' },
+      }),
     };
     const useCase = new CreateProductUseCase({ productRepository });
 
@@ -61,6 +76,10 @@ describe('CreateProductUseCase', () => {
         slug: 'premium-headphones',
       })
     );
+    expect(result.data.images).toHaveLength(1);
+    expect(result.data.images[0].path).toContain('product-images/x/y.png');
+    expect(result.data.seller).not.toBeNull();
+    expect(result.data.category).not.toBeNull();
     expect(result.meta.timestamp).toEqual(expect.any(String));
   });
 
@@ -71,6 +90,12 @@ describe('CreateProductUseCase', () => {
     });
     const productRepository = {
       create: vi.fn().mockResolvedValue(createdRow),
+      findByIdWithDetails: vi.fn().mockResolvedValue({
+        ...createdRow,
+        images: [],
+        seller: { id: 'seller-1', username: 's', full_name: 'S', avatar_path: null },
+        category: { id: 'cat-1', name: 'Cat', slug: 'cat' },
+      }),
     };
     const useCase = new CreateProductUseCase({ productRepository });
 
@@ -129,6 +154,12 @@ describe('CreateProductUseCase', () => {
     const createdRow = createRow({ slug: 'wireless-noise-canceling-headphones-2' });
     const productRepository = {
       create: vi.fn().mockRejectedValueOnce(duplicateError).mockResolvedValueOnce(createdRow),
+      findByIdWithDetails: vi.fn().mockResolvedValue({
+        ...createdRow,
+        images: [],
+        seller: { id: 'seller-1', username: 's', full_name: 'S', avatar_path: null },
+        category: { id: 'cat-1', name: 'Cat', slug: 'cat' },
+      }),
     };
     const useCase = new CreateProductUseCase({ productRepository });
 

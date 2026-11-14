@@ -158,5 +158,35 @@ describe('ProductListDTO', () => {
       const dto = new ProductListItemDTO(product);
       expect(dto.toJSON().attributes).toEqual({ dpi: 16000, wireless: true });
     });
+
+    it('resolves primary_image_path to full URL when relative path is provided', () => {
+      const product = new Product({
+        id: 'prod-img',
+        seller_id: 'seller-456',
+        name: 'Desk Lamp',
+        slug: 'desk-lamp',
+        price: 29.99,
+        stock: 10,
+        primaryImagePath: 'product-images/u/f.webp',
+      });
+
+      const dto = new ProductListItemDTO(product);
+      expect(dto.toJSON().primary_image_path).toMatch(/^http.*product-images\/u\/f\.webp$/);
+    });
+
+    it('keeps primary_image_path null when null', () => {
+      const product = new Product({
+        id: 'prod-null-img',
+        seller_id: 'seller-456',
+        name: 'Desk Lamp',
+        slug: 'desk-lamp',
+        price: 29.99,
+        stock: 10,
+        primaryImagePath: null,
+      });
+
+      const dto = new ProductListItemDTO(product);
+      expect(dto.toJSON().primary_image_path).toBeNull();
+    });
   });
 });

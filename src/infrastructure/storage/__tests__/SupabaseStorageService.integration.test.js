@@ -63,13 +63,15 @@ describe.skipIf(!shouldRun)('SupabaseStorageService (integration, real Supabase 
       accessToken: sellerAccessToken,
     });
 
-    expect(result.path).toContain(`/avatars/${sellerId}/`);
+    expect(result.path).toContain(`avatars/${sellerId}/`);
+    expect(result.publicUrl).toContain(`/avatars/${sellerId}/`);
 
-    const expectedObjectKey = result.path.split('/avatars/')[1];
+    const filename = result.path.split('/').pop();
+    const objectName = `${sellerId}/${filename}`;
 
     const [rows] = await sequelize.query(
       `SELECT bucket_id, owner, name FROM storage.objects WHERE bucket_id = 'avatars' AND name = :name LIMIT 1`,
-      { replacements: { name: `${sellerId}/${expectedObjectKey.split('/').pop()}` } }
+      { replacements: { name: objectName } }
     );
 
     expect(rows.length).toBe(1);

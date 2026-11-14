@@ -499,8 +499,11 @@ export class ProductRepository extends IProductRepository {
             SELECT json_agg(
               json_build_object(
                 'id', img.id,
+                'product_id', img.product_id,
                 'path', img.path,
-                'position', img.position
+                'alt_text', img.alt_text,
+                'position', img.position,
+                'created_at', img.created_at
               ) ORDER BY img.position ASC
             )
             FROM public.product_images img

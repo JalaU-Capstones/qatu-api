@@ -131,3 +131,40 @@ The service-role key (`SUPABASE_SERVICE_ROLE_KEY`) is reserved strictly for admi
 - Scheduled cleanup jobs or migration scripts running outside an interactive user session.
 - System-level queries inspecting storage metadata directly.
   User-initiated file operations must **always** use the user-scoped client pattern.
+
+---
+
+## Path vs URL in DB (ADR-019 Phase 1)
+
+### Storage Convention
+
+The database stores relative storage paths rather than absolute URLs:
+
+- User avatars: `avatars/{userId}/{file}.webp`
+- Product images: `product-images/{productId}/{file}.webp`
+
+### Read-Time Resolution
+
+URL resolution happens strictly at read time in the Data Transfer Objects (DTOs) via `resolveImageUrl()` (`src/application/utils/imageUrl.js`), never in repositories or use cases. Repositories and use cases operate solely on the raw relative storage path to maintain clear separation of concerns.
+
+The affected DTOs include:
+
+- `ProfileDTO` (`ProfileResponseDTO`)
+- `ProductDetailDTO` (resolves `primary_image_path`, nested `images[].path`, and `seller.avatar_path`)
+- `ProductListDTO` (`ProductListItemDTO` resolves `primary_image_path`)
+- `LoginDTO` (`LoginResponseDTO`)
+- `RegisterDTO` (`RegisterResponseDTO`)
+
+### URL Origin Toggle
+
+`resolveImageUrl()` dynamically computes the fully-qualified public URL depending on the `PUBLIC_APP_URL` environment configuration:
+
+- `PUBLIC_APP_URL` empty / unset → Uses `SUPABASE_STORAGE_PUBLIC_URL` (direct Supabase Storage URL: `http://localhost:54321/storage/v1/object/public/...`).
+- `PUBLIC_APP_URL` set (e.g., `http://localhost:5173`) → Uses the SPA origin `${PUBLIC_APP_URL}/...` which proxies storage requests through the frontend nginx proxy (ADR-019 Phase 2).
+
+> [!NOTE]
+> Do NOT pass `avatar_path` to `PATCH /profiles/me`; use `POST /profiles/me/avatar` instead to upload and update user avatars.
+
+### Data Migration
+
+Existing rows that stored legacy full URLs were normalized to relative storage paths using migration [`20261114170000-fix-profile-avatar-paths.js`](file:///home/Botina/development-environment/JalaU-Capstones/Qatu Marketplace/api/src/infrastructure/persistence/migrations/20261114170000-fix-profile-avatar-paths.js). This one-time migration strips the Supabase storage prefix, ensuring all rows conform to the relative path convention.

@@ -33,6 +33,7 @@ describe('PublishProductUseCase', () => {
     productRepository = {
       findById: vi.fn(),
       publish: vi.fn(),
+      findByIdWithDetails: vi.fn(),
     };
     useCase = new PublishProductUseCase({ productRepository });
   });
@@ -122,19 +123,40 @@ describe('PublishProductUseCase', () => {
   });
 
   it('publishes the seller draft and returns product detail with metadata', async () => {
-    productRepository.findById.mockResolvedValue(product({ primary_image_path: '/something' }));
+    productRepository.findById.mockResolvedValue(
+      product({ primary_image_path: 'product-images/x/y.png' })
+    );
     const updated = product({
-      primary_image_path: '/something',
+      primary_image_path: 'product-images/x/y.png',
       state: 'published',
       published_at: '2026-10-15T10:00:00.000Z',
       updated_at: '2026-10-15T10:00:00.000Z',
     });
     productRepository.publish.mockResolvedValue(updated);
+    productRepository.findByIdWithDetails.mockResolvedValue({
+      ...updated,
+      images: [
+        {
+          id: 'img-1',
+          product_id: PRODUCT_ID,
+          path: 'product-images/x/y.png',
+          alt_text: null,
+          position: 0,
+          created_at: '2026-11-14T12:00:00.000Z',
+        },
+      ],
+      seller: { id: SELLER_ID, username: 's', full_name: 'S', avatar_path: null },
+      category: { id: 'cat-1', name: 'Cat', slug: 'cat' },
+    });
 
     const result = await useCase.execute({ productId: PRODUCT_ID, sellerId: SELLER_ID });
 
     expect(result.data.state).toBe('published');
     expect(result.data.published_at).not.toBeNull();
+    expect(result.data.images).toHaveLength(1);
+    expect(result.data.images[0].path).toContain('product-images/x/y.png');
+    expect(result.data.seller).not.toBeNull();
+    expect(result.data.category).not.toBeNull();
     expect(result.meta.timestamp).toEqual(expect.any(String));
     expect(productRepository.publish).toHaveBeenCalledTimes(1);
     expect(productRepository.publish).toHaveBeenCalledWith({

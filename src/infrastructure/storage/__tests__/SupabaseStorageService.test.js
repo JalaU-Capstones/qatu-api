@@ -93,7 +93,8 @@ describe('SupabaseStorageService', () => {
     expect(scopedClient.storage.from).toHaveBeenCalledWith('avatars');
     expect(scopedUpload).toHaveBeenCalled();
     expect(mockClient.storage.from).not.toHaveBeenCalled();
-    expect(result.path).toBe(`${storageBaseUrl}/avatars/${userId}/${fixedUuid}.png`);
+    expect(result.path).toBe(`avatars/${userId}/${fixedUuid}.png`);
+    expect(result.publicUrl).toBe(`${storageBaseUrl}/avatars/${userId}/${fixedUuid}.png`);
   });
 
   it('should upload avatar with UUID filename and return full public URL', async () => {
@@ -113,7 +114,8 @@ describe('SupabaseStorageService', () => {
       upsert: true,
     });
     expect(result).toEqual({
-      path: `${storageBaseUrl}/avatars/${userId}/${fixedUuid}.png`,
+      path: `avatars/${userId}/${fixedUuid}.png`,
+      publicUrl: `${storageBaseUrl}/avatars/${userId}/${fixedUuid}.png`,
     });
   });
 
@@ -134,10 +136,11 @@ describe('SupabaseStorageService', () => {
       accessToken: 'test-jwt',
     });
 
-    expect(result.path).toBe(
+    expect(result.path).toBe(`avatars/${userId}/${fixedUuid}.png`);
+    expect(result.publicUrl).toBe(
       `http://localhost:54321/storage/v1/object/public/avatars/${userId}/${fixedUuid}.png`
     );
-    expect(result.path).not.toContain('host.docker.internal');
+    expect(result.publicUrl).not.toContain('host.docker.internal');
   });
 
   it('should throw 400 VALIDATION_ERROR when userId or buffer is missing', async () => {
@@ -235,7 +238,8 @@ describe('SupabaseStorageService', () => {
     });
 
     expect(result).toEqual({
-      path: `${storageBaseUrl}/avatars/${userId}/${fixedUuid}.jpg`,
+      path: `avatars/${userId}/${fixedUuid}.jpg`,
+      publicUrl: `${storageBaseUrl}/avatars/${userId}/${fixedUuid}.jpg`,
     });
   });
 

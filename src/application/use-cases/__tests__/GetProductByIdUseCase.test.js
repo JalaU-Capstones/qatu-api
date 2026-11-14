@@ -53,7 +53,8 @@ describe('GetProductByIdUseCase', () => {
       currency: 'USD',
       stock: 25,
       attributes: { color: 'black', material: 'mesh' },
-      primary_image_path: 'product-images/chair.webp',
+      primary_image_path:
+        'http://localhost:54321/storage/v1/object/public/product-images/chair.webp',
       state: 'published',
       average_rating: 4.8,
       ratings_count: 12,

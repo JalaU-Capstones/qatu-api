@@ -1,3 +1,5 @@
+import { resolveImageUrl } from '../utils/imageUrl.js';
+
 export class ListProductsRequestDTO {
   /**
    * @param {Object} [params]
@@ -91,6 +93,7 @@ export class ProductListItemDTO {
     }
     const json = typeof product.toJSON === 'function' ? product.toJSON() : product;
     Object.assign(this, json);
+    this.primary_image_path = resolveImageUrl(this.primary_image_path, 'product-images');
     this.attributes = this.attributes ?? {};
   }
 

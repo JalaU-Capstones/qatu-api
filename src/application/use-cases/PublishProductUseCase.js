@@ -66,8 +66,10 @@ export class PublishProductUseCase {
       throw invalidStateError('published');
     }
 
+    const detailed = await this.productRepository.findByIdWithDetails(productId);
+
     return {
-      data: new ProductDetailDTO(updated).toJSON(),
+      data: new ProductDetailDTO(detailed ?? updated).toJSON(),
       meta: { timestamp: new Date().toISOString() },
     };
   }

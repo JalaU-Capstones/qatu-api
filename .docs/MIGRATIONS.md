@@ -180,6 +180,10 @@ The seeders provided are:
 | 25  | `20261010000025-seed-admin-user.js`      | Admin user in `auth.users`, `profiles`, `user_roles`          |
 | 26  | `20261010000026-seed-sample-products.js` | 1 sample seller user + 25 published products (5 per category) |
 
+### Data Migrations
+
+- `20261114170000-fix-profile-avatar-paths.js` — One-time data migration that strips legacy Supabase public URLs from `profiles.avatar_path`, converting them into relative storage paths (e.g. `avatars/{userId}/{file}.webp`) per ADR-019 Phase 1. Idempotent. Reversible: NO (roll-forward only; original URLs are derived at read time from path + env, not authoritative data).
+
 ## Production Deployment
 
 In production:

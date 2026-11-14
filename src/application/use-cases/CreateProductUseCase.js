@@ -71,8 +71,10 @@ export class CreateProductUseCase {
           attributes: requestDto.attributes ?? {},
         });
 
+        const detailed = await this.productRepository.findByIdWithDetails(row.id);
+
         return {
-          data: new ProductDetailDTO(row).toJSON(),
+          data: new ProductDetailDTO(detailed ?? row).toJSON(),
           meta: { timestamp: new Date().toISOString() },
         };
       } catch (error) {

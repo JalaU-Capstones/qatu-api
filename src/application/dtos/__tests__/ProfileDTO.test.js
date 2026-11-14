@@ -108,7 +108,7 @@ describe('ProfileDTO', () => {
           id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
           username: 'john_doe',
           full_name: 'John Doe',
-          avatar_path: 'avatars/john.webp',
+          avatar_path: 'http://localhost:54321/storage/v1/object/public/avatars/john.webp',
           bio: 'Hello world',
           locale: 'en',
           created_at: '2026-10-01T00:00:00.000Z',
@@ -119,6 +119,16 @@ describe('ProfileDTO', () => {
         },
       });
       expect(json.data).not.toHaveProperty('email');
+    });
+
+    it('resolves avatar_path to full URL when relative path is provided', () => {
+      const dto = new ProfileResponseDTO({ avatar_path: 'avatars/u/f.png' });
+      expect(dto.avatar_path).toMatch(/^http.*avatars\/u\/f\.png$/);
+    });
+
+    it('keeps avatar_path null when null', () => {
+      const dto = new ProfileResponseDTO({ avatar_path: null });
+      expect(dto.avatar_path).toBeNull();
     });
   });
 });

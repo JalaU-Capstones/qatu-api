@@ -1,3 +1,5 @@
+import { resolveImageUrl } from '../utils/imageUrl.js';
+
 export class GetProfileByIdRequestDTO {
   /**
    * @param {Object|string} params
@@ -125,7 +127,7 @@ export class ProfileResponseDTO {
     this.id = raw.id;
     this.username = raw.username;
     this.full_name = raw.full_name ?? raw.fullName ?? null;
-    this.avatar_path = raw.avatar_path ?? raw.avatarPath ?? null;
+    this.avatar_path = resolveImageUrl(raw.avatar_path ?? raw.avatarPath, 'avatars');
     this.bio = raw.bio ?? null;
     this.locale = raw.locale || 'en';
     this.created_at = raw.created_at

@@ -130,7 +130,14 @@ describe('PublishProductUseCase (integration, real PostgreSQL)', { timeout: 30_0
   it('publishes a draft, sets the trigger timestamp, and updates the row', async () => {
     const repo = new ProductRepository({ db: sequelize });
     const imagePath = `product-images/${PRODUCT_DRAFT}/cover.webp`;
+    const imagePath2 = `product-images/${PRODUCT_DRAFT}/detail.webp`;
     await repo.addImage({ productId: PRODUCT_DRAFT, path: imagePath, altText: null, position: 0 });
+    await repo.addImage({
+      productId: PRODUCT_DRAFT,
+      path: imagePath2,
+      altText: 'Detail image',
+      position: 1,
+    });
     await repo.setPrimaryImageIfNull({ productId: PRODUCT_DRAFT, path: imagePath });
 
     const before = await getProductRow(PRODUCT_DRAFT);
@@ -141,6 +148,10 @@ describe('PublishProductUseCase (integration, real PostgreSQL)', { timeout: 30_0
     const row = await getProductRow(PRODUCT_DRAFT);
     expect(result.data.state).toBe('published');
     expect(result.data.published_at).not.toBeNull();
+    expect(result.data.seller.id).toBe(SELLER);
+    expect(result.data.category.id).toBe(CATEGORY_ID);
+    expect(result.data.images.length).toBeGreaterThanOrEqual(2);
+    expect(result.data.primary_image_path).toContain(`product-images/${PRODUCT_DRAFT}`);
     expect(result.meta.timestamp).toEqual(expect.any(String));
     expect(row.state).toBe('published');
     expect(row.published_at).not.toBeNull();
