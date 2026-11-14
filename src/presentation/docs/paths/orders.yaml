@@ -234,6 +234,7 @@ listOrCreate:
           | `INSUFFICIENT_STOCK` | A product has less stock than requested (including the concurrent "last unit" case). `details[].field` is `items.<product_id>`. |
           | `PRODUCT_UNAVAILABLE` | A product in the cart is no longer published. |
           | `MIXED_CURRENCIES` | The cart mixes products priced in different currencies. |
+          | `CANNOT_BUY_OWN_PRODUCT` | The cart contains a product owned by the buyer. |
         content:
           application/json:
             schema:
@@ -256,6 +257,14 @@ listOrCreate:
                     details:
                       - field: 'items.7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
                         message: 'Insufficient stock for Ergonomic Office Chair'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+              cannotBuyOwnProduct:
+                summary: Seller tried to buy their own product
+                value:
+                  error:
+                    code: 'CANNOT_BUY_OWN_PRODUCT'
+                    message: 'You cannot purchase your own product: Ergonomic Office Chair'
                   meta:
                     timestamp: '2026-10-14T12:00:00.000Z'
       '500':

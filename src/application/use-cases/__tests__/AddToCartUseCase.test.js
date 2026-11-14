@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { CartItem } from '../../../domain/entities/CartItem.js';
 import { Product } from '../../../domain/entities/Product.js';
+import { CannotBuyOwnProductError } from '../../../domain/errors/CheckoutErrors.js';
 import { AddToCartRequestDTO } from '../../dtos/AddToCartDTO.js';
 import { AddToCartUseCase } from '../AddToCartUseCase.js';
 
@@ -288,5 +289,81 @@ describe('AddToCartUseCase', () => {
 
     expect(countByUserMock).not.toHaveBeenCalled();
     expect(dbQueryMock).not.toHaveBeenCalled();
+  });
+
+  it('Scenario 7: Rejects when product.seller_id === userId -> throws CannotBuyOwnProductError (422)', async () => {
+    const product = new Product({
+      id: productId,
+      seller_id: userId,
+      name: 'My Own Product',
+      slug: 'my-own-product',
+      price: 10,
+      stock: 10,
+      state: 'published',
+    });
+
+    const cartRepository = {
+      findByUserAndProduct: vi.fn().mockResolvedValue(null),
+      incrementQuantity: vi.fn(),
+      countByUser: vi.fn(),
+    };
+    const productRepository = {
+      findById: vi.fn().mockResolvedValue(product),
+    };
+
+    const useCase = new AddToCartUseCase({ cartRepository, productRepository });
+    const requestDto = new AddToCartRequestDTO({ userId, productId, quantity: 1 });
+
+    const promise = useCase.execute(requestDto);
+
+    await expect(promise).rejects.toBeInstanceOf(CannotBuyOwnProductError);
+    await expect(promise).rejects.toMatchObject({
+      code: 'CANNOT_BUY_OWN_PRODUCT',
+      statusCode: 422,
+    });
+    await expect(promise).rejects.toThrow('You cannot purchase your own product: My Own Product');
+
+    expect(cartRepository.incrementQuantity).not.toHaveBeenCalled();
+  });
+
+  it('Scenario 8: Allows when product.seller_id !== userId -> succeeds', async () => {
+    const otherSellerId = '99999999-9999-4999-8999-999999999999';
+    const product = new Product({
+      id: productId,
+      seller_id: otherSellerId,
+      name: 'Other Seller Product',
+      slug: 'other-seller-product',
+      price: 10,
+      stock: 10,
+      state: 'published',
+    });
+
+    const cartItem = new CartItem({
+      id: 'c-1',
+      userId,
+      productId,
+      quantity: 1,
+    });
+
+    const cartRepository = {
+      findByUserAndProduct: vi.fn().mockResolvedValue(null),
+      incrementQuantity: vi.fn().mockResolvedValue(cartItem),
+      countByUser: vi.fn(),
+    };
+    const productRepository = {
+      findById: vi.fn().mockResolvedValue(product),
+    };
+
+    const useCase = new AddToCartUseCase({ cartRepository, productRepository });
+    const requestDto = new AddToCartRequestDTO({ userId, productId, quantity: 1 });
+
+    const result = await useCase.execute(requestDto);
+
+    expect(cartRepository.incrementQuantity).toHaveBeenCalledWith({
+      userId,
+      productId,
+      delta: 1,
+    });
+    expect(result.toJSON().product_id).toBe(productId);
   });
 });

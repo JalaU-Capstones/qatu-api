@@ -1,3 +1,4 @@
+import { CannotBuyOwnProductError } from '../../domain/errors/CheckoutErrors.js';
 // eslint-disable-next-line no-unused-vars
 import { AddToCartRequestDTO, AddToCartResponseDTO } from '../dtos/AddToCartDTO.js';
 
@@ -61,6 +62,10 @@ export class AddToCartUseCase {
       err.code = 'INSUFFICIENT_STOCK';
       err.statusCode = 422;
       throw err;
+    }
+
+    if ((product.seller_id ?? product.sellerId) === userId) {
+      throw new CannotBuyOwnProductError(product.name);
     }
 
     const updatedItem = await this.cartRepository.incrementQuantity({ userId, productId, delta });

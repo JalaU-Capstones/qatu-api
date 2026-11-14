@@ -8,12 +8,29 @@ export class CheckoutError extends Error {
    * @param {string} params.code
    * @param {Array<{ field: string, message: string }>} [params.details]
    */
-  constructor(message, { code, details = [] }) {
+  constructor(message, { code, details = [] } = {}) {
     super(message);
     this.name = new.target.name;
     this.statusCode = 422;
     this.code = code;
     this.details = details;
+  }
+}
+
+export class CannotBuyOwnProductError extends CheckoutError {
+  /**
+   * @param {string} [productName]
+   */
+  constructor(productName = '') {
+    super(
+      productName
+        ? `You cannot purchase your own product: ${productName}`
+        : 'You cannot purchase your own product',
+      { code: 'CANNOT_BUY_OWN_PRODUCT' }
+    );
+    this.code = 'CANNOT_BUY_OWN_PRODUCT';
+    this.statusCode = 422;
+    this.name = 'CannotBuyOwnProductError';
   }
 }
 

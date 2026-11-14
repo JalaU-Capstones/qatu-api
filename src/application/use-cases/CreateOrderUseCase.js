@@ -1,4 +1,8 @@
-import { EmptyCartError, ProductUnavailableError } from '../../domain/errors/CheckoutErrors.js';
+import {
+  CannotBuyOwnProductError,
+  EmptyCartError,
+  ProductUnavailableError,
+} from '../../domain/errors/CheckoutErrors.js';
 import { buildOrderPlacedEvent } from '../../domain/events/OrderPlaced.js';
 import { OrderDetailDTO } from '../dtos/OrderDTO.js';
 
@@ -45,6 +49,13 @@ export class CreateOrderUseCase {
       });
       if (lines.length === 0) {
         throw new EmptyCartError();
+      }
+
+      const ownProduct = lines.find(
+        (line) => (line.sellerId ?? line.seller_id) === requestDto.buyerId
+      );
+      if (ownProduct) {
+        throw new CannotBuyOwnProductError(ownProduct.name);
       }
 
       const unavailable = lines.find((line) => !line.isAvailable);
