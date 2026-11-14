@@ -1,6 +1,14 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Qatu API — Docker Compose BASE
 #
+# ARCHITECTURE NOTE (ADR-020 / SP-19):
+# There is intentionally NO `postgres` container. The single source of
+# truth for auth + storage + public schemas is Supabase CLI on the host
+# (:54322). Any container `postgres:17-alpine` would lack `auth.users`
+# and cannot run migrations 003+. See .docs/MIGRATIONS.md and
+# ADR-020 for rationale. Do not re-add this service without updating
+# the ADR.
+#
 # This file holds the shared service definitions. It is NOT meant to be run
 # on its own. Combine it with one of:
 #
@@ -8,39 +16,11 @@
 #   Production:   docker compose -f docker-compose.yml -f docker-compose.prod.yml up
 #   Dev tools:    docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.dev-tools.yml up
 #
-# Per ADR-016: postgres and rabbitmq use `expose` (internal only) in the base.
+# Per ADR-016: rabbitmq uses `expose` (internal only) in the base.
 # Overrides decide whether to open host ports.
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-postgres}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - qatu-net
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}']
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 5s
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-      - DAC_OVERRIDE
-      - SETGID
-      - SETUID
-    expose:
-      - '5432'
-
   rabbitmq:
     image: rabbitmq:4.1-management-alpine
     environment:
@@ -70,8 +50,6 @@ services:
     networks:
       - qatu-net
     depends_on:
-      postgres:
-        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     security_opt:
@@ -82,8 +60,6 @@ services:
       - '3000'
 
 volumes:
-  postgres_data:
-    driver: local
   rabbitmq_data:
     driver: local
 

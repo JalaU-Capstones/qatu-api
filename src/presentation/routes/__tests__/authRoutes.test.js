@@ -182,8 +182,8 @@ describe('Auth Routes Integration', () => {
       expect(response.status).toBe(409);
       expect(response.body).toEqual({
         error: {
-          code: 'CONFLICT',
-          message: 'A resource with these attributes already exists',
+          code: 'EMAIL_ALREADY_EXISTS',
+          message: 'Email already registered',
         },
         meta: {
           timestamp: expect.any(String),

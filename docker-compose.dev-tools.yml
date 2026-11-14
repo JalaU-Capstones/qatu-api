@@ -35,9 +35,6 @@ services:
       - ./docker/pgadmin/pgpass:/var/lib/pgadmin/pgpass:ro
     networks:
       - qatu-net
-    depends_on:
-      postgres:
-        condition: service_healthy
     ports:
       # pgAdmin v9 with `no-new-privileges:true` internally changes
       # PGADMIN_LISTEN_PORT from 80 to 8080 (avoiding CAP_NET_BIND_SERVICE).

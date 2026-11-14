@@ -32,6 +32,169 @@ export class ProductRepository extends IProductRepository {
   }
 
   /**
+   * Creates a new product row and returns the inserted record.
+   *
+   * @param {Object} data
+   * @param {string} data.sellerId
+   * @param {string} data.categoryId
+   * @param {string} data.name
+   * @param {string} data.slug
+   * @param {string} [data.description]
+   * @param {number} data.price
+   * @param {string} data.currency
+   * @param {number} data.stock
+   * @param {Object} [data.attributes]
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object>}
+   */
+  async create(
+    { sellerId, categoryId, name, slug, description, price, currency, stock, attributes },
+    { transaction } = {}
+  ) {
+    const sql = `
+      INSERT INTO public.products (
+        seller_id, category_id, name, slug, description, price, currency,
+        stock, attributes, state, published_at, primary_image_path,
+        average_rating, ratings_count, deleted_at
+      )
+      VALUES (
+        :sellerId, :categoryId, :name, :slug, :description, :price,
+        :currency, :stock, :attributes::jsonb, 'draft', NULL, NULL,
+        0, 0, NULL
+      )
+      RETURNING *
+    `;
+
+    const queryResult = await this.db.query(sql, {
+      replacements: {
+        sellerId,
+        categoryId: categoryId ?? null,
+        name,
+        slug,
+        description: description ?? null,
+        price,
+        currency: currency || 'USD',
+        stock: stock ?? 0,
+        attributes: JSON.stringify(attributes ?? {}),
+      },
+      ...(transaction ? { transaction } : {}),
+    });
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    if (!rows || rows.length === 0) {
+      return null;
+    }
+
+    return rows[0];
+  }
+
+  async publish({ productId, sellerId }, { transaction } = {}) {
+    // The use case already requires a primary image before publish, but this invariant must also
+    // hold under concurrent image deletion between that check and the UPDATE.
+    const sql = `
+      UPDATE public.products
+      SET state = 'published', updated_at = now()
+      WHERE id = :productId
+        AND seller_id = :sellerId
+        AND state = 'draft'
+        AND deleted_at IS NULL
+        AND primary_image_path IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM public.product_images WHERE product_id = :productId
+        )
+      RETURNING *
+    `;
+
+    const queryResult = await this.db.query(sql, {
+      replacements: { productId, sellerId },
+      ...(transaction ? { transaction } : {}),
+    });
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    return rows[0] ?? null;
+  }
+
+  async addImage({ productId, path, altText = null, position = 0 }, { transaction } = {}) {
+    const sql = `
+      INSERT INTO public.product_images (product_id, path, alt_text, position)
+      VALUES (:productId, :path, :altText, :position)
+      RETURNING id, product_id, path, alt_text, position, created_at
+    `;
+
+    const queryResult = await this.db.query(sql, {
+      replacements: { productId, path, altText, position },
+      ...(transaction ? { transaction } : {}),
+    });
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    return rows[0] ?? null;
+  }
+
+  async countImages(productId, { transaction } = {}) {
+    const sql = `
+      SELECT COUNT(*)::int AS n
+      FROM public.product_images
+      WHERE product_id = :productId
+    `;
+
+    const queryResult = await this.db.query(sql, {
+      replacements: { productId },
+      ...(transaction ? { transaction } : {}),
+    });
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    return Number(rows[0]?.n ?? 0);
+  }
+
+  async setPrimaryImageIfNull({ productId, path }, { transaction } = {}) {
+    const sql = `
+      UPDATE public.products
+      SET primary_image_path = :path, updated_at = now()
+      WHERE id = :productId AND primary_image_path IS NULL
+      RETURNING id
+    `;
+
+    const queryResult = await this.db.query(sql, {
+      replacements: { productId, path },
+      ...(transaction ? { transaction } : {}),
+    });
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    return rows.length > 0;
+  }
+
+  /**
    * Maps a database row to a domain Product entity.
    *
    * @param {Object} row
@@ -236,6 +399,76 @@ export class ProductRepository extends IProductRepository {
   }
 
   /**
+   * Paginated list of products owned by a seller, optionally filtered by state.
+   *
+   * @param {string} sellerId
+   * @param {{ page?: number, limit?: number, status?: 'draft'|'published' }} [options]
+   * @returns {Promise<{ items: Product[], total: number, page: number, limit: number }>}
+   */
+  async listBySeller(sellerId, { page = 1, limit = 20, status } = {}) {
+    const pageNumber = Math.max(1, Number(page) || 1);
+    const limitNumber = Math.max(1, Number(limit) || 20);
+    const offsetNumber = (pageNumber - 1) * limitNumber;
+    const replacements = {
+      sellerId,
+      limit: limitNumber,
+      offset: offsetNumber,
+    };
+
+    const whereClauses = ['p.seller_id = :sellerId', 'p.deleted_at IS NULL'];
+    if (status) {
+      whereClauses.push('p.state = :status');
+      replacements.status = status;
+    }
+
+    const whereSql = whereClauses.join(' AND ');
+
+    const countResult = await this.db.query(
+      `SELECT COUNT(*) AS total
+       FROM public.products p
+       WHERE ${whereSql}`,
+      {
+        replacements,
+        type: QueryTypes.SELECT,
+      }
+    );
+
+    const total = Number(countResult?.[0]?.total ?? 0);
+    if (total === 0) {
+      return { items: [], total, page: pageNumber, limit: limitNumber };
+    }
+
+    const queryResult = await this.db.query(
+      `SELECT
+        p.id, p.seller_id, p.category_id, p.name, p.slug, p.description,
+        p.price, p.currency, p.stock, p.attributes, p.primary_image_path,
+        p.state, p.average_rating, p.ratings_count, p.published_at,
+        p.created_at, p.updated_at
+      FROM public.products p
+      WHERE ${whereSql}
+      ORDER BY p.created_at DESC
+      LIMIT :limit OFFSET :offset`,
+      {
+        replacements,
+      }
+    );
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    return {
+      items: rows.map((row) => this.toDomain(row)),
+      total,
+      page: pageNumber,
+      limit: limitNumber,
+    };
+  }
+
+  /**
    * Find a single product with full relational details (seller, category, images).
    *
    * @param {string} productId
@@ -266,7 +499,7 @@ export class ProductRepository extends IProductRepository {
             SELECT json_agg(
               json_build_object(
                 'id', img.id,
-                'image_path', img.image_path,
+                'path', img.path,
                 'position', img.position
               ) ORDER BY img.position ASC
             )

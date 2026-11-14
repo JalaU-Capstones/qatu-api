@@ -173,6 +173,32 @@ export class ProfileRepository extends IProfileRepository {
    * @param {import('sequelize').Transaction} [options.transaction]
    * @returns {Promise<Profile|null>}
    */
+  /**
+   * Returns the role names assigned to the given user profile.
+   *
+   * @param {string} userId
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<string[]>}
+   */
+  async getRoleNames(userId, { transaction } = {}) {
+    if (!userId) return [];
+
+    const [rows] = await this.db.query(
+      `SELECT r.name
+       FROM user_roles ur
+       JOIN roles r ON r.id = ur.role_id
+       WHERE ur.profile_id = :userId
+       ORDER BY r.name`,
+      {
+        replacements: { userId },
+        transaction,
+      }
+    );
+
+    return (rows || []).map((row) => row.name).filter(Boolean);
+  }
+
   async findByUsername(username, { transaction } = {}) {
     const query = `
       SELECT id, username, full_name, email, avatar_path, bio, locale, created_at, updated_at

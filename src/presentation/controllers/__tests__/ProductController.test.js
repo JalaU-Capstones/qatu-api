@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { CreateProductRequestDTO } from '../../../application/dtos/CreateProductDTO.js';
 import { ProductController } from '../ProductController.js';
 
 describe('ProductController', () => {
   let useCaseMock;
   let getByIdUseCaseMock;
+  let createProductUseCaseMock;
+  let publishProductUseCaseMock;
+  let uploadProductImageUseCaseMock;
   let controller;
 
   beforeEach(() => {
@@ -13,18 +17,30 @@ describe('ProductController', () => {
     getByIdUseCaseMock = {
       execute: vi.fn(),
     };
+    createProductUseCaseMock = {
+      execute: vi.fn(),
+    };
+    publishProductUseCaseMock = {
+      execute: vi.fn(),
+    };
+    uploadProductImageUseCaseMock = {
+      execute: vi.fn(),
+    };
     controller = new ProductController({
       listProductsUseCase: useCaseMock,
       getProductByIdUseCase: getByIdUseCaseMock,
+      createProductUseCase: createProductUseCaseMock,
+      publishProductUseCase: publishProductUseCaseMock,
+      uploadProductImageUseCase: uploadProductImageUseCaseMock,
     });
   });
 
-  it('should throw if listProductsUseCase dependency is missing in constructor', () => {
-    expect(() => new ProductController({})).toThrow('listProductsUseCase is required');
+  it('should throw if neither product use case dependency is provided in constructor', () => {
+    expect(() => new ProductController({})).toThrow('at least one product use case is required');
   });
 
   it('should throw if no arguments are passed to constructor', () => {
-    expect(() => new ProductController()).toThrow('listProductsUseCase is required');
+    expect(() => new ProductController()).toThrow('at least one product use case is required');
   });
 
   describe('list', () => {
@@ -84,6 +100,73 @@ describe('ProductController', () => {
       await controller.list(req, res, next);
 
       expect(next).toHaveBeenCalledWith(error);
+    });
+  });
+
+  describe('create', () => {
+    it('should respond with 201 and pass the authenticated seller id into the DTO', async () => {
+      const mockResult = {
+        data: { id: 'p1', name: 'X', slug: 'x' },
+        meta: { timestamp: '2026-10-24T12:00:00.000Z' },
+      };
+      createProductUseCaseMock.execute.mockResolvedValue(mockResult);
+
+      const req = {
+        user: { id: 'seller-123', roles: ['seller'] },
+        body: { name: 'X', price: 10, category_id: '11111111-1111-4111-8111-111111111111' },
+      };
+      const json = vi.fn();
+      const status = vi.fn().mockReturnValue({ json });
+      const res = { status };
+      const next = vi.fn();
+
+      await controller.create(req, res, next);
+
+      expect(status).toHaveBeenCalledWith(201);
+      expect(json).toHaveBeenCalledWith(mockResult);
+      expect(createProductUseCaseMock.execute).toHaveBeenCalledTimes(1);
+      const dto = createProductUseCaseMock.execute.mock.calls[0][0];
+      expect(dto).toBeInstanceOf(CreateProductRequestDTO);
+      expect(dto.sellerId).toBe('seller-123');
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('should call next with the thrown error when the use case fails', async () => {
+      const error = new Error('boom');
+      createProductUseCaseMock.execute.mockRejectedValue(error);
+
+      const req = {
+        user: { id: 'seller-123', roles: ['seller'] },
+        body: { name: 'X', price: 10, category_id: '11111111-1111-4111-8111-111111111111' },
+      };
+      const res = { status: vi.fn() };
+      const next = vi.fn();
+
+      await controller.create(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(error);
+      expect(res.status).not.toHaveBeenCalled();
+    });
+
+    it('should call next with a missing dependency error when createProductUseCase is absent', async () => {
+      const controllerWithoutCreate = new ProductController({
+        listProductsUseCase: useCaseMock,
+      });
+
+      const req = {
+        user: { id: 'seller-123', roles: ['seller'] },
+        body: { name: 'X', price: 10, category_id: '11111111-1111-4111-8111-111111111111' },
+      };
+      const res = {};
+      const next = vi.fn();
+
+      await controllerWithoutCreate.create(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringContaining('createProductUseCase is required'),
+        })
+      );
     });
   });
 
@@ -158,6 +241,208 @@ describe('ProductController', () => {
 
       expect(next).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'getProductByIdUseCase is required' })
+      );
+    });
+  });
+
+  describe('publish', () => {
+    const productId = '550e8400-e29b-41d4-a716-446655440000';
+
+    it('responds with 200 and passes product and seller IDs to the use case', async () => {
+      const result = {
+        data: { id: productId, state: 'published', published_at: '2026-10-15T10:00:00.000Z' },
+        meta: { timestamp: '2026-10-15T10:00:00.000Z' },
+      };
+      publishProductUseCaseMock.execute.mockResolvedValue(result);
+
+      const req = {
+        user: { id: 'seller-1', roles: ['seller'] },
+        params: { id: productId },
+      };
+      const json = vi.fn();
+      const status = vi.fn().mockReturnValue({ json });
+      const next = vi.fn();
+
+      await controller.publish(req, { status }, next);
+
+      expect(status).toHaveBeenCalledWith(200);
+      expect(json).toHaveBeenCalledWith(result);
+      expect(publishProductUseCaseMock.execute).toHaveBeenCalledWith({
+        productId,
+        sellerId: 'seller-1',
+      });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('passes use case errors to next without responding', async () => {
+      const error = Object.assign(new Error('You do not own this product'), {
+        code: 'FORBIDDEN',
+        statusCode: 403,
+      });
+      publishProductUseCaseMock.execute.mockRejectedValue(error);
+
+      const status = vi.fn();
+      const next = vi.fn();
+      await controller.publish(
+        { user: { id: 'seller-1' }, params: { id: productId } },
+        { status },
+        next
+      );
+
+      expect(next).toHaveBeenCalledWith(error);
+      expect(status).not.toHaveBeenCalled();
+    });
+
+    it('passes a missing dependency error to next', async () => {
+      const controllerWithoutPublish = new ProductController({
+        listProductsUseCase: useCaseMock,
+      });
+      const next = vi.fn();
+
+      await controllerWithoutPublish.publish(
+        { user: { id: 'seller-1' }, params: { id: productId } },
+        {},
+        next
+      );
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'publishProductUseCase is required' })
+      );
+    });
+  });
+
+  describe('uploadImage', () => {
+    const productId = '550e8400-e29b-41d4-a716-446655440000';
+
+    it('reads req.cookies.access_token and passes it to the use case', async () => {
+      const payload = {
+        data: { id: 'img-1', product_id: productId, path: 'product-images/abc/cover.webp' },
+        meta: { timestamp: '2026-10-15T10:00:00.000Z' },
+        location: `/v1/products/${productId}/images/img-1`,
+      };
+      uploadProductImageUseCaseMock.execute.mockResolvedValue(payload);
+
+      const req = {
+        user: { id: 'seller-1', roles: ['seller'] },
+        params: { id: productId },
+        body: { alt_text: 'Front view', position: 0 },
+        file: { buffer: Buffer.from('x'), size: 1, mimeType: 'image/png', originalName: 'a.png' },
+        cookies: { access_token: 'cookie-access-token' },
+      };
+      const json = vi.fn();
+      const locationMock = vi.fn().mockReturnValue({ json });
+      const status = vi.fn().mockReturnValue({ location: locationMock, json });
+      const next = vi.fn();
+
+      await controller.uploadImage(req, { status }, next);
+
+      expect(status).toHaveBeenCalledWith(201);
+      expect(locationMock).toHaveBeenCalledWith(payload.location);
+      expect(json).toHaveBeenCalledWith({ data: payload.data, meta: payload.meta });
+      expect(uploadProductImageUseCaseMock.execute).toHaveBeenCalledWith({
+        productId,
+        sellerId: 'seller-1',
+        file: req.file,
+        altText: 'Front view',
+        position: 0,
+        accessToken: 'cookie-access-token',
+      });
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('falls back to req.headers.authorization Bearer if cookie is missing', async () => {
+      const payload = {
+        data: { id: 'img-1', product_id: productId, path: 'product-images/abc/cover.webp' },
+        meta: { timestamp: '2026-10-15T10:00:00.000Z' },
+        location: `/v1/products/${productId}/images/img-1`,
+      };
+      uploadProductImageUseCaseMock.execute.mockResolvedValue(payload);
+
+      const req = {
+        user: { id: 'seller-1', roles: ['seller'] },
+        params: { id: productId },
+        body: { alt_text: 'Front view', position: 0 },
+        file: { buffer: Buffer.from('x'), size: 1, mimeType: 'image/png', originalName: 'a.png' },
+        cookies: {},
+        headers: { authorization: 'Bearer bearer-access-token' },
+      };
+      const json = vi.fn();
+      const locationMock = vi.fn().mockReturnValue({ json });
+      const status = vi.fn().mockReturnValue({ location: locationMock, json });
+      const next = vi.fn();
+
+      await controller.uploadImage(req, { status }, next);
+
+      expect(status).toHaveBeenCalledWith(201);
+      expect(uploadProductImageUseCaseMock.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accessToken: 'bearer-access-token',
+        })
+      );
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 UNAUTHORIZED when both cookie and Bearer are missing', async () => {
+      const req = {
+        user: { id: 'seller-1', roles: ['seller'] },
+        params: { id: productId },
+        file: { buffer: Buffer.from('x'), size: 1, mimeType: 'image/png', originalName: 'a.png' },
+        cookies: {},
+        headers: {},
+      };
+      const next = vi.fn();
+
+      await controller.uploadImage(req, {}, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'UNAUTHORIZED',
+          statusCode: 401,
+          message: 'Session token not available for storage upload',
+        })
+      );
+      expect(uploadProductImageUseCaseMock.execute).not.toHaveBeenCalled();
+    });
+
+    it('forwards use case errors without writing a response', async () => {
+      const error = Object.assign(new Error('You do not own this product'), {
+        code: 'FORBIDDEN',
+        statusCode: 403,
+      });
+      uploadProductImageUseCaseMock.execute.mockRejectedValue(error);
+
+      const status = vi.fn();
+      const next = vi.fn();
+
+      await controller.uploadImage(
+        {
+          user: { id: 'seller-1' },
+          params: { id: productId },
+          file: { buffer: Buffer.from('x') },
+          cookies: { access_token: 'valid-token' },
+        },
+        { status },
+        next
+      );
+
+      expect(next).toHaveBeenCalledWith(error);
+      expect(status).not.toHaveBeenCalled();
+    });
+
+    it('passes a missing dependency error to next', async () => {
+      const controllerWithoutUpload = new ProductController({
+        listProductsUseCase: useCaseMock,
+      });
+      const next = vi.fn();
+
+      await controllerWithoutUpload.uploadImage(
+        { user: { id: 'seller-1' }, params: { id: productId }, file: { buffer: Buffer.from('x') } },
+        {},
+        next
+      );
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'uploadProductImageUseCase is required' })
       );
     });
   });

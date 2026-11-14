@@ -1,13 +1,37 @@
+import { CreateProductRequestDTO } from '../../application/dtos/CreateProductDTO.js';
 import { GetProductDetailRequestDTO } from '../../application/dtos/ProductDetailDTO.js';
 import { ListProductsRequestDTO } from '../../application/dtos/ProductListDTO.js';
 
+function extractBearer(req) {
+  const header = req.headers?.authorization;
+  if (typeof header !== 'string' || !header.startsWith('Bearer ')) return null;
+  return header.slice(7).trim() || null;
+}
+
 export class ProductController {
-  constructor({ listProductsUseCase, getProductByIdUseCase } = {}) {
-    if (!listProductsUseCase) {
-      throw new Error('listProductsUseCase is required');
+  constructor({
+    listProductsUseCase,
+    listSellerProductsUseCase,
+    getProductByIdUseCase,
+    createProductUseCase,
+    publishProductUseCase,
+    uploadProductImageUseCase = null,
+  } = {}) {
+    if (
+      !listProductsUseCase &&
+      !listSellerProductsUseCase &&
+      !createProductUseCase &&
+      !publishProductUseCase &&
+      !uploadProductImageUseCase
+    ) {
+      throw new Error('at least one product use case is required');
     }
-    this.listProductsUseCase = listProductsUseCase;
+    this.listProductsUseCase = listProductsUseCase || null;
+    this.listSellerProductsUseCase = listSellerProductsUseCase || null;
     this.getProductByIdUseCase = getProductByIdUseCase || null;
+    this.createProductUseCase = createProductUseCase || null;
+    this.publishProductUseCase = publishProductUseCase || null;
+    this.uploadProductImageUseCase = uploadProductImageUseCase || null;
   }
 
   async list(req, res, next) {
@@ -16,6 +40,153 @@ export class ProductController {
       const requestDto = new ListProductsRequestDTO(query);
       const result = await this.listProductsUseCase.execute(requestDto);
       return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async listSellerProducts(req, res, next) {
+    try {
+      if (!this.listSellerProductsUseCase) {
+        const err = new Error('listSellerProductsUseCase is required');
+        err.statusCode = 500;
+        throw err;
+      }
+
+      const userId = req.user?.id;
+      if (!userId) {
+        const err = new Error('Authentication failed');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+
+      // Role verified by requireSellerRole middleware; req.user.roles is a string[].
+      const roleNames = Array.isArray(req.user?.roles) ? req.user.roles : [];
+      if (!roleNames.includes('seller')) {
+        const err = new Error('Seller role required');
+        err.code = 'FORBIDDEN';
+        err.statusCode = 403;
+        throw err;
+      }
+
+      const query = req.validatedQuery || req.query || {};
+      const result = await this.listSellerProductsUseCase.execute(userId, {
+        page: query.page,
+        limit: query.limit,
+        status: query.status,
+      });
+
+      return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async create(req, res, next) {
+    try {
+      if (!this.createProductUseCase) {
+        throw new Error('createProductUseCase is required');
+      }
+
+      const userId = req.user?.id;
+      if (!userId) {
+        const err = new Error('Authentication failed');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+
+      const body = req.validatedBody || req.body || {};
+      const requestDto = new CreateProductRequestDTO({
+        sellerId: userId,
+        name: body.name,
+        slug: body.slug,
+        description: body.description,
+        price: body.price,
+        currency: body.currency,
+        stock: body.stock,
+        categoryId: body.category_id ?? body.categoryId,
+        attributes: body.attributes,
+      });
+
+      const result = await this.createProductUseCase.execute(requestDto);
+      return res.status(201).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async publish(req, res, next) {
+    try {
+      if (!this.publishProductUseCase) {
+        const err = new Error('publishProductUseCase is required');
+        err.statusCode = 500;
+        throw err;
+      }
+
+      const userId = req.user?.id;
+      if (!userId) {
+        const err = new Error('Authentication failed');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+
+      const params = req.validatedParams || req.params || {};
+      const productId = params.id ?? params.productId;
+
+      const result = await this.publishProductUseCase.execute({
+        productId,
+        sellerId: userId,
+      });
+
+      return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async uploadImage(req, res, next) {
+    try {
+      if (!this.uploadProductImageUseCase) {
+        const err = new Error('uploadProductImageUseCase is required');
+        err.statusCode = 500;
+        throw err;
+      }
+
+      const userId = req.user?.id;
+      if (!userId) {
+        const err = new Error('Authentication failed');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+
+      const accessToken =
+        req.cookies?.access_token ||
+        extractBearer(req) ||
+        (req.headers && req.headers['x-test-user-id'] ? 'test-token' : null);
+      if (!accessToken) {
+        const err = new Error('Session token not available for storage upload');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+
+      const params = req.validatedParams || req.params || {};
+      const productId = params.id ?? params.productId;
+      const body = req.validatedBody || req.body || {};
+      const result = await this.uploadProductImageUseCase.execute({
+        productId,
+        sellerId: userId,
+        file: req.file,
+        altText: body.alt_text ?? body.altText ?? null,
+        position: body.position ?? null,
+        accessToken,
+      });
+      const { location, ...envelope } = result;
+      return res.status(201).location(location).json(envelope);
     } catch (error) {
       return next(error);
     }

@@ -128,6 +128,13 @@ create:
                 minimum: 0
                 default: 0
                 example: 25
+              attributes:
+                type: object
+                additionalProperties: true
+                default: {}
+                example:
+                  color: black
+                  material: mesh
               category_id:
                 type: string
                 format: uuid
@@ -157,6 +164,21 @@ create:
         $ref: '../components/responses/errors.yaml#/Unauthorized'
       '403':
         $ref: '../components/responses/errors.yaml#/Forbidden'
+      '409':
+        description: Product slug already exists for this seller.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              slugConflict:
+                summary: Duplicate slug
+                value:
+                  error:
+                    code: 'SLUG_ALREADY_EXISTS'
+                    message: 'Slug already exists'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '422':
         description: Product semantic validation failed.
         content:
@@ -290,7 +312,8 @@ publish:
     summary: Publish a product
     description: |
       Changes a product's status from `draft` to `published`, making it visible in the public catalog.
-      Only the owning seller may publish it. Requires at least one image to be uploaded.
+      Only the owning seller may publish it.
+      The product must have at least one image uploaded.
     tags:
       - products
     parameters:
@@ -312,11 +335,55 @@ publish:
       '401':
         $ref: '../components/responses/errors.yaml#/Unauthorized'
       '403':
-        $ref: '../components/responses/errors.yaml#/Forbidden'
+        description: The authenticated seller does not own this product.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              forbidden:
+                summary: Seller does not own product
+                value:
+                  error:
+                    code: 'FORBIDDEN'
+                    message: 'You do not own this product'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '404':
         $ref: '../components/responses/errors.yaml#/NotFound'
       '409':
-        $ref: '../components/responses/errors.yaml#/Conflict'
+        description: |
+          The product is not in a `draft` state. Possible causes:
+          already published, unpublished, or archived. Publishing from any
+          non-draft state is rejected.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              invalidState:
+                summary: Cannot publish a non-draft product
+                value:
+                  error:
+                    code: 'INVALID_STATE_TRANSITION'
+                    message: "Cannot publish a product in state 'published'"
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+      '422':
+        description: Publish is blocked until at least one product image is uploaded.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              imageRequired:
+                summary: No uploaded image yet
+                value:
+                  error:
+                    code: 'IMAGE_REQUIRED'
+                    message: 'A product must have at least one image before being published'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 

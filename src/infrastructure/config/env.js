@@ -25,6 +25,7 @@ function createEnvConfig(source = process.env) {
     source.SUPABASE_STORAGE_URL ||
     `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/public`;
   const supabaseStorageBucket = source.SUPABASE_STORAGE_BUCKET || 'avatars';
+  const publicAppUrl = (source.PUBLIC_APP_URL || '').trim();
 
   const frontendUrl = source.FRONTEND_URL || 'http://localhost:5173';
   const allowedOrigins = source.ALLOWED_ORIGINS
@@ -42,6 +43,7 @@ function createEnvConfig(source = process.env) {
     SUPABASE_STORAGE_PUBLIC_URL: supabaseStoragePublicUrl,
     SUPABASE_STORAGE_URL: supabaseStoragePublicUrl,
     SUPABASE_STORAGE_BUCKET: supabaseStorageBucket,
+    PUBLIC_APP_URL: publicAppUrl,
     RABBITMQ_URL: source.RABBITMQ_URL || 'amqp://qatu:qatu_dev_password@localhost:5672',
     // Off unless enabled, so tests and CI never need a broker.
     // Messaging (ADR-014). Off unless explicitly enabled so tests/CI never need a broker.
