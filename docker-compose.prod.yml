@@ -5,18 +5,18 @@
 #
 # Differences from base:
 #   - api builds the runtime stage (multi-stage, no dev deps).
-#   - No host port exposure for postgres or rabbitmq (they use `expose` only,
-#     per ADR-016 security requirement).
+#   - No host port exposure for rabbitmq (`expose` only, ADR-016).
+#   - No local postgres service (ADR-020). DB is Supabase.
 #   - No host port exposure for api either — a future nginx service in the
 #     client repo's compose will proxy from a shared external network.
 #   - Migrations run automatically via entrypoint.sh (RUN_MIGRATIONS=true).
 #   - Restart policies active.
+#   - Runtime secrets/config from .env are re-declared as ${VAR} so they are
+#     overridable via shell env / compose without editing the file (Lab W3 #3).
+#   - API healthcheck lives in the BASE compose (inherited); do not duplicate.
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
-  postgres:
-    restart: unless-stopped
-
   rabbitmq:
     restart: unless-stopped
 
@@ -27,13 +27,25 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      RUN_MIGRATIONS: 'true'
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
       RUN_SEEDS: ${RUN_SEEDS:-false}
+      PORT: ${PORT:-3000}
       # In prod, .env MUST point to Supabase Cloud (Mode C) or a real
-      # postgres with auth schema. Do NOT override here.
-    healthcheck:
-      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:3000/health']
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 90s
+      # postgres with auth schema. Values below are overridable via env.
+      DATABASE_URL: ${DATABASE_URL}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_STORAGE_PUBLIC_URL: ${SUPABASE_STORAGE_PUBLIC_URL}
+      SUPABASE_STORAGE_BUCKET: ${SUPABASE_STORAGE_BUCKET:-avatars}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      RABBITMQ_ENABLED: ${RABBITMQ_ENABLED:-true}
+      RABBITMQ_EXCHANGE: ${RABBITMQ_EXCHANGE:-qatu.events}
+      RABBITMQ_NOTIFICATIONS_QUEUE: ${RABBITMQ_NOTIFICATIONS_QUEUE:-qatu.notifications}
+      RABBITMQ_DLX: ${RABBITMQ_DLX:-qatu.dlx}
+      RABBITMQ_DLQ: ${RABBITMQ_DLQ:-qatu.notifications.dlq}
+      OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-5000}
+      OUTBOX_MAX_ATTEMPTS: ${OUTBOX_MAX_ATTEMPTS:-3}
+      FRONTEND_URL: ${FRONTEND_URL}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}

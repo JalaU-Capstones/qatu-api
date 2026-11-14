@@ -6,7 +6,58 @@ This document describes how the Qatu API is containerized: how to run it locally
 
 - [SP-16: Containerization Strategy](../../Methodology/Spikes-and-PoC/SP-16-Containerization) (wiki)
 - [ADR-016: Containerization Architecture](../../Architecture/ADR/ADR-016-Containerization) (wiki)
+- [ADR-018: DevOps Topology](../../Architecture/ADR/ADR-018-DevOps-Topology) (wiki) — multi-network + LB + SSL
+- [DevOps page](../../Architecture/DevOps) (wiki)
 - [US-36](https://gitlab.com/jala-university1/cohort-5/ES.CSSD-245.GA.T2.26.M2/SD/group-b/grupo-2/api/-/work_items/37) (GitLab issue)
+- [Lab W3 #3 — Backend Compose Hardening](https://gitlab.com/jala-university1/cohort-5/ES.CSSD-245.GA.T2.26.M2/SD/group-b/grupo-2/devops/tracking/-/work_items/3)
+
+---
+
+## Network topology (Lab W3 / ADR-018 + ADR-020)
+
+The API compose project owns two networks. There is **no** `postgres` service (ADR-020): the database is Supabase CLI on the host (`host.docker.internal:54322`).
+
+| Network    | Membership (API repo) | Purpose                                                                        |
+| ---------- | --------------------- | ------------------------------------------------------------------------------ |
+| `back-end` | `api`, `rabbitmq`     | Broker stays off the cross-repo bridge.                                        |
+| `qatu-net` | `api` only            | Cross-repo bridge so `client` (separate Compose project) can reach `api:3000`. |
+
+```mermaid
+flowchart TB
+    subgraph host["Host"]
+        Supa["Supabase CLI<br/>:54322"]
+    end
+
+    subgraph qt["qatu-net (cross-repo bridge)"]
+        Client["client<br/>(other compose project)"]
+        ApiBridge["api"]
+    end
+
+    subgraph be["back-end (broker isolation)"]
+        Api["api<br/>:3000"]
+        Mq[("rabbitmq<br/>volume: rabbitmq_data")]
+    end
+
+    Client -->|HTTP /v1| ApiBridge
+    ApiBridge -.->|same container| Api
+    Api -->|TCP 54322| Supa
+    Api -->|AMQP 5672| Mq
+```
+
+**Why `api` is on both networks:** `rabbitmq` stays on `back-end` only, so the client cannot open a socket to the broker. The database is not on either Docker network; the API reaches it on the host. `qatu-net` is the narrow bridge for `/v1` traffic only.
+
+**Verify membership:**
+
+```bash
+docker network inspect back-end --format '{{range .Containers}}{{.Name}} {{"\n"}}{{end}}'
+# expect: ...-api-1, ...-rabbitmq-1
+
+docker network inspect qatu-net --format '{{range .Containers}}{{.Name}} {{"\n"}}{{end}}'
+# expect: ...-api-1  (and client when the client compose is up)
+# must NOT list rabbitmq
+```
+
+**Volume persistence:** named volume `rabbitmq_data` survives `docker compose down` (without `-v`). Database persistence is the Supabase CLI volume, not a compose volume.
 
 ---
 
@@ -205,7 +256,7 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - qatu-net
+      - back-end
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
@@ -304,12 +355,13 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml exec postgres \
 ### Inspect the network
 
 ```bash
-# List containers on qatu-net and their IPs
+# List containers on each network and their IPs
+docker network inspect back-end --format '{{range .Containers}}{{.Name}} {{.IPv4Address}}{{"\n"}}{{end}}'
 docker network inspect qatu-net --format '{{range .Containers}}{{.Name}} {{.IPv4Address}}{{"\n"}}{{end}}'
 
-# Check DNS resolution between containers
-docker compose exec api getent hosts postgres
-docker compose exec api getent hosts rabbitmq
+# Check DNS resolution (broker is on back-end; DB is Supabase on the host)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api getent hosts rabbitmq
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec api getent hosts host.docker.internal
 ```
 
 ### Verify migrations ran
@@ -358,9 +410,13 @@ docker compose exec api npx sequelize-cli db:migrate:status
 | `POSTGRES_DB`                  | `postgres`                                              | no                      | Postgres container database (docker-compose only).                             |
 | `PGADMIN_EMAIL`                | `admin@qatu.com`                                        | n/a (dev only)          | pgAdmin login (dev-tools override only).                                       |
 | `PGADMIN_PASSWORD`             | `admin123`                                              | n/a (dev only)          | pgAdmin password (dev-tools override only). pgAdmin v9 requires ≥ 6 chars.     |
+| `RABBITMQ_DEFAULT_USER`        | `qatu`                                                  | no                      | RabbitMQ container default user (docker-compose only).                         |
+| `RABBITMQ_DEFAULT_PASS`        | `qatu_dev_password`                                     | no                      | RabbitMQ container default password (docker-compose only).                     |
 | `POSTGRES_WAIT_TRIES`          | `30`                                                    | no                      | Number of `pg_isready` attempts before failing (entrypoint.sh).                |
 | `RUN_MIGRATIONS`               | `true`                                                  | no                      | Set to `false` to skip migrations on startup (useful for one-shot containers). |
 | `RUN_SEEDS`                    | `false`                                                 | no                      | Set to `true` to run `db:seed:all` on startup (recommended on first deploy).   |
+
+Runtime keys (`DATABASE_URL`, `SUPABASE_*`, `JWT_SECRET`, `RABBITMQ_*`, CORS) are also declared as `${VAR}` in `docker-compose.dev.yml` and `docker-compose.prod.yml`, so CI/shell can override them without editing YAML.
 
 ---
 
@@ -524,8 +580,9 @@ docker volume rm qatu_postgres_local
 ## Reference
 
 - **Dockerfile:** `./Dockerfile` (four stages: deps → build → development → runtime)
+- **Runtime image check (Lab W3 #3):** `docker build --target runtime -t qatu-api:check .` then `docker run --rm --entrypoint sh qatu-api:check -c 'du -sh node_modules'`. Expect ~65 MB prod `node_modules` and **no** `nodemon` / `jest` / `eslint`. Image size ≈ 243 MB (`node:26-alpine` + prod deps).
 - **Entrypoint:** `./docker/entrypoint.sh` (waits for Postgres, runs migrations, then execs CMD)
 - **Compose files:** `./docker-compose.yml`, `./docker-compose.dev.yml`, `./docker-compose.prod.yml`, `./docker-compose.dev-tools.yml`
 - **CI workflows:** `.github/workflows/publish-image.yml`, `.gitlab-ci.yml` (`publish:image` job)
-- **Design docs (wiki):** SP-16 (strategy), ADR-016 (decision), ADR-014 (message broker)
-- **Lab deadline:** DevOps Lab Week 2 — 2026-11-08 23:59 UTC-4
+- **Design docs (wiki):** SP-16 (strategy), ADR-016 (decision), ADR-018 (topology), ADR-014 (message broker)
+- **Lab deadlines:** DevOps Lab Week 2 — 2026-11-08; DevOps Lab Week 3 (#3 backend network) — 2026-11-15 23:59 UTC-4
