@@ -3,15 +3,12 @@
 #
 # Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 #
-# Mode B (fully containerized for API + DB + Broker). Auth uses Supabase CLI
-# on host via `host.docker.internal` (see .env.example Mode A).
+# Mode A: DB is Supabase CLI on host :54322. No postgres container.
 #
 # Differences from base:
 #   - api runs `pnpm dev` (nodemon) with source bind-mount for hot reload.
 #   - api is exposed on host:3000 for frontend dev.
 #   - rabbitmq management UI is exposed on host:15672.
-#   - postgres is NOT exposed to host (matches the US-36 AC: "postgres is
-#     reachable only via pgAdmin at http://localhost:8080").
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -37,8 +34,8 @@ services:
       SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
       SUPABASE_STORAGE_PUBLIC_URL: ${SUPABASE_STORAGE_PUBLIC_URL:-http://localhost:54321/storage/v1/object/public}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-}
-      # Override the DB URL to point to the containerized postgres.
-      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/postgres}
+      # Point to Supabase CLI DB (Mode A).
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@host.docker.internal:54322/postgres}
     volumes:
       - .:/app
       - /app/node_modules
@@ -46,4 +43,6 @@ services:
     ports:
       - '3000:3000'
     extra_hosts:
-      - 'host.docker.internal:host-gateway'
+      # On Linux with user-defined bridge network qatu-net (172.19.0.0/16),
+      # host-gateway resolves to inactive docker0 (172.17.0.1). 172.19.0.1 is the active bridge gateway.
+      - 'host.docker.internal:172.19.0.1'

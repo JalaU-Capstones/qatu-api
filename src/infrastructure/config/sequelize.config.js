@@ -20,7 +20,7 @@ module.exports = {
   },
   test: {
     ...common,
-    url: process.env.DATABASE_URL_TEST || process.env.DATABASE_URL,
+    url: process.env.DATABASE_URL,
   },
   production: {
     ...common,

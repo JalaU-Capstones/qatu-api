@@ -224,9 +224,23 @@ Running `pnpm db:migrate` before `npx supabase db reset` will fail because `publ
 
 See [SP-19](../Methodology/Spikes-and-PoC/SP-19-Supabase-Schema-Ownership) and [ADR-020](../Architecture/ADR/ADR-020-Database-Topology-and-Schema-Ownership) for rationale.
 
+## Test Database & Integration Tests
+
+Integration tests (`pnpm test:integration`) require a PostgreSQL database with the `auth` schema:
+
+- **Default (Offline / Testcontainers):** Leave `TEST_DATABASE_URL` unset or commented out in `.env`. Vitest spins up an isolated PostgreSQL container via Testcontainers, automatically runs all migrations and seeds the auth schema stub, and tears it down after tests finish. Requires a running Docker daemon.
+- **Dedicated Test DB:** Set `TEST_DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:54322/postgres` (or a dedicated test database URL). When set, tests reuse the running database directly (creating temporary test databases), which is faster but requires Supabase CLI to be running.
+
 ---
 
 ## Troubleshooting
+
+### `docker ps` doesn't show a `postgres` container
+
+Intentional. Per ADR-020 there is NO `postgres` container in this
+repository. The single source of truth is Supabase CLI on `:54322`. The
+container `postgres:17-alpine` cannot run migrations 003+ (no
+`auth.users`). Do not re-add it. See [ADR-020](../Architecture/ADR/ADR-020-Database-Topology-and-Schema-Ownership).
 
 ### `pgcrypto` extension not found
 
