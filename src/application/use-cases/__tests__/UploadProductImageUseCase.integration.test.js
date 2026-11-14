@@ -18,11 +18,15 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
   const runQuery = (sql, replacements = {}) =>
     sequelize.query(sql, { replacements, type: QueryTypes.SELECT });
 
-  const buildUseCase = (storageService) =>
-    new UploadProductImageUseCase({
+  const buildUseCase = (storageService) => {
+    const uc = new UploadProductImageUseCase({
       productRepository,
       storageService,
     });
+    const origExecute = uc.execute.bind(uc);
+    uc.execute = (params = {}) => origExecute({ accessToken: 'integration-test-token', ...params });
+    return uc;
+  };
 
   const insertProduct = async ({ id, sellerId, state = 'draft' }) => {
     await sequelize.query(

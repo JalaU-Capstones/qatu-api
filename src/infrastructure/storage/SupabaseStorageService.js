@@ -5,7 +5,7 @@ import {
   MAX_AVATAR_SIZE_BYTES,
 } from '../../application/use-cases/UploadAvatarUseCase.js';
 import { env } from '../config/env.js';
-import { supabase } from '../config/supabase.js';
+import { createUserScopedSupabaseClient, supabase } from '../config/supabase.js';
 
 export const DEFAULT_AVATAR_BUCKET = env.SUPABASE_STORAGE_BUCKET || 'avatars';
 
@@ -97,7 +97,22 @@ export class SupabaseStorageService extends IStorageService {
    * (Phase 2, deferred). Until Phase 2 ships, `PUBLIC_APP_URL` should stay
    * empty in environments where avatars must render.
    */
-  async uploadAvatar({ userId, buffer, mimeType, extension, originalName, size } = {}) {
+  async uploadAvatar({
+    userId,
+    buffer,
+    mimeType,
+    extension,
+    originalName,
+    size,
+    accessToken,
+  } = {}) {
+    if (!accessToken) {
+      const err = new Error('accessToken is required for avatar upload');
+      err.code = 'VALIDATION_ERROR';
+      err.statusCode = 400;
+      throw err;
+    }
+
     if (!userId || !Buffer.isBuffer(buffer) || buffer.length === 0) {
       const err = new Error('userId and a non-empty buffer are required');
       err.code = 'VALIDATION_ERROR';
@@ -133,7 +148,9 @@ export class SupabaseStorageService extends IStorageService {
     const fileUuid = this.uuidGenerator();
     const objectKey = `${userId}/${fileUuid}.${cleanExt}`;
 
+    const client = createUserScopedSupabaseClient(accessToken);
     await this._uploadToStorage({
+      client,
       bucket: this.bucket,
       objectKey,
       buffer,
@@ -159,9 +176,25 @@ export class SupabaseStorageService extends IStorageService {
    * @param {string} [params.extension] - Optional file extension hint.
    * @param {string} [params.originalName] - Original filename for extension check.
    * @param {number} [params.size] - Optional size hint.
+   * @param {string} params.accessToken - Scoped JWT access token.
    * @returns {Promise<{ bucket: string, path: string, publicUrl: string }>}
    */
-  async uploadProductImage({ productId, buffer, mimeType, extension, originalName, size } = {}) {
+  async uploadProductImage({
+    productId,
+    buffer,
+    mimeType,
+    extension,
+    originalName,
+    size,
+    accessToken,
+  } = {}) {
+    if (!accessToken) {
+      const err = new Error('accessToken is required for product image upload');
+      err.code = 'VALIDATION_ERROR';
+      err.statusCode = 400;
+      throw err;
+    }
+
     if (!productId || !Buffer.isBuffer(buffer) || buffer.length === 0) {
       const err = new Error('productId and a non-empty buffer are required');
       err.code = 'VALIDATION_ERROR';
@@ -197,7 +230,9 @@ export class SupabaseStorageService extends IStorageService {
     const fileUuid = this.uuidGenerator();
     const objectKey = `${productId}/${fileUuid}.${mappedExt}`;
 
+    const client = createUserScopedSupabaseClient(accessToken);
     await this._uploadToStorage({
+      client,
       bucket,
       objectKey,
       buffer,
@@ -213,9 +248,10 @@ export class SupabaseStorageService extends IStorageService {
     };
   }
 
-  async _uploadToStorage({ bucket, objectKey, buffer, contentType, upsert, uploadType }) {
-    if (this.client?.storage && typeof this.client.storage.from === 'function') {
-      const bucketClient = this.client.storage.from(bucket);
+  async _uploadToStorage({ client, bucket, objectKey, buffer, contentType, upsert, uploadType }) {
+    const targetClient = client || this.client;
+    if (targetClient?.storage && typeof targetClient.storage.from === 'function') {
+      const bucketClient = targetClient.storage.from(bucket);
       const { error } = await bucketClient.upload(objectKey, buffer, { contentType, upsert });
 
       if (error) {

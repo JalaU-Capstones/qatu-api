@@ -4,6 +4,12 @@ import {
   UploadAvatarRequestDTO,
 } from '../../application/dtos/ProfileDTO.js';
 
+function extractBearer(req) {
+  const header = req.headers?.authorization;
+  if (typeof header !== 'string' || !header.startsWith('Bearer ')) return null;
+  return header.slice(7).trim() || null;
+}
+
 export class ProfileController {
   /**
    * @param {Object} deps
@@ -91,11 +97,22 @@ export class ProfileController {
         throw new Error('uploadAvatarUseCase is not configured');
       }
 
+      // HttpOnly-safe: read the JWT from the cookie the backend already parsed.
+      // Fallback to Bearer for legacy clients (deprecated per openapi).
+      const accessToken = req.cookies?.access_token || extractBearer(req);
+      if (!accessToken) {
+        const err = new Error('Session token not available for storage upload');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+
       const requestDto = new UploadAvatarRequestDTO({
         userId,
         targetUserId: userId,
         requestingUserId: userId,
         file: req.file,
+        accessToken,
       });
 
       const result = await this.uploadAvatarUseCase.execute(requestDto);

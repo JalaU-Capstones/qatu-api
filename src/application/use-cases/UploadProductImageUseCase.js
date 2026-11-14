@@ -38,7 +38,10 @@ export class UploadProductImageUseCase {
     this.storageService = storageService;
   }
 
-  async execute({ productId, sellerId, file, altText = null, position = null } = {}) {
+  async execute({ productId, sellerId, file, altText = null, position = null, accessToken } = {}) {
+    if (!accessToken) {
+      throw errors.validationError('accessToken is required');
+    }
     if (!productId || !UUID_RE.test(productId)) {
       throw errors.validationError('productId must be a valid UUID');
     }
@@ -72,6 +75,7 @@ export class UploadProductImageUseCase {
         extension,
         originalName: file.originalName,
         size: file.size,
+        accessToken,
       });
     } catch (error) {
       if (!(error instanceof Error)) {

@@ -129,7 +129,8 @@ describe('ProfileController', () => {
   });
 
   describe('uploadAvatar', () => {
-    it('should return 200 with updated profile data when avatar upload succeeds', async () => {
+    it('should read req.cookies.access_token and pass it to the use case', async () => {
+      req.cookies = { access_token: 'cookie-jwt-token' };
       req.file = {
         buffer: Buffer.from('png-bytes'),
         mimeType: 'image/png',
@@ -144,12 +145,55 @@ describe('ProfileController', () => {
       expect(dto.userId).toBe('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11');
       expect(dto.requestingUserId).toBe('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11');
       expect(dto.mimeType).toBe('image/png');
+      expect(dto.accessToken).toBe('cookie-jwt-token');
       expect(res.status).toHaveBeenCalledWith(200);
       expect(res.json).toHaveBeenCalledWith(sampleProfileEnvelope);
     });
 
+    it('should fall back to req.headers.authorization Bearer if cookie is missing', async () => {
+      req.cookies = {};
+      req.headers = { authorization: 'Bearer header-jwt-token' };
+      req.file = {
+        buffer: Buffer.from('png-bytes'),
+        mimeType: 'image/png',
+        originalName: 'avatar.png',
+        size: 9,
+      };
+
+      await controller.uploadAvatar(req, res, next);
+
+      expect(mockUploadAvatarUseCase.execute).toHaveBeenCalledTimes(1);
+      const dto = mockUploadAvatarUseCase.execute.mock.calls[0][0];
+      expect(dto.accessToken).toBe('header-jwt-token');
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(sampleProfileEnvelope);
+    });
+
+    it('should return 401 UNAUTHORIZED when both cookie and Bearer are missing', async () => {
+      req.cookies = {};
+      req.headers = {};
+      req.file = {
+        buffer: Buffer.from('png-bytes'),
+        mimeType: 'image/png',
+        originalName: 'avatar.png',
+        size: 9,
+      };
+
+      await controller.uploadAvatar(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'UNAUTHORIZED',
+          statusCode: 401,
+          message: 'Session token not available for storage upload',
+        })
+      );
+      expect(mockUploadAvatarUseCase.execute).not.toHaveBeenCalled();
+    });
+
     it('should call next with 401 UNAUTHORIZED when req.user is missing', async () => {
       req.user = null;
+      req.cookies = { access_token: 'cookie-jwt-token' };
 
       await controller.uploadAvatar(req, res, next);
 

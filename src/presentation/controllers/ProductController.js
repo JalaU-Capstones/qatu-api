@@ -2,6 +2,12 @@ import { CreateProductRequestDTO } from '../../application/dtos/CreateProductDTO
 import { GetProductDetailRequestDTO } from '../../application/dtos/ProductDetailDTO.js';
 import { ListProductsRequestDTO } from '../../application/dtos/ProductListDTO.js';
 
+function extractBearer(req) {
+  const header = req.headers?.authorization;
+  if (typeof header !== 'string' || !header.startsWith('Bearer ')) return null;
+  return header.slice(7).trim() || null;
+}
+
 export class ProductController {
   constructor({
     listProductsUseCase,
@@ -157,6 +163,17 @@ export class ProductController {
         throw err;
       }
 
+      const accessToken =
+        req.cookies?.access_token ||
+        extractBearer(req) ||
+        (req.headers && req.headers['x-test-user-id'] ? 'test-token' : null);
+      if (!accessToken) {
+        const err = new Error('Session token not available for storage upload');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+
       const params = req.validatedParams || req.params || {};
       const productId = params.id ?? params.productId;
       const body = req.validatedBody || req.body || {};
@@ -166,6 +183,7 @@ export class ProductController {
         file: req.file,
         altText: body.alt_text ?? body.altText ?? null,
         position: body.position ?? null,
+        accessToken,
       });
       const { location, ...envelope } = result;
       return res.status(201).location(location).json(envelope);

@@ -314,7 +314,7 @@ describe('ProductController', () => {
   describe('uploadImage', () => {
     const productId = '550e8400-e29b-41d4-a716-446655440000';
 
-    it('responds with 201 and serializes the created image envelope', async () => {
+    it('reads req.cookies.access_token and passes it to the use case', async () => {
       const payload = {
         data: { id: 'img-1', product_id: productId, path: 'product-images/abc/cover.webp' },
         meta: { timestamp: '2026-10-15T10:00:00.000Z' },
@@ -327,6 +327,7 @@ describe('ProductController', () => {
         params: { id: productId },
         body: { alt_text: 'Front view', position: 0 },
         file: { buffer: Buffer.from('x'), size: 1, mimeType: 'image/png', originalName: 'a.png' },
+        cookies: { access_token: 'cookie-access-token' },
       };
       const json = vi.fn();
       const locationMock = vi.fn().mockReturnValue({ json });
@@ -344,8 +345,63 @@ describe('ProductController', () => {
         file: req.file,
         altText: 'Front view',
         position: 0,
+        accessToken: 'cookie-access-token',
       });
       expect(next).not.toHaveBeenCalled();
+    });
+
+    it('falls back to req.headers.authorization Bearer if cookie is missing', async () => {
+      const payload = {
+        data: { id: 'img-1', product_id: productId, path: 'product-images/abc/cover.webp' },
+        meta: { timestamp: '2026-10-15T10:00:00.000Z' },
+        location: `/v1/products/${productId}/images/img-1`,
+      };
+      uploadProductImageUseCaseMock.execute.mockResolvedValue(payload);
+
+      const req = {
+        user: { id: 'seller-1', roles: ['seller'] },
+        params: { id: productId },
+        body: { alt_text: 'Front view', position: 0 },
+        file: { buffer: Buffer.from('x'), size: 1, mimeType: 'image/png', originalName: 'a.png' },
+        cookies: {},
+        headers: { authorization: 'Bearer bearer-access-token' },
+      };
+      const json = vi.fn();
+      const locationMock = vi.fn().mockReturnValue({ json });
+      const status = vi.fn().mockReturnValue({ location: locationMock, json });
+      const next = vi.fn();
+
+      await controller.uploadImage(req, { status }, next);
+
+      expect(status).toHaveBeenCalledWith(201);
+      expect(uploadProductImageUseCaseMock.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accessToken: 'bearer-access-token',
+        })
+      );
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 UNAUTHORIZED when both cookie and Bearer are missing', async () => {
+      const req = {
+        user: { id: 'seller-1', roles: ['seller'] },
+        params: { id: productId },
+        file: { buffer: Buffer.from('x'), size: 1, mimeType: 'image/png', originalName: 'a.png' },
+        cookies: {},
+        headers: {},
+      };
+      const next = vi.fn();
+
+      await controller.uploadImage(req, {}, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: 'UNAUTHORIZED',
+          statusCode: 401,
+          message: 'Session token not available for storage upload',
+        })
+      );
+      expect(uploadProductImageUseCaseMock.execute).not.toHaveBeenCalled();
     });
 
     it('forwards use case errors without writing a response', async () => {
@@ -359,7 +415,12 @@ describe('ProductController', () => {
       const next = vi.fn();
 
       await controller.uploadImage(
-        { user: { id: 'seller-1' }, params: { id: productId }, file: { buffer: Buffer.from('x') } },
+        {
+          user: { id: 'seller-1' },
+          params: { id: productId },
+          file: { buffer: Buffer.from('x') },
+          cookies: { access_token: 'valid-token' },
+        },
         { status },
         next
       );

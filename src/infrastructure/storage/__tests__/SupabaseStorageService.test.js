@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_AVATAR_SIZE_BYTES } from '../../../application/use-cases/UploadAvatarUseCase.js';
 import { env } from '../../config/env.js';
+import { createUserScopedSupabaseClient } from '../../config/supabase.js';
 import { MAX_PRODUCT_IMAGE_SIZE_BYTES } from '../SupabaseStorageService.js';
 import { SupabaseStorageService } from '../SupabaseStorageService.js';
 
@@ -19,6 +20,7 @@ vi.mock('../../config/supabase.js', () => ({
       from: vi.fn(),
     },
   },
+  createUserScopedSupabaseClient: vi.fn(),
 }));
 
 describe('SupabaseStorageService', () => {
@@ -43,12 +45,55 @@ describe('SupabaseStorageService', () => {
         }),
       },
     };
+    createUserScopedSupabaseClient.mockReset();
+    createUserScopedSupabaseClient.mockReturnValue(mockClient);
     service = new SupabaseStorageService({
       client: mockClient,
       bucket: 'avatars',
       storageUrl: storageBaseUrl,
       uuidGenerator: () => fixedUuid,
     });
+  });
+
+  it('should throw 400 VALIDATION_ERROR when accessToken is missing on uploadAvatar', async () => {
+    await expect(
+      service.uploadAvatar({
+        userId,
+        buffer: sampleBuffer,
+        mimeType: 'image/png',
+      })
+    ).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      statusCode: 400,
+      message: 'accessToken is required for avatar upload',
+    });
+    expect(mockUpload).not.toHaveBeenCalled();
+  });
+
+  it('should call createUserScopedSupabaseClient with accessToken and use scoped client', async () => {
+    const scopedUpload = vi.fn().mockResolvedValue({ data: {}, error: null });
+    const scopedClient = {
+      storage: {
+        from: vi.fn().mockReturnValue({ upload: scopedUpload }),
+      },
+    };
+    createUserScopedSupabaseClient.mockReturnValueOnce(scopedClient);
+
+    const result = await service.uploadAvatar({
+      userId,
+      buffer: sampleBuffer,
+      mimeType: 'image/png',
+      extension: 'png',
+      originalName: 'avatar.png',
+      size: sampleBuffer.length,
+      accessToken: 'custom-user-jwt',
+    });
+
+    expect(createUserScopedSupabaseClient).toHaveBeenCalledWith('custom-user-jwt');
+    expect(scopedClient.storage.from).toHaveBeenCalledWith('avatars');
+    expect(scopedUpload).toHaveBeenCalled();
+    expect(mockClient.storage.from).not.toHaveBeenCalled();
+    expect(result.path).toBe(`${storageBaseUrl}/avatars/${userId}/${fixedUuid}.png`);
   });
 
   it('should upload avatar with UUID filename and return full public URL', async () => {
@@ -59,6 +104,7 @@ describe('SupabaseStorageService', () => {
       extension: 'png',
       originalName: 'avatar.png',
       size: sampleBuffer.length,
+      accessToken: 'test-jwt',
     });
 
     expect(mockClient.storage.from).toHaveBeenCalledWith('avatars');
@@ -85,6 +131,7 @@ describe('SupabaseStorageService', () => {
       extension: 'png',
       originalName: 'avatar.png',
       size: sampleBuffer.length,
+      accessToken: 'test-jwt',
     });
 
     expect(result.path).toBe(
@@ -99,6 +146,7 @@ describe('SupabaseStorageService', () => {
         userId: '',
         buffer: sampleBuffer,
         mimeType: 'image/png',
+        accessToken: 'test-jwt',
       })
     ).rejects.toMatchObject({
       code: 'VALIDATION_ERROR',
@@ -116,6 +164,7 @@ describe('SupabaseStorageService', () => {
         buffer: oversized,
         mimeType: 'image/jpeg',
         extension: 'jpg',
+        accessToken: 'test-jwt',
       })
     ).rejects.toMatchObject({
       code: 'FILE_TOO_LARGE',
@@ -136,6 +185,7 @@ describe('SupabaseStorageService', () => {
         service.uploadAvatar({
           userId,
           buffer: sampleBuffer,
+          accessToken: 'test-jwt',
           ...badCase,
         })
       ).rejects.toMatchObject({
@@ -159,6 +209,7 @@ describe('SupabaseStorageService', () => {
         buffer: sampleBuffer,
         mimeType: 'image/webp',
         extension: '.webp',
+        accessToken: 'test-jwt',
       })
     ).rejects.toMatchObject({
       code: 'STORAGE_UPLOAD_ERROR',
@@ -168,6 +219,7 @@ describe('SupabaseStorageService', () => {
   });
 
   it('should construct full public URL from storageUrl when client.storage is not available', async () => {
+    createUserScopedSupabaseClient.mockReturnValueOnce({});
     const fallbackService = new SupabaseStorageService({
       client: {},
       bucket: 'avatars',
@@ -179,6 +231,7 @@ describe('SupabaseStorageService', () => {
       buffer: sampleBuffer,
       mimeType: 'image/jpeg',
       extension: 'jpg',
+      accessToken: 'test-jwt',
     });
 
     expect(result).toEqual({
@@ -238,11 +291,49 @@ describe('SupabaseStorageService', () => {
   });
 
   describe('uploadProductImage', () => {
+    it('throws 400 VALIDATION_ERROR when accessToken is missing on uploadProductImage', async () => {
+      await expect(
+        service.uploadProductImage({
+          productId: 'prod-uuid',
+          buffer: Buffer.from('x'),
+          mimeType: 'image/webp',
+        })
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        statusCode: 400,
+        message: 'accessToken is required for product image upload',
+      });
+      expect(mockUpload).not.toHaveBeenCalled();
+    });
+
+    it('calls createUserScopedSupabaseClient with accessToken and uses scoped client', async () => {
+      const scopedUpload = vi.fn().mockResolvedValue({ data: {}, error: null });
+      const scopedClient = {
+        storage: {
+          from: vi.fn().mockReturnValue({ upload: scopedUpload }),
+        },
+      };
+      createUserScopedSupabaseClient.mockReturnValueOnce(scopedClient);
+
+      await service.uploadProductImage({
+        productId: 'prod-uuid',
+        buffer: Buffer.from('x'),
+        mimeType: 'image/webp',
+        accessToken: 'scoped-jwt',
+      });
+
+      expect(createUserScopedSupabaseClient).toHaveBeenCalledWith('scoped-jwt');
+      expect(scopedClient.storage.from).toHaveBeenCalledWith('product-images');
+      expect(scopedUpload).toHaveBeenCalled();
+      expect(mockClient.storage.from).not.toHaveBeenCalled();
+    });
+
     it('uploads to product-images with a product UUID path and upsert disabled', async () => {
       await service.uploadProductImage({
         productId: 'prod-uuid',
         buffer: Buffer.from('x'),
         mimeType: 'image/webp',
+        accessToken: 'test-jwt',
       });
 
       expect(mockClient.storage.from).toHaveBeenCalledWith('product-images');
@@ -258,6 +349,7 @@ describe('SupabaseStorageService', () => {
         productId: 'prod-uuid',
         buffer: Buffer.from('x'),
         mimeType: 'image/webp',
+        accessToken: 'test-jwt',
       });
 
       expect(result.bucket).toBe('product-images');
@@ -270,6 +362,7 @@ describe('SupabaseStorageService', () => {
         service.uploadProductImage({
           buffer: Buffer.from('x'),
           mimeType: 'image/webp',
+          accessToken: 'test-jwt',
         })
       ).rejects.toMatchObject({ code: 'VALIDATION_ERROR', statusCode: 400 });
     });
@@ -280,6 +373,7 @@ describe('SupabaseStorageService', () => {
           productId: 'prod-uuid',
           buffer: Buffer.alloc(MAX_PRODUCT_IMAGE_SIZE_BYTES + 1),
           mimeType: 'image/jpeg',
+          accessToken: 'test-jwt',
         })
       ).rejects.toMatchObject({ code: 'FILE_TOO_LARGE', statusCode: 422 });
       expect(mockUpload).not.toHaveBeenCalled();
@@ -291,6 +385,7 @@ describe('SupabaseStorageService', () => {
           productId: 'prod-uuid',
           buffer: Buffer.from('x'),
           mimeType: 'image/gif',
+          accessToken: 'test-jwt',
         })
       ).rejects.toMatchObject({ code: 'INVALID_FILE_FORMAT', statusCode: 422 });
       expect(mockUpload).not.toHaveBeenCalled();
@@ -304,11 +399,55 @@ describe('SupabaseStorageService', () => {
           productId: 'prod-uuid',
           buffer: Buffer.from('x'),
           mimeType: 'image/webp',
+          accessToken: 'test-jwt',
         })
       ).rejects.toMatchObject({
         code: 'STORAGE_UPLOAD_ERROR',
         statusCode: 500,
         message: 'Failed to upload product image to storage: quota exceeded',
+      });
+    });
+  });
+
+  describe('_uploadToStorage', () => {
+    it('uses explicit client parameter when provided', async () => {
+      const explicitUpload = vi.fn().mockResolvedValue({ error: null });
+      const explicitClient = {
+        storage: { from: vi.fn().mockReturnValue({ upload: explicitUpload }) },
+      };
+
+      await service._uploadToStorage({
+        client: explicitClient,
+        bucket: 'avatars',
+        objectKey: 'some/key.png',
+        buffer: Buffer.from('x'),
+        contentType: 'image/png',
+        upsert: true,
+        uploadType: 'avatar',
+      });
+
+      expect(explicitClient.storage.from).toHaveBeenCalledWith('avatars');
+      expect(explicitUpload).toHaveBeenCalledWith('some/key.png', expect.any(Buffer), {
+        contentType: 'image/png',
+        upsert: true,
+      });
+      expect(mockClient.storage.from).not.toHaveBeenCalled();
+    });
+
+    it('falls back to this.client when client parameter is omitted', async () => {
+      await service._uploadToStorage({
+        bucket: 'avatars',
+        objectKey: 'fallback/key.png',
+        buffer: Buffer.from('x'),
+        contentType: 'image/png',
+        upsert: true,
+        uploadType: 'avatar',
+      });
+
+      expect(mockClient.storage.from).toHaveBeenCalledWith('avatars');
+      expect(mockUpload).toHaveBeenCalledWith('fallback/key.png', expect.any(Buffer), {
+        contentType: 'image/png',
+        upsert: true,
       });
     });
   });

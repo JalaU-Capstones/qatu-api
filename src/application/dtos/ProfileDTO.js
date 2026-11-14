@@ -83,8 +83,11 @@ export class UploadAvatarRequestDTO {
    * @param {string} [params.mimeType]
    * @param {string} [params.originalName]
    * @param {number} [params.size]
+   * @param {string} [params.accessToken]
    */
   constructor(params = {}) {
+    this.accessToken = typeof params.accessToken === 'string' ? params.accessToken.trim() : '';
+
     const rawTargetId = params.targetUserId !== undefined ? params.targetUserId : params.userId;
     this.userId = typeof rawTargetId === 'string' ? rawTargetId.trim() : '';
     this.targetUserId = this.userId;
