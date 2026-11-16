@@ -103,12 +103,38 @@ export class ProductRepository extends IProductRepository {
       SET state = 'published', updated_at = now()
       WHERE id = :productId
         AND seller_id = :sellerId
-        AND state = 'draft'
+        AND state IN ('draft', 'unpublished')
         AND deleted_at IS NULL
         AND primary_image_path IS NOT NULL
         AND EXISTS (
           SELECT 1 FROM public.product_images WHERE product_id = :productId
         )
+      RETURNING *
+    `;
+
+    const queryResult = await this.db.query(sql, {
+      replacements: { productId, sellerId },
+      ...(transaction ? { transaction } : {}),
+    });
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    return rows[0] ?? null;
+  }
+
+  async unpublish({ productId, sellerId }, { transaction } = {}) {
+    const sql = `
+      UPDATE public.products
+      SET state = 'unpublished', updated_at = now()
+      WHERE id = :productId
+        AND seller_id = :sellerId
+        AND state = 'published'
+        AND deleted_at IS NULL
       RETURNING *
     `;
 
