@@ -130,4 +130,85 @@ export class SellerApplicationRepository extends ISellerApplicationRepository {
 
     return rows && rows.length > 0 ? this.toDomain(rows[0]) : null;
   }
+
+  async findById(id, { transaction } = {}) {
+    const query = `
+      SELECT
+        id, profile_id, business_name, business_description,
+        contact_phone, contact_email, status, reviewed_by,
+        reviewed_at, rejection_reason, created_at, updated_at
+      FROM public.seller_applications
+      WHERE id = :id
+      LIMIT 1
+    `;
+    const [rows] = await this.db.query(query, {
+      replacements: { id },
+      transaction,
+    });
+    return rows && rows.length > 0 ? this.toDomain(rows[0]) : null;
+  }
+
+  async findAllPaginated({ status = null, page = 1, limit = 20 } = {}) {
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(100, Math.max(1, Number(limit) || 20));
+    const offset = (safePage - 1) * safeLimit;
+
+    const whereClause = status ? 'WHERE status = :status' : '';
+    const replacements = { limit: safeLimit, offset };
+    if (status) replacements.status = status;
+
+    const countQuery = `
+      SELECT COUNT(*)::int AS total
+      FROM public.seller_applications
+      ${whereClause}
+    `;
+    const [countRows] = await this.db.query(countQuery, { replacements });
+    const total = countRows?.[0]?.total ?? 0;
+
+    const dataQuery = `
+      SELECT
+        id, profile_id, business_name, business_description,
+        contact_phone, contact_email, status, reviewed_by,
+        reviewed_at, rejection_reason, created_at, updated_at
+      FROM public.seller_applications
+      ${whereClause}
+      ORDER BY created_at DESC
+      LIMIT :limit OFFSET :offset
+    `;
+    const [rows] = await this.db.query(dataQuery, { replacements });
+
+    return {
+      items: (rows || []).map((row) => this.toDomain(row)),
+      total,
+      page: safePage,
+      limit: safeLimit,
+    };
+  }
+
+  async review({ id, status, reviewedBy, rejectionReason = null }, { transaction } = {}) {
+    const query = `
+      UPDATE public.seller_applications
+      SET
+        status = :status,
+        reviewed_by = :reviewed_by,
+        reviewed_at = now(),
+        rejection_reason = :rejection_reason
+      WHERE id = :id
+        AND status = 'pending'
+      RETURNING
+        id, profile_id, business_name, business_description,
+        contact_phone, contact_email, status, reviewed_by,
+        reviewed_at, rejection_reason, created_at, updated_at
+    `;
+    const [rows] = await this.db.query(query, {
+      replacements: {
+        id,
+        status,
+        reviewed_by: reviewedBy,
+        rejection_reason: status === 'rejected' ? rejectionReason : null,
+      },
+      transaction,
+    });
+    return rows && rows.length > 0 ? this.toDomain(rows[0]) : null;
+  }
 }

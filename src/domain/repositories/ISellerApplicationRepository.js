@@ -11,4 +11,18 @@ export class ISellerApplicationRepository {
   async findLatestByProfileId(_profileId, _options) {
     throw new Error('Method findLatestByProfileId() must be implemented');
   }
+  // eslint-disable-next-line no-unused-vars
+  async findById(id, { transaction }) {
+    throw new Error('Method findById() must be implemented');
+  }
+
+  // eslint-disable-next-line no-unused-vars
+  async findAllPaginated({ status, page = 1, limit = 20 }) {
+    throw new Error('Method findAllPaginated() must be implemented');
+  }
+
+  // eslint-disable-next-line no-unused-vars
+  async review({ id, status, reviewedBy, rejectionReason = null }, { transaction }) {
+    throw new Error('Method review() must be implemented');
+  }
 }
