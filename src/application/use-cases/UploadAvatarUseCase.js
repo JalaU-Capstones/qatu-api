@@ -35,8 +35,24 @@ export class UploadAvatarUseCase {
    */
   async execute(input) {
     const dto = input instanceof UploadAvatarRequestDTO ? input : new UploadAvatarRequestDTO(input);
-    const { userId, targetUserId, requestingUserId, buffer, mimeType, originalName, size } = dto;
+    const {
+      userId,
+      targetUserId,
+      requestingUserId,
+      buffer,
+      mimeType,
+      originalName,
+      size,
+      accessToken,
+    } = dto;
     const resolvedTargetId = targetUserId || userId;
+
+    if (!accessToken) {
+      const err = new Error('accessToken is required');
+      err.code = 'VALIDATION_ERROR';
+      err.statusCode = 400;
+      throw err;
+    }
 
     if (!resolvedTargetId || !requestingUserId) {
       const err = new Error('Authentication failed');
@@ -75,14 +91,24 @@ export class UploadAvatarUseCase {
       throw err;
     }
 
-    const { path: avatarPath } = await this.storageService.uploadAvatar({
+    const uploadParams = {
       userId: resolvedTargetId,
       buffer,
       mimeType,
       extension: mappedExt,
       originalName,
       size,
-    });
+    };
+    if (accessToken) {
+      Object.defineProperty(uploadParams, 'accessToken', {
+        value: accessToken,
+        enumerable: false,
+        writable: true,
+        configurable: true,
+      });
+    }
+
+    const { path: avatarPath } = await this.storageService.uploadAvatar(uploadParams);
 
     const updatedProfile = await this.profileRepository.update(resolvedTargetId, {
       avatar_path: avatarPath,

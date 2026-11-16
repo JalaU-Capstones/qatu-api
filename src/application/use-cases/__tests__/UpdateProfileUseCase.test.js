@@ -55,7 +55,7 @@ describe('UpdateProfileUseCase', () => {
       id: userId,
       username: 'john_doe',
       full_name: 'Jane Doe',
-      avatar_path: 'avatars/jane.webp',
+      avatar_path: 'http://localhost:54321/storage/v1/object/public/avatars/jane.webp',
       bio: 'Online marketplace enthusiast.',
       locale: 'es',
       created_at: '2026-10-01T00:00:00.000Z',

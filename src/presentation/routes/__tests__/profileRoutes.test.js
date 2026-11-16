@@ -106,7 +106,7 @@ describe('Profile Routes Integration (GET /v1/profiles/:id, PATCH /v1/profiles/m
         id: userId,
         username: 'john_doe',
         full_name: 'John Doe',
-        avatar_path: 'avatars/john.webp',
+        avatar_path: 'http://localhost:54321/storage/v1/object/public/avatars/john.webp',
         bio: 'Artisan collector.',
         locale: 'en',
         created_at: '2026-10-01T00:00:00.000Z',
@@ -189,7 +189,8 @@ describe('Profile Routes Integration (GET /v1/profiles/:id, PATCH /v1/profiles/m
         id: userId,
         username: 'john_doe',
         full_name: 'Jane Doe',
-        avatar_path: 'avatars/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/avatar.webp',
+        avatar_path:
+          'http://localhost:54321/storage/v1/object/public/avatars/a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11/avatar.webp',
         bio: 'Online marketplace enthusiast.',
         locale: 'es',
         created_at: '2026-10-01T00:00:00.000Z',
@@ -231,7 +232,9 @@ describe('Profile Routes Integration (GET /v1/profiles/:id, PATCH /v1/profiles/m
         bio: 'Only bio changed.',
       });
       expect(response.body.data.full_name).toBe('John Doe');
-      expect(response.body.data.avatar_path).toBe('avatars/john.webp');
+      expect(response.body.data.avatar_path).toBe(
+        'http://localhost:54321/storage/v1/object/public/avatars/john.webp'
+      );
     });
 
     it('Scenario: Another user cannot update your profile -> strips injected id/userId from body and only targets authenticated user', async () => {

@@ -1,3 +1,5 @@
+import { resolveImageUrl } from '../utils/imageUrl.js';
+
 export class LoginRequestDTO {
   /**
    * @param {Object} payload
@@ -29,7 +31,7 @@ export class LoginResponseDTO {
       username: profile.username,
       full_name: profile.full_name,
       email: profile.email,
-      avatar_path: profile.avatar_path ?? null,
+      avatar_path: resolveImageUrl(profile.avatar_path ?? profile.avatarPath, 'avatars'),
       bio: profile.bio ?? null,
       locale: profile.locale || 'en',
       created_at: profile.created_at,

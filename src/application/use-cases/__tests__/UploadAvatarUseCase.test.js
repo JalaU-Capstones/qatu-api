@@ -8,7 +8,8 @@ describe('UploadAvatarUseCase', () => {
   let useCase;
 
   const userId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
-  const publicAvatarUrl = `https://example.supabase.co/storage/v1/object/public/avatars/${userId}/550e8400-e29b-41d4-a716-446655440000.webp`;
+  const relativeAvatarPath = `avatars/${userId}/550e8400-e29b-41d4-a716-446655440000.webp`;
+  const publicAvatarUrl = `http://localhost:54321/storage/v1/object/public/${relativeAvatarPath}`;
   const validBuffer = Buffer.from('fake-image-binary-content');
 
   const updatedProfileEntity = new Profile({
@@ -16,7 +17,7 @@ describe('UploadAvatarUseCase', () => {
     username: 'john_doe',
     fullName: 'John Doe',
     email: 'john@example.com',
-    avatarPath: publicAvatarUrl,
+    avatarPath: relativeAvatarPath,
     bio: 'Artisan collector.',
     locale: 'en',
     createdAt: '2026-10-01T00:00:00.000Z',
@@ -29,7 +30,8 @@ describe('UploadAvatarUseCase', () => {
     };
     mockStorageService = {
       uploadAvatar: vi.fn().mockResolvedValue({
-        path: publicAvatarUrl,
+        path: relativeAvatarPath,
+        publicUrl: publicAvatarUrl,
       }),
     };
     useCase = new UploadAvatarUseCase({
@@ -45,7 +47,25 @@ describe('UploadAvatarUseCase', () => {
     );
   });
 
-  it('should upload valid JPEG, PNG, or WebP image and update profile avatar_path with full public URL', async () => {
+  it('should throw 400 VALIDATION_ERROR when accessToken is missing', async () => {
+    await expect(
+      useCase.execute({
+        userId,
+        requestingUserId: userId,
+        buffer: validBuffer,
+        mimeType: 'image/webp',
+        originalName: 'avatar.webp',
+        size: validBuffer.length,
+      })
+    ).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      statusCode: 400,
+      message: 'accessToken is required',
+    });
+    expect(mockStorageService.uploadAvatar).not.toHaveBeenCalled();
+  });
+
+  it('should upload valid JPEG, PNG, or WebP image and update profile avatar_path with relative storage path', async () => {
     const result = await useCase.execute({
       userId,
       requestingUserId: userId,
@@ -53,6 +73,7 @@ describe('UploadAvatarUseCase', () => {
       mimeType: 'image/webp',
       originalName: 'avatar.webp',
       size: validBuffer.length,
+      accessToken: 'test-jwt',
     });
 
     expect(mockStorageService.uploadAvatar).toHaveBeenCalledWith({
@@ -63,8 +84,9 @@ describe('UploadAvatarUseCase', () => {
       originalName: 'avatar.webp',
       size: validBuffer.length,
     });
+    expect(mockStorageService.uploadAvatar.mock.calls[0][0].accessToken).toBe('test-jwt');
     expect(mockProfileRepository.update).toHaveBeenCalledWith(userId, {
-      avatar_path: publicAvatarUrl,
+      avatar_path: relativeAvatarPath,
     });
     expect(result.data).toEqual({
       id: userId,
@@ -85,6 +107,7 @@ describe('UploadAvatarUseCase', () => {
         userId: '',
         buffer: validBuffer,
         mimeType: 'image/png',
+        accessToken: 'test-jwt',
       })
     ).rejects.toMatchObject({
       code: 'UNAUTHORIZED',
@@ -100,6 +123,7 @@ describe('UploadAvatarUseCase', () => {
         requestingUserId: '11111111-2222-3333-4444-555555555555',
         buffer: validBuffer,
         mimeType: 'image/png',
+        accessToken: 'test-jwt',
       })
     ).rejects.toMatchObject({
       code: 'FORBIDDEN',
@@ -113,8 +137,10 @@ describe('UploadAvatarUseCase', () => {
     await expect(
       useCase.execute({
         userId,
+        requestingUserId: userId,
         buffer: null,
         mimeType: 'image/png',
+        accessToken: 'test-jwt',
       })
     ).rejects.toMatchObject({
       code: 'VALIDATION_ERROR',
@@ -128,10 +154,12 @@ describe('UploadAvatarUseCase', () => {
     await expect(
       useCase.execute({
         userId,
+        requestingUserId: userId,
         buffer: oversizedBuffer,
         mimeType: 'image/jpeg',
         originalName: 'large.jpg',
         size: oversizedBuffer.length,
+        accessToken: 'test-jwt',
       })
     ).rejects.toMatchObject({
       code: 'FILE_TOO_LARGE',
@@ -145,9 +173,11 @@ describe('UploadAvatarUseCase', () => {
     await expect(
       useCase.execute({
         userId,
+        requestingUserId: userId,
         buffer: validBuffer,
         mimeType: 'image/gif',
         originalName: 'animated.gif',
+        accessToken: 'test-jwt',
       })
     ).rejects.toMatchObject({
       code: 'INVALID_FILE_FORMAT',
@@ -158,9 +188,11 @@ describe('UploadAvatarUseCase', () => {
     await expect(
       useCase.execute({
         userId,
+        requestingUserId: userId,
         buffer: validBuffer,
         mimeType: 'image/png',
         originalName: 'malicious.svg',
+        accessToken: 'test-jwt',
       })
     ).rejects.toMatchObject({
       code: 'INVALID_FILE_FORMAT',
@@ -177,9 +209,11 @@ describe('UploadAvatarUseCase', () => {
     await expect(
       useCase.execute({
         userId,
+        requestingUserId: userId,
         buffer: validBuffer,
         mimeType: 'image/png',
         originalName: 'avatar.png',
+        accessToken: 'test-jwt',
       })
     ).rejects.toMatchObject({
       code: 'NOT_FOUND',

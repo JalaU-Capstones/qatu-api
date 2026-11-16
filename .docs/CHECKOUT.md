@@ -72,16 +72,36 @@ the client never sends prices, quantities or a buyer id.
 
 ## Error contract
 
-| Status | `error.code`            | When                                                                                                                      |
-| ------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| 400    | `VALIDATION_ERROR`      | Missing/invalid `shipping_address` or `notes` (> 500 chars)                                                               |
-| 401    | `UNAUTHORIZED`          | No valid session                                                                                                          |
-| 403    | `INVALID_CSRF_TOKEN`    | Cookie session without a matching `X-CSRF-Token` header                                                                   |
-| 422    | `EMPTY_CART`            | Nothing to buy                                                                                                            |
-| 422    | `INSUFFICIENT_STOCK`    | Not enough stock, including losing the race for the last unit. `details[0].field` is `items.<product_id>`                 |
-| 422    | `PRODUCT_UNAVAILABLE`   | A product in the cart is no longer published                                                                              |
-| 422    | `MIXED_CURRENCIES`      | Cart mixes currencies (an order has exactly one)                                                                          |
-| 500    | `INTERNAL_SERVER_ERROR` | Database failure: the transaction is rolled back, the error is logged server-side, the client only sees a generic message |
+| Status | `error.code`             | When                                                                                                                      |
+| ------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| 400    | `VALIDATION_ERROR`       | Missing/invalid `shipping_address` or `notes` (> 500 chars)                                                               |
+| 401    | `UNAUTHORIZED`           | No valid session                                                                                                          |
+| 403    | `INVALID_CSRF_TOKEN`     | Cookie session without a matching `X-CSRF-Token` header                                                                   |
+| 422    | `EMPTY_CART`             | Nothing to buy                                                                                                            |
+| 422    | `INSUFFICIENT_STOCK`     | Not enough stock, including losing the race for the last unit. `details[0].field` is `items.<product_id>`                 |
+| 422    | `PRODUCT_UNAVAILABLE`    | A product in the cart is no longer published                                                                              |
+| 422    | `MIXED_CURRENCIES`       | Cart mixes currencies (an order has exactly one)                                                                          |
+| 422    | `CANNOT_BUY_OWN_PRODUCT` | Cart contains a product owned by the buyer                                                                                |
+| 500    | `INTERNAL_SERVER_ERROR`  | Database failure: the transaction is rolled back, the error is logged server-side, the client only sees a generic message |
+
+## Business rules
+
+### Sellers cannot buy their own products
+
+`POST /v1/cart/items` and `POST /v1/orders` both reject any request where
+`product.seller_id === buyerId` with:
+
+- Status: **422 Unprocessable Entity**
+- Code: `CANNOT_BUY_OWN_PRODUCT`
+- Message: `You cannot purchase your own product: <product name>`
+
+The frontend hides the "add to cart" / "buy now" buttons for own products,
+but this backend check is the source of truth. Direct API calls are
+rejected even if the UI is bypassed.
+
+`AddToCartUseCase` rejects early (fast feedback for the user). `CreateOrderUseCase`
+rejects before any transaction work (defense-in-depth for carts that
+already contain a self-product — e.g., added before this fix landed).
 
 ## Running it locally
 

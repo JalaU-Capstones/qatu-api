@@ -169,6 +169,14 @@ add:
                     details: []
                   meta:
                     timestamp: '2026-10-14T12:00:00.000Z'
+              cannotBuyOwnProduct:
+                summary: Seller tried to buy their own product
+                value:
+                  error:
+                    code: 'CANNOT_BUY_OWN_PRODUCT'
+                    message: 'You cannot purchase your own product: Ergonomic Office Chair'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 

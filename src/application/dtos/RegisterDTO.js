@@ -1,3 +1,5 @@
+import { resolveImageUrl } from '../utils/imageUrl.js';
+
 export class RegisterRequestDTO {
   /**
    * @param {Object} data
@@ -45,8 +47,10 @@ export class RegisterResponseDTO {
           username: profile.username,
           full_name: profile.full_name !== undefined ? profile.full_name : profile.fullName || null,
           email: profile.email || user.email,
-          avatar_path:
-            profile.avatar_path !== undefined ? profile.avatar_path : profile.avatarPath || null,
+          avatar_path: resolveImageUrl(
+            profile.avatar_path !== undefined ? profile.avatar_path : profile.avatarPath,
+            'avatars'
+          ),
           bio: profile.bio || null,
           locale: profile.locale || 'en',
           created_at:

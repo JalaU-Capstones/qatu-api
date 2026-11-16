@@ -1,3 +1,5 @@
+import { resolveImageUrl } from '../utils/imageUrl.js';
+
 export class GetProductDetailRequestDTO {
   /**
    * @param {Object} params
@@ -30,16 +32,23 @@ export class ProductDetailDTO {
       !Array.isArray(rawData.attributes)
         ? rawData.attributes
         : {};
-    this.primary_image_path = rawData.primary_image_path ?? null;
-    this.images = Array.isArray(rawData.images) ? rawData.images : [];
-    this.seller = rawData.seller
-      ? {
-          id: rawData.seller.id || rawData.seller_id,
-          username: rawData.seller.username || null,
-          full_name: rawData.seller.full_name || null,
-          avatar_path: rawData.seller.avatar_path || null,
-        }
-      : null;
+    this.primary_image_path = resolveImageUrl(rawData.primary_image_path, 'product-images');
+    this.images = Array.isArray(rawData.images)
+      ? rawData.images.map((img) => ({
+          ...img,
+          path: resolveImageUrl(img.path, 'product-images'),
+        }))
+      : [];
+    this.seller =
+      rawData.seller && typeof rawData.seller === 'object'
+        ? {
+            ...rawData.seller,
+            id: rawData.seller.id || rawData.seller_id,
+            username: rawData.seller.username || null,
+            full_name: rawData.seller.full_name || null,
+            avatar_path: resolveImageUrl(rawData.seller.avatar_path, 'avatars'),
+          }
+        : null;
     this.category = rawData.category
       ? {
           id: rawData.category.id || rawData.category_id,

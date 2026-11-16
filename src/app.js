@@ -12,10 +12,12 @@ import { categoryRouter } from './presentation/routes/categoryRoutes.js';
 import { orderRouter } from './presentation/routes/orderRoutes.js';
 import { productRouter } from './presentation/routes/productRoutes.js';
 import { profileRouter } from './presentation/routes/profileRoutes.js';
+import { sellerProductsRouter } from './presentation/routes/sellerProductsRoutes.js';
 
 export function createApp({
   authRoutes = authRouter,
   productRoutes = productRouter,
+  sellerProductRoutes = sellerProductsRouter,
   categoryRoutes = categoryRouter,
   cartRoutes = cartRouter,
   orderRoutes = orderRouter,
@@ -119,6 +121,7 @@ export function createApp({
   // API Routes
   app.use('/v1/auth', authLimiter, authRoutes);
   app.use('/v1/products', publicLimiter, productRoutes);
+  app.use('/v1/seller', publicLimiter, sellerProductRoutes);
   app.use('/v1/categories', publicLimiter, categoryRoutes);
   app.use('/v1/cart', cartLimiter, cartRoutes);
   app.use('/v1/orders', orderLimiter, orderRoutes);

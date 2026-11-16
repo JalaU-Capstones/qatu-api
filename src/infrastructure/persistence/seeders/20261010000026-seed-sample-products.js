@@ -1,5 +1,9 @@
 'use strict';
 
+// ADR-020: This seeder no longer inserts into auth.users. The auth row is
+// provisioned by supabase/seed.sql during `npx supabase db reset`. Only
+// public.profiles and public.user_roles are managed here.
+
 /**
  * Supabase Auth rejects non-routable domains such as `.local`, so a seller seeded with
  * `seller@qatu.local` cannot sign in or reset its password. Keep this a real-looking domain.
@@ -17,18 +21,23 @@ module.exports = {
 
     const transaction = await queryInterface.sequelize.transaction();
     try {
+      // ADR-020: verify the auth.users row was provisioned by supabase/seed.sql.
+      // The public.profiles insert has an FK to auth.users(id), so without it the
+      // seeder fails with a cryptic FK error. Fail with an actionable message.
+      const [sellerAuthRows] = await queryInterface.sequelize.query(
+        `select 1 from auth.users where id = '00000000-0000-0000-0000-000000000002'::uuid limit 1`,
+        { transaction }
+      );
+      if (sellerAuthRows.length === 0) {
+        await transaction.rollback();
+        throw new Error(
+          'Seller auth.users row is missing. Run `npx supabase db reset` before `pnpm db:seed:all`. ' +
+            'See .docs/MIGRATIONS.md for the canonical bootstrap sequence (ADR-020).'
+        );
+      }
+
       await queryInterface.sequelize.query(
         `
-        insert into auth.users (id, email, raw_user_meta_data)
-        values (
-          '00000000-0000-0000-0000-000000000002'::uuid,
-          '${SELLER_EMAIL}',
-          '{"username": "sample_seller", "full_name": "Sample Seller"}'::jsonb
-        )
-        -- Re-running the seeder also migrates DBs seeded with the old .local email.
-        -- (No backticks in this SQL comment: it lives inside a JS template literal.)
-        on conflict (id) do update set email = excluded.email;
-
         insert into public.profiles (id, username, full_name, email)
         values (
           '00000000-0000-0000-0000-000000000002'::uuid,
@@ -524,9 +533,6 @@ module.exports = {
         where profile_id = '00000000-0000-0000-0000-000000000002'::uuid;
 
         delete from public.profiles
-        where id = '00000000-0000-0000-0000-000000000002'::uuid;
-
-        delete from auth.users
         where id = '00000000-0000-0000-0000-000000000002'::uuid;
       `,
         { transaction }

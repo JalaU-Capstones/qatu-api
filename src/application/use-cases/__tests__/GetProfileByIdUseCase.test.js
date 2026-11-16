@@ -41,7 +41,7 @@ describe('GetProfileByIdUseCase', () => {
       id: validId,
       username: 'john_doe',
       full_name: 'John Doe',
-      avatar_path: 'avatars/john.webp',
+      avatar_path: 'http://localhost:54321/storage/v1/object/public/avatars/john.webp',
       bio: 'Artisan collector.',
       locale: 'en',
       created_at: '2026-10-01T00:00:00.000Z',

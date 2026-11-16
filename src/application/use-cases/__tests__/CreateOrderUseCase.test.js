@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Order } from '../../../domain/entities/Order.js';
 import {
+  CannotBuyOwnProductError,
   EmptyCartError,
   InsufficientStockError,
   ProductUnavailableError,
@@ -248,6 +249,40 @@ describe('CreateOrderUseCase', () => {
 
       await expect(useCase.execute(request)).rejects.toBeInstanceOf(ProductUnavailableError);
       expect(deps.productRepository.decrementStockIfAvailable).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Scenario: self-purchase rejection', () => {
+    it('rejects when any cart item is an own-product, creates nothing and does NOT clear the cart or decrement stock', async () => {
+      deps.cartRepository.findCheckoutLines.mockResolvedValue([
+        line({ productId: 'p-1', sellerId: BUYER_ID, name: 'Own Book' }),
+      ]);
+
+      const promise = useCase.execute(request);
+
+      await expect(promise).rejects.toBeInstanceOf(CannotBuyOwnProductError);
+      await expect(promise).rejects.toMatchObject({
+        statusCode: 422,
+        code: 'CANNOT_BUY_OWN_PRODUCT',
+        message: 'You cannot purchase your own product: Own Book',
+      });
+      expect(deps.productRepository.decrementStockIfAvailable).not.toHaveBeenCalled();
+      expect(deps.orderRepository.createWithItems).not.toHaveBeenCalled();
+      expect(deps.paymentRepository.createPending).not.toHaveBeenCalled();
+      expect(deps.outboxRepository.enqueue).not.toHaveBeenCalled();
+      expect(deps.cartRepository.clearCart).not.toHaveBeenCalled();
+    });
+
+    it('allows checkout when all items belong to other sellers', async () => {
+      deps.cartRepository.findCheckoutLines.mockResolvedValue([
+        line({ productId: 'p-1', sellerId: SELLER_1 }),
+        line({ productId: 'p-2', sellerId: SELLER_2 }),
+      ]);
+
+      const result = await useCase.execute(request);
+
+      expect(result.data).toBeDefined();
+      expect(deps.orderRepository.createWithItems).toHaveBeenCalled();
     });
   });
 

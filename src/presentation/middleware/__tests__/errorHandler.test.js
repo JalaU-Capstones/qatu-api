@@ -12,10 +12,11 @@ describe('errorHandler Middleware', () => {
   const mockNext = vi.fn();
   const mockReq = {};
 
-  it('should handle conflict errors (EMAIL_ALREADY_EXISTS) with 409', () => {
+  it('preserves EMAIL_ALREADY_EXISTS when it carries a 409 status code', () => {
     const res = createMockRes();
     const err = new Error('Email already registered');
     err.code = 'EMAIL_ALREADY_EXISTS';
+    err.statusCode = 409;
 
     errorHandler(err, mockReq, res, mockNext);
 
@@ -23,15 +24,15 @@ describe('errorHandler Middleware', () => {
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         error: {
-          code: 'CONFLICT',
-          message: 'A resource with these attributes already exists',
+          code: 'EMAIL_ALREADY_EXISTS',
+          message: 'Email already registered',
         },
         meta: expect.objectContaining({ timestamp: expect.any(String) }),
       })
     );
   });
 
-  it('should handle 409 status code with CONFLICT envelope', () => {
+  it('uses the error message for a generic 409 conflict when no code is provided', () => {
     const res = createMockRes();
     const err = new Error('Conflict error');
     err.statusCode = 409;
@@ -43,10 +44,49 @@ describe('errorHandler Middleware', () => {
       expect.objectContaining({
         error: {
           code: 'CONFLICT',
-          message: 'A resource with these attributes already exists',
+          message: 'Conflict error',
         },
+        meta: expect.objectContaining({ timestamp: expect.any(String) }),
       })
     );
+  });
+
+  it('preserves the INVALID_STATE_TRANSITION code and message for product state conflicts', () => {
+    const res = createMockRes();
+    const err = Object.assign(new Error("Cannot publish a product in state 'published'"), {
+      code: 'INVALID_STATE_TRANSITION',
+      statusCode: 409,
+    });
+
+    errorHandler(err, mockReq, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({
+      error: {
+        code: 'INVALID_STATE_TRANSITION',
+        message: "Cannot publish a product in state 'published'",
+      },
+      meta: expect.objectContaining({ timestamp: expect.any(String) }),
+    });
+  });
+
+  it('preserves SLUG_ALREADY_EXISTS instead of collapsing it to CONFLICT', () => {
+    const res = createMockRes();
+    const err = Object.assign(new Error('Slug already exists'), {
+      code: 'SLUG_ALREADY_EXISTS',
+      statusCode: 409,
+    });
+
+    errorHandler(err, mockReq, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({
+      error: {
+        code: 'SLUG_ALREADY_EXISTS',
+        message: 'Slug already exists',
+      },
+      meta: expect.objectContaining({ timestamp: expect.any(String) }),
+    });
   });
 
   it('should handle domain Password validation errors with 400', () => {

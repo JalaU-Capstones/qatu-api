@@ -1,5 +1,6 @@
 import { QueryTypes } from 'sequelize';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CannotBuyOwnProductError } from '../../../domain/errors/CheckoutErrors.js';
 import { InventoryService } from '../../../domain/services/InventoryService.js';
 import { OrderPricingService } from '../../../domain/services/OrderPricingService.js';
 import { SequelizeTransactionManager } from '../../../infrastructure/persistence/SequelizeTransactionManager.js';
@@ -303,6 +304,29 @@ describe('CreateOrderUseCase (integration, real PostgreSQL)', { timeout: 30_000 
       });
       expect(await stockOf(P1)).toBe(5);
       expect(await count('public.cart_items')).toBe(1);
+    });
+  });
+
+  describe('Scenario: self-purchase rejection', () => {
+    it('rejects a checkout where the cart contains the seller own product', async () => {
+      await addProduct(P1, { name: 'Seller Own Product', price: 20, stock: 10 });
+      await addToCart(SELLER, P1, 1);
+
+      const promise = useCase.execute(request(SELLER));
+
+      await expect(promise).rejects.toBeInstanceOf(CannotBuyOwnProductError);
+      await expect(promise).rejects.toMatchObject({
+        statusCode: 422,
+        code: 'CANNOT_BUY_OWN_PRODUCT',
+        message: 'You cannot purchase your own product: Seller Own Product',
+      });
+
+      expect(await count('public.orders')).toBe(0);
+      expect(await count('public.order_items')).toBe(0);
+      expect(await count('public.payments')).toBe(0);
+      expect(await count('public.outbox_events')).toBe(0);
+      expect(await stockOf(P1)).toBe(10);
+      expect(await count('public.cart_items', 'user_id = :id', { id: SELLER })).toBe(1);
     });
   });
 

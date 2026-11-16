@@ -1,5 +1,9 @@
 'use strict';
 
+// ADR-020: This seeder no longer inserts into auth.users. The auth row is
+// provisioned by supabase/seed.sql during `npx supabase db reset`. Only
+// public.profiles and public.user_roles are managed here.
+
 module.exports = {
   async up(queryInterface, Sequelize) {
     if (process.env.NODE_ENV === 'production') {
@@ -9,22 +13,29 @@ module.exports = {
 
     const transaction = await queryInterface.sequelize.transaction();
     try {
+      // ADR-020: verify the auth.users row was provisioned by supabase/seed.sql.
+      // The public.profiles insert has an FK to auth.users(id), so without it the
+      // seeder fails with a cryptic FK error. Fail with an actionable message.
+      const [adminAuthRows] = await queryInterface.sequelize.query(
+        `select 1 from auth.users where id = '00000000-0000-0000-0000-000000000001'::uuid limit 1`,
+        { transaction }
+      );
+      if (adminAuthRows.length === 0) {
+        await transaction.rollback();
+        throw new Error(
+          'Admin auth.users row is missing. Run `npx supabase db reset` before `pnpm db:seed:all`. ' +
+            'See .docs/MIGRATIONS.md for the canonical bootstrap sequence (ADR-020).'
+        );
+      }
+
       await queryInterface.sequelize.query(
         `
-        insert into auth.users (id, email, raw_user_meta_data)
-        values (
-          '00000000-0000-0000-0000-000000000001'::uuid,
-          'admin@qatu.local',
-          '{"username": "admin", "full_name": "Admin User"}'::jsonb
-        )
-        on conflict (id) do nothing;
-
         insert into public.profiles (id, username, full_name, email)
         values (
           '00000000-0000-0000-0000-000000000001'::uuid,
           'admin',
           'Admin User',
-          'admin@qatu.local'
+          'admin@example.qatu.pe'
         )
         on conflict (id) do update set
           username = excluded.username,
@@ -57,9 +68,6 @@ module.exports = {
         where profile_id = '00000000-0000-0000-0000-000000000001'::uuid;
 
         delete from public.profiles
-        where id = '00000000-0000-0000-0000-000000000001'::uuid;
-
-        delete from auth.users
         where id = '00000000-0000-0000-0000-000000000001'::uuid;
       `,
         { transaction }

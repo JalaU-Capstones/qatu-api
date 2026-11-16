@@ -18,6 +18,9 @@ function fakeQueryInterface() {
       transaction: vi.fn().mockResolvedValue(transaction),
       query: vi.fn(async (sql) => {
         queries.push(sql);
+        // Sequelize query() returns [rows, metadata]; the seeder destructures
+        // `[rows]` for its defensive auth.users check.
+        return [[{ ok: 1 }], {}];
       }),
     },
   };
@@ -36,7 +39,8 @@ describe('seed-sample-products', () => {
 
     await seeder.up(queryInterface);
 
-    expect(queries).toHaveLength(1);
+    // Two queries: (1) the ADR-020 defensive auth.users check, (2) the INSERT chain.
+    expect(queries).toHaveLength(2);
     expect(transaction.commit).toHaveBeenCalledTimes(1);
     expect(transaction.rollback).not.toHaveBeenCalled();
   });
@@ -46,12 +50,14 @@ describe('seed-sample-products', () => {
 
     await seeder.up(queryInterface);
 
-    const [sql] = queries;
-    expect(sql).toContain("'seller@example.qatu.pe'");
-    expect(sql).not.toContain("'seller@qatu.local'");
-    expect(sql).toContain("r.name = 'seller'");
+    const profileInsert = queries.find((q) => q.includes('insert into public.profiles'));
+    expect(profileInsert).toBeDefined();
+    expect(profileInsert).toContain("'seller@example.qatu.pe'");
+    expect(profileInsert).not.toContain("'seller@qatu.local'");
+    expect(profileInsert).toContain("r.name = 'seller'");
     // Re-seeding must migrate a database that still has the old non-routable e-mail.
-    expect(sql).toContain('on conflict (id) do update set email = excluded.email');
+    expect(profileInsert).toContain('on conflict (id) do update set');
+    expect(profileInsert).toContain('email = excluded.email');
   });
 
   it('seeds published products owned by the seller id (not by e-mail)', async () => {
@@ -59,8 +65,9 @@ describe('seed-sample-products', () => {
 
     await seeder.up(queryInterface);
 
-    expect(queries[0]).toContain('00000000-0000-0000-0000-000000000002');
-    expect(queries[0]).toContain('insert into public.products');
+    const productsInsert = queries.find((q) => q.includes('insert into public.products'));
+    expect(productsInsert).toBeDefined();
+    expect(productsInsert).toContain('00000000-0000-0000-0000-000000000002');
   });
 
   it('up() does nothing in production', async () => {
