@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
+    setupFiles: ['src/__tests__/setup/isolateEnv.js'],
     include: ['src/**/*.test.js'],
     exclude: ['node_modules/', 'dist/', 'coverage/'],
     coverage: {
