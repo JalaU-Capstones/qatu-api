@@ -12,12 +12,14 @@ import { categoryRouter } from './presentation/routes/categoryRoutes.js';
 import { orderRouter } from './presentation/routes/orderRoutes.js';
 import { productRouter } from './presentation/routes/productRoutes.js';
 import { profileRouter } from './presentation/routes/profileRoutes.js';
+import { sellerApplicationRouter } from './presentation/routes/sellerApplicationRoutes.js';
 import { sellerProductsRouter } from './presentation/routes/sellerProductsRoutes.js';
 
 export function createApp({
   authRoutes = authRouter,
   productRoutes = productRouter,
   sellerProductRoutes = sellerProductsRouter,
+  sellerApplicationRoutes = sellerApplicationRouter,
   categoryRoutes = categoryRouter,
   cartRoutes = cartRouter,
   orderRoutes = orderRouter,
@@ -126,6 +128,7 @@ export function createApp({
   app.use('/v1/cart', cartLimiter, cartRoutes);
   app.use('/v1/orders', orderLimiter, orderRoutes);
   app.use('/v1/profiles', publicLimiter, profileRoutes);
+  app.use('/v1/seller-applications', publicLimiter, sellerApplicationRoutes);
 
   // Global Error Handler
   app.use(errorHandler);
