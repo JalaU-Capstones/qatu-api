@@ -2,6 +2,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Profile } from '../../../domain/entities/Profile.js';
 import { MAX_AVATAR_SIZE_BYTES, UploadAvatarUseCase } from '../UploadAvatarUseCase.js';
 
+const JPEG_BUF = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+const PNG_BUF = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+const WEBP_BUF = Buffer.concat([
+  Buffer.from('RIFF'),
+  Buffer.from([0x00, 0x00, 0x00, 0x00]),
+  Buffer.from('WEBP'),
+  Buffer.alloc(4),
+]);
+const ZIP_BUF = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00]);
+const RANDOM_BUF = Buffer.from([
+  0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b,
+]);
+
 describe('UploadAvatarUseCase', () => {
   let mockProfileRepository;
   let mockStorageService;
@@ -10,7 +23,7 @@ describe('UploadAvatarUseCase', () => {
   const userId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
   const relativeAvatarPath = `avatars/${userId}/550e8400-e29b-41d4-a716-446655440000.webp`;
   const publicAvatarUrl = `http://localhost:54321/storage/v1/object/public/${relativeAvatarPath}`;
-  const validBuffer = Buffer.from('fake-image-binary-content');
+  const validBuffer = WEBP_BUF;
 
   const updatedProfileEntity = new Profile({
     id: userId,
@@ -210,7 +223,7 @@ describe('UploadAvatarUseCase', () => {
       useCase.execute({
         userId,
         requestingUserId: userId,
-        buffer: validBuffer,
+        buffer: PNG_BUF,
         mimeType: 'image/png',
         originalName: 'avatar.png',
         accessToken: 'test-jwt',
@@ -220,5 +233,129 @@ describe('UploadAvatarUseCase', () => {
       statusCode: 404,
       message: 'Profile not found',
     });
+  });
+
+  it('throws 422 INVALID_FILE_FORMAT when avatar buffer has unknown magic bytes (ZIP)', async () => {
+    await expect(
+      useCase.execute({
+        userId,
+        requestingUserId: userId,
+        buffer: ZIP_BUF,
+        mimeType: 'image/png',
+        originalName: 'avatar.png',
+        size: ZIP_BUF.length,
+        accessToken: 'test-jwt',
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_FILE_FORMAT',
+      statusCode: 422,
+      message: 'File content is not a valid JPEG, PNG, or WebP image.',
+    });
+
+    expect(mockStorageService.uploadAvatar).not.toHaveBeenCalled();
+  });
+
+  it('throws 422 INVALID_FILE_FORMAT when avatar buffer contains random non-image bytes', async () => {
+    await expect(
+      useCase.execute({
+        userId,
+        requestingUserId: userId,
+        buffer: RANDOM_BUF,
+        mimeType: 'image/jpeg',
+        originalName: 'avatar.jpg',
+        size: RANDOM_BUF.length,
+        accessToken: 'test-jwt',
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_FILE_FORMAT',
+      statusCode: 422,
+      message: 'File content is not a valid JPEG, PNG, or WebP image.',
+    });
+
+    expect(mockStorageService.uploadAvatar).not.toHaveBeenCalled();
+  });
+
+  it('throws 422 INVALID_FILE_FORMAT when declared MIME is image/jpeg but magic bytes are PNG', async () => {
+    await expect(
+      useCase.execute({
+        userId,
+        requestingUserId: userId,
+        buffer: PNG_BUF,
+        mimeType: 'image/jpeg',
+        originalName: 'avatar.jpg',
+        size: PNG_BUF.length,
+        accessToken: 'test-jwt',
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_FILE_FORMAT',
+      statusCode: 422,
+      message: 'File content does not match the declared image format.',
+    });
+
+    expect(mockStorageService.uploadAvatar).not.toHaveBeenCalled();
+  });
+
+  it('throws 422 INVALID_FILE_FORMAT when declared MIME is image/webp but magic bytes are JPEG', async () => {
+    await expect(
+      useCase.execute({
+        userId,
+        requestingUserId: userId,
+        buffer: JPEG_BUF,
+        mimeType: 'image/webp',
+        originalName: 'avatar.webp',
+        size: JPEG_BUF.length,
+        accessToken: 'test-jwt',
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_FILE_FORMAT',
+      statusCode: 422,
+      message: 'File content does not match the declared image format.',
+    });
+
+    expect(mockStorageService.uploadAvatar).not.toHaveBeenCalled();
+  });
+
+  it('accepts valid JPEG buffer with image/jpeg MIME type for avatar', async () => {
+    const result = await useCase.execute({
+      userId,
+      requestingUserId: userId,
+      buffer: JPEG_BUF,
+      mimeType: 'image/jpeg',
+      originalName: 'avatar.jpg',
+      size: JPEG_BUF.length,
+      accessToken: 'test-jwt',
+    });
+
+    expect(mockStorageService.uploadAvatar).toHaveBeenCalledWith({
+      userId,
+      buffer: JPEG_BUF,
+      mimeType: 'image/jpeg',
+      extension: 'jpg',
+      originalName: 'avatar.jpg',
+      size: JPEG_BUF.length,
+    });
+    expect(result.data.id).toBe(userId);
+  });
+
+  it('accepts valid PNG buffer with image/png MIME type for avatar', async () => {
+    const result = await useCase.execute({
+      userId,
+      requestingUserId: userId,
+      buffer: PNG_BUF,
+      mimeType: 'image/png',
+      originalName: 'avatar.png',
+      size: PNG_BUF.length,
+      accessToken: 'test-jwt',
+    });
+
+    expect(mockStorageService.uploadAvatar).toHaveBeenCalledWith({
+      userId,
+      buffer: PNG_BUF,
+      mimeType: 'image/png',
+      extension: 'png',
+      originalName: 'avatar.png',
+      size: PNG_BUF.length,
+    });
+    expect(result.data.id).toBe(userId);
   });
 });

@@ -1,3 +1,4 @@
+import { detectImageMimeType } from '../../domain/utils/imageMagicBytes.js';
 import { ProfileResponseDTO, UploadAvatarRequestDTO } from '../dtos/ProfileDTO.js';
 
 export const MAX_AVATAR_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB per SP-10
@@ -86,6 +87,21 @@ export class UploadAvatarUseCase {
     const mappedExt = ALLOWED_AVATAR_MIME_TYPES[mimeType];
     if (!mappedExt || !this._hasValidExtension(originalName)) {
       const err = new Error('Only JPEG, PNG, and WebP images are accepted.');
+      err.code = 'INVALID_FILE_FORMAT';
+      err.statusCode = 422;
+      throw err;
+    }
+
+    const declaredMime = (mimeType || '').toLowerCase();
+    const detectedMime = detectImageMimeType(buffer);
+    if (!detectedMime) {
+      const err = new Error('File content is not a valid JPEG, PNG, or WebP image.');
+      err.code = 'INVALID_FILE_FORMAT';
+      err.statusCode = 422;
+      throw err;
+    }
+    if (detectedMime !== declaredMime) {
+      const err = new Error('File content does not match the declared image format.');
       err.code = 'INVALID_FILE_FORMAT';
       err.statusCode = 422;
       throw err;
