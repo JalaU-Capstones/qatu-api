@@ -110,6 +110,24 @@ export class IProductRepository {
   }
 
   /**
+   * Atomically soft-deletes a product owned by the seller by setting
+   * `deleted_at = now()`. Does NOT touch `product_images` rows, Supabase
+   * Storage files, `state`, or `published_at` — soft-delete is reversible
+   * and hard delete is out of scope. Works in ALL states
+   * (draft|published|unpublished|archived). Returns the updated row, or
+   * null if no row matched (product not found, wrong seller, or already
+   * soft-deleted).
+   *
+   * @param {{ productId: string, sellerId: string }} args
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object|null>}
+   */
+  async softDelete(args, options) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ args, options })}`);
+  }
+
+  /**
    * Inserts a product image row.
    *
    * @param {{ productId: string, path: string, altText: string|null, position: number }} args
