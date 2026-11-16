@@ -295,4 +295,50 @@ describe('UpdateProductUseCase', () => {
     expect(result.data.published_at).toBe(publishedAt);
     expect(result.data.stock).toBe(50);
   });
+
+  it('15. blocks currency change on a published product with 409 CANNOT_CHANGE_CURRENCY_ON_PUBLISHED', async () => {
+    productRepository.findById.mockResolvedValue(product({ state: 'published', currency: 'USD' }));
+
+    await expect(
+      useCase.execute({
+        productId: PRODUCT_ID,
+        sellerId: SELLER_ID,
+        fields: { currency: 'EUR' },
+      })
+    ).rejects.toMatchObject({
+      code: 'CANNOT_CHANGE_CURRENCY_ON_PUBLISHED',
+      statusCode: 409,
+      message: 'Cannot change currency on a published product. Unpublish it first.',
+    });
+    expect(productRepository.update).not.toHaveBeenCalled();
+  });
+
+  it('16. allows same-currency "change" on a published product (no-op guard)', async () => {
+    const publishedAt = '2026-10-10T10:00:00.000Z';
+    const existing = product({ state: 'published', currency: 'USD', published_at: publishedAt });
+    productRepository.findById.mockResolvedValue(existing);
+
+    const updated = {
+      ...existing,
+      price: '50.00',
+      updated_at: '2026-10-15T12:00:00.000Z',
+    };
+    productRepository.update.mockResolvedValue(updated);
+    productRepository.findByIdWithDetails.mockResolvedValue({
+      ...updated,
+      seller: { id: SELLER_ID, username: 'seller', full_name: 'Seller Name', avatar_path: null },
+      category: { id: CATEGORY_ID, name: 'Electronics', slug: 'electronics' },
+      images: [],
+    });
+
+    const result = await useCase.execute({
+      productId: PRODUCT_ID,
+      sellerId: SELLER_ID,
+      fields: { currency: 'USD', price: 50 },
+    });
+
+    expect(result.data.currency).toBe('USD');
+    expect(result.data.price).toBe(50);
+    expect(productRepository.update).toHaveBeenCalledTimes(1);
+  });
 });

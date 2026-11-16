@@ -97,6 +97,17 @@ export class UpdateProductUseCase {
 
     if (product.state === 'archived') throw invalidStateError('archived');
 
+    if (
+      product.state === 'published' &&
+      fields.currency !== undefined &&
+      fields.currency !== product.currency
+    ) {
+      const err = new Error('Cannot change currency on a published product. Unpublish it first.');
+      err.code = 'CANNOT_CHANGE_CURRENCY_ON_PUBLISHED';
+      err.statusCode = 409;
+      throw err;
+    }
+
     let updated;
     try {
       updated = await this.productRepository.update({ productId, sellerId, fields });

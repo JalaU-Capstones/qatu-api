@@ -2,6 +2,8 @@ import { QueryTypes } from 'sequelize';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createMigratedTestDatabase } from '../../../infrastructure/persistence/__tests__/helpers/migratedTestDatabase.js';
 import { ProductRepository } from '../../../infrastructure/persistence/repositories/ProductRepository.js';
+import { PublishProductUseCase } from '../PublishProductUseCase.js';
+import { UnpublishProductUseCase } from '../UnpublishProductUseCase.js';
 import { UpdateProductUseCase } from '../UpdateProductUseCase.js';
 
 const SELLER = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -276,41 +278,61 @@ describe('UpdateProductUseCase (integration, real PostgreSQL)', { timeout: 30_00
     expect(after.name).toBe(before.name);
   });
 
-  it('6. currency change invariant: existing order retains USD when product currency updated to EUR', async () => {
-    const orderId = '30000000-0000-4000-8000-000000000001';
-    await sequelize.query(
-      `insert into public.orders (
-         id, buyer_id, status, currency, subtotal, shipping_cost, tax, total
-       ) values (
-         :orderId, :buyerId, 'pending', 'USD', 19.99, 0, 0, 19.99
-       )`,
-      { replacements: { orderId, buyerId: BUYER } }
-    );
+  it('6. blocks currency change on published products; allows after unpublish → republish', async () => {
+    const repo = new ProductRepository({ db: sequelize });
 
-    await sequelize.query(
-      `insert into public.order_items (
-         order_id, product_id, product_name, quantity, unit_price
-       ) values (
-         :orderId, :productId, 'Published Product', 1, 19.99
-       )`,
-      { replacements: { orderId, productId: PRODUCT_PUBLISHED } }
-    );
+    // Step 1: seed product with an image so it can be published/republished
+    const imagePath = `product-images/${PRODUCT_PUBLISHED}/cover.webp`;
+    await repo.addImage({
+      productId: PRODUCT_PUBLISHED,
+      path: imagePath,
+      altText: null,
+      position: 0,
+    });
+    await repo.setPrimaryImageIfNull({ productId: PRODUCT_PUBLISHED, path: imagePath });
 
-    // Update product currency to EUR
+    const beforeRow = await getProductRow(PRODUCT_PUBLISHED);
+    expect(beforeRow.currency).toBe('USD');
+
+    // Step 2: attempt currency change on published product → 409
+    await expect(
+      buildUseCase().execute({
+        productId: PRODUCT_PUBLISHED,
+        sellerId: SELLER,
+        fields: { currency: 'EUR' },
+      })
+    ).rejects.toMatchObject({
+      code: 'CANNOT_CHANGE_CURRENCY_ON_PUBLISHED',
+      statusCode: 409,
+      message: 'Cannot change currency on a published product. Unpublish it first.',
+    });
+    // DB still has USD
+    expect((await getProductRow(PRODUCT_PUBLISHED)).currency).toBe('USD');
+
+    // Step 3: unpublish
+    const unpublishUseCase = new UnpublishProductUseCase({ productRepository: repo });
+    await unpublishUseCase.execute({ productId: PRODUCT_PUBLISHED, sellerId: SELLER });
+    expect((await getProductRow(PRODUCT_PUBLISHED)).state).toBe('unpublished');
+
+    // Step 4: currency change now succeeds on unpublished product
     await buildUseCase().execute({
       productId: PRODUCT_PUBLISHED,
       sellerId: SELLER,
       fields: { currency: 'EUR' },
     });
+    const afterCurrencyChange = await getProductRow(PRODUCT_PUBLISHED);
+    expect(afterCurrencyChange.currency).toBe('EUR');
+    expect(afterCurrencyChange.state).toBe('unpublished');
 
-    const productAfter = await getProductRow(PRODUCT_PUBLISHED);
-    expect(productAfter.currency).toBe('EUR');
-
-    const [orderAfter] = await runQuery(
-      `select id, currency, total from public.orders where id = :orderId`,
-      { orderId }
-    );
-    expect(orderAfter.currency).toBe('USD');
+    // Step 5: republish
+    const publishUseCase = new PublishProductUseCase({ productRepository: repo });
+    await publishUseCase.execute({ productId: PRODUCT_PUBLISHED, sellerId: SELLER });
+    const finalRow = await getProductRow(PRODUCT_PUBLISHED);
+    expect(finalRow.currency).toBe('EUR');
+    expect(finalRow.state).toBe('published');
+    // published_at is preserved from original (handle_product_published_at trigger only
+    // sets it on first transition when published_at IS NULL; it was already set)
+    expect(new Date(finalRow.published_at).getTime()).toBe(KNOWN_PUBLISHED_AT.getTime());
   });
 
   it('7. returns 409 INVALID_STATE_TRANSITION for archived product and leaves DB unchanged', async () => {
