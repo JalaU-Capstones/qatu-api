@@ -1,8 +1,7 @@
 'use strict';
 
-// ADR-020: This seeder no longer inserts into auth.users. The auth row is
-// provisioned by supabase/seed.sql during `npx supabase db reset`. Only
-// public.profiles and public.user_roles are managed here.
+// ADR-020: auth.users row is created by supabase/seed.sql.
+// This seeder only provisions public.profiles and public.user_roles.
 
 /**
  * Supabase Auth rejects non-routable domains such as `.local`, so a seller seeded with
