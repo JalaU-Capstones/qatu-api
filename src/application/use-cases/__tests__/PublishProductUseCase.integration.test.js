@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createMigratedTestDatabase } from '../../../infrastructure/persistence/__tests__/helpers/migratedTestDatabase.js';
 import { ProductRepository } from '../../../infrastructure/persistence/repositories/ProductRepository.js';
 import { PublishProductUseCase } from '../PublishProductUseCase.js';
+import { UnpublishProductUseCase } from '../UnpublishProductUseCase.js';
 
 const SELLER = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const OTHER_SELLER = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
@@ -254,5 +255,50 @@ describe('PublishProductUseCase (integration, real PostgreSQL)', { timeout: 30_0
     const after = repository.findAll({});
     expect((await after).items.map((item) => item.id)).toContain(PRODUCT_DRAFT);
     expect((await after).items).toHaveLength(2);
+  });
+
+  it('re-publishes an unpublished product and preserves original published_at timestamp', async () => {
+    const repo = new ProductRepository({ db: sequelize });
+    const imagePath = `product-images/${PRODUCT_PUBLISHED}/cover.webp`;
+    await repo.addImage({
+      productId: PRODUCT_PUBLISHED,
+      path: imagePath,
+      altText: null,
+      position: 0,
+    });
+    await repo.setPrimaryImageIfNull({ productId: PRODUCT_PUBLISHED, path: imagePath });
+
+    await sequelize.query(
+      "update public.products set published_at = now() - interval '2 days' where id = :id",
+      { replacements: { id: PRODUCT_PUBLISHED } }
+    );
+
+    const originalRow = await getProductRow(PRODUCT_PUBLISHED);
+    const originalPublishedAt = originalRow.published_at;
+
+    const unpublishUseCase = new UnpublishProductUseCase({ productRepository: repo });
+    const unpublishRes = await unpublishUseCase.execute({
+      productId: PRODUCT_PUBLISHED,
+      sellerId: SELLER,
+    });
+    expect(unpublishRes.data.state).toBe('unpublished');
+
+    const unpublishedRow = await getProductRow(PRODUCT_PUBLISHED);
+    expect(unpublishedRow.state).toBe('unpublished');
+    expect(new Date(unpublishedRow.published_at).getTime()).toBe(
+      new Date(originalPublishedAt).getTime()
+    );
+
+    const publishRes = await buildUseCase().execute({
+      productId: PRODUCT_PUBLISHED,
+      sellerId: SELLER,
+    });
+    expect(publishRes.data.state).toBe('published');
+
+    const republishedRow = await getProductRow(PRODUCT_PUBLISHED);
+    expect(republishedRow.state).toBe('published');
+    expect(new Date(republishedRow.published_at).getTime()).toBe(
+      new Date(originalPublishedAt).getTime()
+    );
   });
 });

@@ -74,6 +74,22 @@ export class IProductRepository {
   }
 
   /**
+   * Atomically transitions a product owned by the seller from 'published'
+   * to 'unpublished'. Returns the updated row, or null if no row matched
+   * (product not found, wrong seller, wrong source state, or soft-deleted).
+   * Does NOT modify `published_at` — the timestamp is preserved across
+   * unpublish/republish cycles per ADR policy.
+   *
+   * @param {{ productId: string, sellerId: string }} args
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object|null>}
+   */
+  async unpublish(args, options) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ args, options })}`);
+  }
+
+  /**
    * Inserts a product image row.
    *
    * @param {{ productId: string, path: string, altText: string|null, position: number }} args
