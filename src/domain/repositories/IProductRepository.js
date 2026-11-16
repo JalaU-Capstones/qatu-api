@@ -90,6 +90,26 @@ export class IProductRepository {
   }
 
   /**
+   * Atomically updates the provided fields on a product owned by the seller.
+   * Does NOT touch `slug`, `state`, `seller_id`, `published_at`, or any
+   * timestamp column. At least one field MUST be provided. Returns the
+   * updated row, or null if no row matched (product not found, wrong seller,
+   * archived state, or soft-deleted).
+   *
+   * Throws SequelizeForeignKeyConstraintError (Postgres 23503) if
+   * `category_id` references a non-existent category — callers must map
+   * this to INVALID_CATEGORY.
+   *
+   * @param {{ productId: string, sellerId: string, fields: Object }} args
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object|null>}
+   */
+  async update(args, options) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ args, options })}`);
+  }
+
+  /**
    * Inserts a product image row.
    *
    * @param {{ productId: string, path: string, altText: string|null, position: number }} args

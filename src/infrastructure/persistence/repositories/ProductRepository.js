@@ -153,6 +153,62 @@ export class ProductRepository extends IProductRepository {
     return rows[0] ?? null;
   }
 
+  async update({ productId, sellerId, fields = {} }, { transaction } = {}) {
+    const allowed = [
+      'name',
+      'description',
+      'price',
+      'stock',
+      'currency',
+      'category_id',
+      'attributes',
+    ];
+    const setClauses = [];
+    const replacements = { productId, sellerId };
+
+    for (const key of allowed) {
+      if (!(key in fields)) continue;
+      if (key === 'attributes') {
+        setClauses.push('attributes = :attributes::jsonb');
+        replacements.attributes = JSON.stringify(fields.attributes ?? {});
+      } else {
+        setClauses.push(`${key} = :${key}`);
+        // eslint-disable-next-line security/detect-object-injection
+        replacements[key] = fields[key];
+      }
+    }
+
+    if (setClauses.length === 0) {
+      return null; // defensive; use case already rejects empty fields
+    }
+
+    setClauses.push('updated_at = now()');
+
+    const sql = `
+      UPDATE public.products
+      SET ${setClauses.join(', ')}
+      WHERE id = :productId
+        AND seller_id = :sellerId
+        AND state IN ('draft', 'published', 'unpublished')
+        AND deleted_at IS NULL
+      RETURNING *
+    `;
+
+    const queryResult = await this.db.query(sql, {
+      replacements,
+      ...(transaction ? { transaction } : {}),
+    });
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    return rows[0] ?? null;
+  }
+
   async addImage({ productId, path, altText = null, position = 0 }, { transaction } = {}) {
     const sql = `
       INSERT INTO public.product_images (product_id, path, alt_text, position)
