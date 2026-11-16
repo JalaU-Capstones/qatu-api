@@ -234,6 +234,69 @@ export class ProductRepository extends IProductRepository {
     return rows[0] ?? null;
   }
 
+  async findImageById(imageId) {
+    const queryResult = await this.db.query(
+      `SELECT id, product_id, path, alt_text, position, created_at
+       FROM public.product_images
+       WHERE id = :imageId
+       LIMIT 1`,
+      { replacements: { imageId } }
+    );
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+    return rows[0] ?? null;
+  }
+
+  async deleteImage(imageId, { transaction } = {}) {
+    const queryResult = await this.db.query(
+      `DELETE FROM public.product_images
+       WHERE id = :imageId
+       RETURNING id, product_id, path, alt_text, position, created_at`,
+      {
+        replacements: { imageId },
+        ...(transaction ? { transaction } : {}),
+      }
+    );
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+    return rows[0] ?? null;
+  }
+
+  async recomputePrimaryImage(productId, { transaction } = {}) {
+    const sql = `
+      UPDATE public.products
+      SET primary_image_path = (
+        SELECT path FROM public.product_images
+        WHERE product_id = :productId
+        ORDER BY position ASC, created_at ASC
+        LIMIT 1
+      ),
+      updated_at = now()
+      WHERE id = :productId
+        AND deleted_at IS NULL
+      RETURNING *
+    `;
+    const queryResult = await this.db.query(sql, {
+      replacements: { productId },
+      ...(transaction ? { transaction } : {}),
+    });
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+    return rows[0] ?? null;
+  }
+
   async addImage({ productId, path, altText = null, position = 0 }, { transaction } = {}) {
     const sql = `
       INSERT INTO public.product_images (product_id, path, alt_text, position)
