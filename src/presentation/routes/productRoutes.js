@@ -1,9 +1,13 @@
 import { Router } from 'express';
 import { CreateProductUseCase } from '../../application/use-cases/CreateProductUseCase.js';
+import { DeleteProductImageUseCase } from '../../application/use-cases/DeleteProductImageUseCase.js';
+import { DeleteProductUseCase } from '../../application/use-cases/DeleteProductUseCase.js';
 import { GetProductDetailUseCase } from '../../application/use-cases/GetProductDetailUseCase.js';
 import { ListProductImagesUseCase } from '../../application/use-cases/ListProductImagesUseCase.js';
 import { ListProductsUseCase } from '../../application/use-cases/ListProductsUseCase.js';
 import { PublishProductUseCase } from '../../application/use-cases/PublishProductUseCase.js';
+import { UnpublishProductUseCase } from '../../application/use-cases/UnpublishProductUseCase.js';
+import { UpdateProductUseCase } from '../../application/use-cases/UpdateProductUseCase.js';
 import { UploadProductImageUseCase } from '../../application/use-cases/UploadProductImageUseCase.js';
 import { ProductRepository } from '../../infrastructure/persistence/repositories/ProductRepository.js';
 import { SupabaseStorageService } from '../../infrastructure/storage/SupabaseStorageService.js';
@@ -14,6 +18,7 @@ import { requireSellerRole } from '../middleware/requireSellerRole.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { createProductSchema } from '../validators/createProductSchema.js';
 import { listProductsSchema } from '../validators/listProductsSchema.js';
+import { updateProductSchema } from '../validators/updateProductSchema.js';
 
 export function createProductRouter({
   productRepository = new ProductRepository(),
@@ -21,6 +26,10 @@ export function createProductRouter({
   getProductByIdUseCase,
   createProductUseCase,
   publishProductUseCase,
+  unpublishProductUseCase,
+  updateProductUseCase,
+  deleteProductUseCase,
+  deleteProductImageUseCase,
   uploadProductImageUseCase,
   listProductImagesUseCase,
   storageService = new SupabaseStorageService(),
@@ -52,6 +61,31 @@ export function createProductRouter({
       productRepository,
     });
 
+  const unpublishUC =
+    unpublishProductUseCase ||
+    new UnpublishProductUseCase({
+      productRepository,
+    });
+
+  const updateUC =
+    updateProductUseCase ||
+    new UpdateProductUseCase({
+      productRepository,
+    });
+
+  const deleteUC =
+    deleteProductUseCase ||
+    new DeleteProductUseCase({
+      productRepository,
+    });
+
+  const deleteImageUC =
+    deleteProductImageUseCase ||
+    new DeleteProductImageUseCase({
+      productRepository,
+      storageService,
+    });
+
   const productImageUC =
     uploadProductImageUseCase ||
     new UploadProductImageUseCase({
@@ -72,6 +106,10 @@ export function createProductRouter({
       getProductByIdUseCase: getByIdUC,
       createProductUseCase: createUC,
       publishProductUseCase: publishUC,
+      unpublishProductUseCase: unpublishUC,
+      updateProductUseCase: updateUC,
+      deleteProductUseCase: deleteUC,
+      deleteProductImageUseCase: deleteImageUC,
       uploadProductImageUseCase: productImageUC,
       listProductImagesUseCase: listImagesUC,
     });
@@ -94,6 +132,22 @@ export function createProductRouter({
     controller.publish(req, res, next)
   );
 
+  router.patch('/:id/unpublish', authMiddleware, requireSellerRole(), (req, res, next) =>
+    controller.unpublish(req, res, next)
+  );
+
+  router.patch(
+    '/:id',
+    authMiddleware,
+    requireSellerRole(),
+    validateRequest(updateProductSchema, { source: 'body' }),
+    (req, res, next) => controller.update(req, res, next)
+  );
+
+  router.delete('/:id', authMiddleware, requireSellerRole(), (req, res, next) =>
+    controller.remove(req, res, next)
+  );
+
   router.post(
     '/:id/images',
     authMiddleware,
@@ -103,6 +157,10 @@ export function createProductRouter({
   );
 
   router.get('/:id/images', (req, res, next) => controller.listImages(req, res, next));
+
+  router.delete('/:id/images/:imageId', authMiddleware, requireSellerRole(), (req, res, next) =>
+    controller.deleteImage(req, res, next)
+  );
 
   return router;
 }
