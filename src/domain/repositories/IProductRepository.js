@@ -173,6 +173,44 @@ export class IProductRepository {
   }
 
   /**
+   * Returns the product_images row for `imageId`, or null. Does NOT filter
+   * by product ownership — caller must verify `product_id` matches the
+   * URL param.
+   * @param {string} imageId
+   * @returns {Promise<{ id: string, product_id: string, path: string, position: number, alt_text: string|null, created_at: Date }|null>}
+   */
+  async findImageById(imageId) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ imageId })}`);
+  }
+
+  /**
+   * Deletes the product_images row by `id` and returns the deleted row
+   * (`RETURNING *`), or null if it did not exist.
+   * @param {string} imageId
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object|null>}
+   */
+  async deleteImage(imageId, options) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ imageId, options })}`);
+  }
+
+  /**
+   * If `products.primary_image_path` currently points to a path that no
+   * longer exists in `product_images`, promote the next image by
+   * `(position ASC, created_at ASC)`, or set it to NULL if none. Only
+   * touches `primary_image_path` and `updated_at`. Returns the updated
+   * row (products) or null.
+   * @param {string} productId
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object|null>}
+   */
+  async recomputePrimaryImage(productId, options) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ productId, options })}`);
+  }
+
+  /**
    * Find a single, non-deleted product with full relational details.
    *
    * @param {string} productId
