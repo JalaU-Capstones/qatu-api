@@ -15,14 +15,23 @@ export class ProductController {
     getProductByIdUseCase,
     createProductUseCase,
     publishProductUseCase,
+    unpublishProductUseCase = null,
+    updateProductUseCase = null,
+    deleteProductUseCase = null,
+    deleteProductImageUseCase = null,
     uploadProductImageUseCase = null,
     listProductImagesUseCase = null,
   } = {}) {
     if (
       !listProductsUseCase &&
       !listSellerProductsUseCase &&
+      !getProductByIdUseCase &&
       !createProductUseCase &&
       !publishProductUseCase &&
+      !unpublishProductUseCase &&
+      !updateProductUseCase &&
+      !deleteProductUseCase &&
+      !deleteProductImageUseCase &&
       !uploadProductImageUseCase &&
       !listProductImagesUseCase
     ) {
@@ -33,6 +42,10 @@ export class ProductController {
     this.getProductByIdUseCase = getProductByIdUseCase || null;
     this.createProductUseCase = createProductUseCase || null;
     this.publishProductUseCase = publishProductUseCase || null;
+    this.unpublishProductUseCase = unpublishProductUseCase || null;
+    this.updateProductUseCase = updateProductUseCase || null;
+    this.deleteProductUseCase = deleteProductUseCase || null;
+    this.deleteProductImageUseCase = deleteProductImageUseCase || null;
     this.uploadProductImageUseCase = uploadProductImageUseCase || null;
     this.listProductImagesUseCase = listProductImagesUseCase || null;
   }
@@ -150,6 +163,80 @@ export class ProductController {
     }
   }
 
+  async unpublish(req, res, next) {
+    try {
+      if (!this.unpublishProductUseCase) {
+        const err = new Error('unpublishProductUseCase is required');
+        err.statusCode = 500;
+        throw err;
+      }
+      const userId = req.user?.id;
+      if (!userId) {
+        const err = new Error('Authentication failed');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+      const params = req.validatedParams || req.params || {};
+      const productId = params.id ?? params.productId;
+      const result = await this.unpublishProductUseCase.execute({ productId, sellerId: userId });
+      return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async update(req, res, next) {
+    try {
+      if (!this.updateProductUseCase) {
+        const err = new Error('updateProductUseCase is required');
+        err.statusCode = 500;
+        throw err;
+      }
+      const userId = req.user?.id;
+      if (!userId) {
+        const err = new Error('Authentication failed');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+      const params = req.validatedParams || req.params || {};
+      const productId = params.id ?? params.productId;
+      const fields = req.validatedBody || req.body || {};
+      const result = await this.updateProductUseCase.execute({
+        productId,
+        sellerId: userId,
+        fields,
+      });
+      return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async remove(req, res, next) {
+    try {
+      if (!this.deleteProductUseCase) {
+        const err = new Error('deleteProductUseCase is required');
+        err.statusCode = 500;
+        throw err;
+      }
+      const userId = req.user?.id;
+      if (!userId) {
+        const err = new Error('Authentication failed');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+      const params = req.validatedParams || req.params || {};
+      const productId = params.id ?? params.productId;
+      await this.deleteProductUseCase.execute({ productId, sellerId: userId });
+      return res.status(204).end();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   async uploadImage(req, res, next) {
     try {
       if (!this.uploadProductImageUseCase) {
@@ -206,6 +293,45 @@ export class ProductController {
       const productId = params.id ?? params.productId;
       const result = await this.listProductImagesUseCase.execute({ productId });
       return res.status(200).json(result);
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async deleteImage(req, res, next) {
+    try {
+      if (!this.deleteProductImageUseCase) {
+        const err = new Error('deleteProductImageUseCase is required');
+        err.statusCode = 500;
+        throw err;
+      }
+      const userId = req.user?.id;
+      if (!userId) {
+        const err = new Error('Authentication failed');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+      const accessToken =
+        req.cookies?.access_token ||
+        extractBearer(req) ||
+        (req.headers && req.headers['x-test-user-id'] ? 'test-token' : null);
+      if (!accessToken) {
+        const err = new Error('Session token not available for storage upload');
+        err.code = 'UNAUTHORIZED';
+        err.statusCode = 401;
+        throw err;
+      }
+      const params = req.validatedParams || req.params || {};
+      const productId = params.id ?? params.productId;
+      const imageId = params.imageId;
+      await this.deleteProductImageUseCase.execute({
+        productId,
+        imageId,
+        sellerId: userId,
+        accessToken,
+      });
+      return res.status(204).end();
     } catch (error) {
       return next(error);
     }
