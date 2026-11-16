@@ -209,6 +209,31 @@ export class ProductRepository extends IProductRepository {
     return rows[0] ?? null;
   }
 
+  async softDelete({ productId, sellerId }, { transaction } = {}) {
+    const sql = `
+      UPDATE public.products
+      SET deleted_at = now(), updated_at = now()
+      WHERE id = :productId
+        AND seller_id = :sellerId
+        AND deleted_at IS NULL
+      RETURNING *
+    `;
+
+    const queryResult = await this.db.query(sql, {
+      replacements: { productId, sellerId },
+      ...(transaction ? { transaction } : {}),
+    });
+
+    const rows =
+      Array.isArray(queryResult) && Array.isArray(queryResult[0])
+        ? queryResult[0]
+        : Array.isArray(queryResult)
+          ? queryResult
+          : [];
+
+    return rows[0] ?? null;
+  }
+
   async addImage({ productId, path, altText = null, position = 0 }, { transaction } = {}) {
     const sql = `
       INSERT INTO public.product_images (product_id, path, alt_text, position)
