@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { env } from '../../../infrastructure/config/env.js';
 import { UploadProductImageUseCase } from '../UploadProductImageUseCase.js';
 
 const JPEG_BUF = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
@@ -29,6 +30,8 @@ describe('UploadProductImageUseCase', () => {
   };
 
   beforeEach(() => {
+    env.PUBLIC_APP_URL = '';
+    env.SUPABASE_STORAGE_PUBLIC_URL = 'http://localhost:54321/storage/v1/object/public';
     mockProductRepository = {
       findById: vi.fn().mockResolvedValue({
         id: productId,
@@ -97,10 +100,51 @@ describe('UploadProductImageUseCase', () => {
     expect(result.data).toEqual({
       id: 'img-1',
       product_id: productId,
-      path: `product-images/${productId}/img-1.png`,
-      altText: null,
+      path: `http://localhost:54321/storage/v1/object/public/product-images/${productId}/img-1.png`,
+      alt_text: null,
       position: 0,
+      created_at: null,
     });
+  });
+
+  it('returns a resolved product-image URL when PUBLIC_APP_URL is empty', async () => {
+    env.PUBLIC_APP_URL = '';
+
+    const result = await useCase.execute({
+      productId,
+      sellerId,
+      file: sampleFile,
+      accessToken: 'seller-jwt-token',
+    });
+
+    expect(result.data.path).toBe(
+      `http://localhost:54321/storage/v1/object/public/product-images/${productId}/img-1.png`
+    );
+  });
+
+  it('returns a SPA-origin product-image URL when PUBLIC_APP_URL is set', async () => {
+    env.PUBLIC_APP_URL = 'http://localhost:5173';
+
+    const result = await useCase.execute({
+      productId,
+      sellerId,
+      file: sampleFile,
+      accessToken: 'seller-jwt-token',
+    });
+
+    expect(result.data.path).toBe(`http://localhost:5173/product-images/${productId}/img-1.png`);
+  });
+
+  it('keeps the raw DB row returned by addImage unchanged', async () => {
+    await useCase.execute({
+      productId,
+      sellerId,
+      file: sampleFile,
+      accessToken: 'seller-jwt-token',
+    });
+
+    const rawRow = await mockProductRepository.addImage.mock.results[0].value;
+    expect(rawRow.path).toBe(`product-images/${productId}/img-1.png`);
   });
 
   it('throws 422 INVALID_FILE_FORMAT when file buffer has unknown magic bytes (ZIP)', async () => {
