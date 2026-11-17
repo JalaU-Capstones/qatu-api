@@ -23,9 +23,9 @@ properties:
       - '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
   path:
     type: string
-    description: Storage path of the image in Supabase Storage product-images bucket.
+    description: Resolved public URL for the image. Resolved at read time via resolveImageUrl() under ADR-019.
     examples:
-      - 'product-images/7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c/side-view.webp'
+      - 'http://localhost:54321/storage/v1/object/public/product-images/7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c/side-view.webp'
   alt_text:
     type: [string, 'null']
     maxLength: 200

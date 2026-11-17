@@ -1,5 +1,6 @@
 import { QueryTypes } from 'sequelize';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { env } from '../../../infrastructure/config/env.js';
 import { createMigratedTestDatabase } from '../../../infrastructure/persistence/__tests__/helpers/migratedTestDatabase.js';
 import { ProductRepository } from '../../../infrastructure/persistence/repositories/ProductRepository.js';
 import { UploadProductImageUseCase } from '../UploadProductImageUseCase.js';
@@ -71,6 +72,8 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
   });
 
   beforeEach(async () => {
+    env.PUBLIC_APP_URL = '';
+    env.SUPABASE_STORAGE_PUBLIC_URL = 'http://localhost:54321/storage/v1/object/public';
     await sequelize.query('delete from public.product_images;');
     await sequelize.query('delete from public.products;');
     await sequelize.query('delete from public.user_roles;');
@@ -138,7 +141,7 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
     );
 
     expect(row.primary_image_path).toBe(`product-images/${PRODUCT_ID}/first.png`);
-    expect(result.data.path).toBe(`product-images/${PRODUCT_ID}/first.png`);
+    expect(result.data.path).toMatch(/^https?:\/\/.+\/product-images\/.+\/first\.png$/);
     expect(result.meta.timestamp).toEqual(expect.any(String));
     expect(result.location).toBe(`/v1/products/${PRODUCT_ID}/images/${result.data.id}`);
     expect(storageService.uploadProductImage).toHaveBeenCalledWith(
@@ -186,7 +189,7 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
       { productId: PRODUCT_ID }
     );
 
-    expect(result.data.path).toBe(path2);
+    expect(result.data.path).toMatch(/^https?:\/\/.+\/product-images\/.+\/two\.png$/);
     expect(row.primary_image_path).toBe(path1);
     expect(await productRepository.countImages(PRODUCT_ID)).toBe(2);
   });
@@ -365,7 +368,7 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
       },
     });
 
-    expect(result.data.path).toBe(`product-images/${PRODUCT_ID}/valid.jpg`);
+    expect(result.data.path).toMatch(/^https?:\/\/.+\/product-images\/.+\/valid\.jpg$/);
     expect(await productRepository.countImages(PRODUCT_ID)).toBe(1);
     const [row] = await runQuery(
       `SELECT primary_image_path FROM public.products WHERE id = :productId`,

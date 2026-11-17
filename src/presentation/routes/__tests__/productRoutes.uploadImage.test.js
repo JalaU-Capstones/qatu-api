@@ -65,7 +65,11 @@ describe('Product Routes - POST /v1/products/:id/images', () => {
     const location = `/v1/products/${productId}/images/img-1`;
 
     mockUploadProductImageUseCase.execute.mockResolvedValue({
-      data: { id: 'img-1', product_id: productId, path: 'product-images/abc/cover.webp' },
+      data: {
+        id: 'img-1',
+        product_id: productId,
+        path: 'http://localhost:54321/storage/v1/object/public/product-images/abc/cover.webp',
+      },
       meta: { timestamp: '2026-10-15T10:00:00.000Z' },
       location,
     });
@@ -78,6 +82,8 @@ describe('Product Routes - POST /v1/products/:id/images', () => {
     expect(response.status).toBe(201);
     expect(response.headers.location).toBe(location);
     expect(response.body.data.id).toBe('img-1');
+    expect(response.body.data.path).toMatch(/^https?:\/\//);
+    expect(response.body.data.path).not.toMatch(/^product-images\//);
     expect(response.body.meta.timestamp).toBe('2026-10-15T10:00:00.000Z');
     expect(mockUploadProductImageUseCase.execute).toHaveBeenCalledTimes(1);
     expect(mockUploadProductImageUseCase.execute).toHaveBeenCalledWith(
