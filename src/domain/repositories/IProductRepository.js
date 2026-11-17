@@ -74,6 +74,60 @@ export class IProductRepository {
   }
 
   /**
+   * Atomically transitions a product owned by the seller from 'published'
+   * to 'unpublished'. Returns the updated row, or null if no row matched
+   * (product not found, wrong seller, wrong source state, or soft-deleted).
+   * Does NOT modify `published_at` — the timestamp is preserved across
+   * unpublish/republish cycles per ADR policy.
+   *
+   * @param {{ productId: string, sellerId: string }} args
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object|null>}
+   */
+  async unpublish(args, options) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ args, options })}`);
+  }
+
+  /**
+   * Atomically updates the provided fields on a product owned by the seller.
+   * Does NOT touch `slug`, `state`, `seller_id`, `published_at`, or any
+   * timestamp column. At least one field MUST be provided. Returns the
+   * updated row, or null if no row matched (product not found, wrong seller,
+   * archived state, or soft-deleted).
+   *
+   * Throws SequelizeForeignKeyConstraintError (Postgres 23503) if
+   * `category_id` references a non-existent category — callers must map
+   * this to INVALID_CATEGORY.
+   *
+   * @param {{ productId: string, sellerId: string, fields: Object }} args
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object|null>}
+   */
+  async update(args, options) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ args, options })}`);
+  }
+
+  /**
+   * Atomically soft-deletes a product owned by the seller by setting
+   * `deleted_at = now()`. Does NOT touch `product_images` rows, Supabase
+   * Storage files, `state`, or `published_at` — soft-delete is reversible
+   * and hard delete is out of scope. Works in ALL states
+   * (draft|published|unpublished|archived). Returns the updated row, or
+   * null if no row matched (product not found, wrong seller, or already
+   * soft-deleted).
+   *
+   * @param {{ productId: string, sellerId: string }} args
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object|null>}
+   */
+  async softDelete(args, options) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ args, options })}`);
+  }
+
+  /**
    * Inserts a product image row.
    *
    * @param {{ productId: string, path: string, altText: string|null, position: number }} args
@@ -116,6 +170,44 @@ export class IProductRepository {
    */
   async setPrimaryImageIfNull(args) {
     throw new Error(`Method not implemented with ${JSON.stringify({ args })}`);
+  }
+
+  /**
+   * Returns the product_images row for `imageId`, or null. Does NOT filter
+   * by product ownership — caller must verify `product_id` matches the
+   * URL param.
+   * @param {string} imageId
+   * @returns {Promise<{ id: string, product_id: string, path: string, position: number, alt_text: string|null, created_at: Date }|null>}
+   */
+  async findImageById(imageId) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ imageId })}`);
+  }
+
+  /**
+   * Deletes the product_images row by `id` and returns the deleted row
+   * (`RETURNING *`), or null if it did not exist.
+   * @param {string} imageId
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object|null>}
+   */
+  async deleteImage(imageId, options) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ imageId, options })}`);
+  }
+
+  /**
+   * If `products.primary_image_path` currently points to a path that no
+   * longer exists in `product_images`, promote the next image by
+   * `(position ASC, created_at ASC)`, or set it to NULL if none. Only
+   * touches `primary_image_path` and `updated_at`. Returns the updated
+   * row (products) or null.
+   * @param {string} productId
+   * @param {Object} [options]
+   * @param {import('sequelize').Transaction} [options.transaction]
+   * @returns {Promise<Object|null>}
+   */
+  async recomputePrimaryImage(productId, options) {
+    throw new Error(`Method not implemented with ${JSON.stringify({ productId, options })}`);
   }
 
   /**
