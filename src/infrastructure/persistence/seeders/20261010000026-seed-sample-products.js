@@ -1,5 +1,10 @@
 'use strict';
 
+// Fixed development seed mapping (UUID v4 literals; stable across re-seeds):
+// seller user -> 00000000-0000-4000-8000-000000000002
+// products -> 10000000-0000-4000-8000-000000000001 through
+// 10000000-0000-4000-8000-000000000025 in the order listed below; product image
+// paths use the matching product UUID.
 // ADR-020: auth.users row is created by supabase/seed.sql.
 // This seeder only provisions public.profiles and public.user_roles.
 
@@ -24,7 +29,7 @@ module.exports = {
       // The public.profiles insert has an FK to auth.users(id), so without it the
       // seeder fails with a cryptic FK error. Fail with an actionable message.
       const [sellerAuthRows] = await queryInterface.sequelize.query(
-        `select 1 from auth.users where id = '00000000-0000-0000-0000-000000000002'::uuid limit 1`,
+        `select 1 from auth.users where id = '00000000-0000-4000-8000-000000000002'::uuid limit 1`,
         { transaction }
       );
       if (sellerAuthRows.length === 0) {
@@ -39,7 +44,7 @@ module.exports = {
         `
         insert into public.profiles (id, username, full_name, email)
         values (
-          '00000000-0000-0000-0000-000000000002'::uuid,
+          '00000000-0000-4000-8000-000000000002'::uuid,
           'sample_seller',
           'Sample Seller',
           '${SELLER_EMAIL}'
@@ -51,7 +56,7 @@ module.exports = {
 
         insert into public.user_roles (profile_id, role_id)
         select
-          '00000000-0000-0000-0000-000000000002'::uuid,
+          '00000000-0000-4000-8000-000000000002'::uuid,
           r.id
         from public.roles r
         where r.name = 'seller'
@@ -77,8 +82,8 @@ module.exports = {
         values
           -- Category 1: Electronics (5 products)
           (
-            '10000000-0000-0000-0000-000000000001'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000001'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'electronics'),
             'Wireless Noise-Canceling Headphones',
             'wireless-noise-canceling-headphones',
@@ -87,15 +92,15 @@ module.exports = {
             'USD',
             45,
             '{"color": "Midnight Black", "warranty_months": 24}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000001/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000001/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000002'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000002'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'electronics'),
             'Ultra-Slim Mechanical Keyboard',
             'ultra-slim-mechanical-keyboard',
@@ -104,15 +109,15 @@ module.exports = {
             'USD',
             70,
             '{"color": "Space Gray", "warranty_months": 12}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000002/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000002/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000003'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000003'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'electronics'),
             '4K Ultra HD Action Camera',
             '4k-ultra-hd-action-camera',
@@ -121,15 +126,15 @@ module.exports = {
             'USD',
             30,
             '{"color": "Matte Black", "warranty_months": 12}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000003/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000003/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000004'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000004'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'electronics'),
             'Smart Home Security Camera',
             'smart-home-security-camera',
@@ -138,15 +143,15 @@ module.exports = {
             'USD',
             85,
             '{"color": "White", "warranty_months": 24}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000004/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000004/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000005'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000005'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'electronics'),
             'Portable Bluetooth Speaker',
             'portable-bluetooth-speaker',
@@ -155,7 +160,7 @@ module.exports = {
             'USD',
             110,
             '{"color": "Teal", "warranty_months": 12}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000005/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000005/primary.webp',
             'published',
             now(),
             0,
@@ -164,8 +169,8 @@ module.exports = {
 
           -- Category 2: Clothing (5 products)
           (
-            '10000000-0000-0000-0000-000000000006'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000006'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'clothing'),
             'Classic Heavyweight Cotton T-Shirt',
             'classic-heavyweight-cotton-t-shirt',
@@ -174,15 +179,15 @@ module.exports = {
             'USD',
             150,
             '{"size": "L", "material": "100% Organic Cotton"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000006/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000006/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000007'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000007'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'clothing'),
             'Slim-Fit Stretch Denim Jeans',
             'slim-fit-stretch-denim-jeans',
@@ -191,15 +196,15 @@ module.exports = {
             'USD',
             95,
             '{"size": "32x32", "material": "98% Cotton 2% Elastane"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000007/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000007/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000008'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000008'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'clothing'),
             'Merino Wool Knit Sweater',
             'merino-wool-knit-sweater',
@@ -208,15 +213,15 @@ module.exports = {
             'USD',
             40,
             '{"size": "M", "material": "100% Merino Wool"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000008/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000008/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000009'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000009'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'clothing'),
             'Waterproof Windbreaker Jacket',
             'waterproof-windbreaker-jacket',
@@ -225,15 +230,15 @@ module.exports = {
             'USD',
             60,
             '{"size": "XL", "material": "100% Recycled Nylon"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000009/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000009/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000010'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000010'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'clothing'),
             'Everyday Canvas Low-Top Sneakers',
             'everyday-canvas-low-top-sneakers',
@@ -242,7 +247,7 @@ module.exports = {
             'USD',
             80,
             '{"size": "10 US", "material": "Cotton Canvas"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000010/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000010/primary.webp',
             'published',
             now(),
             0,
@@ -251,8 +256,8 @@ module.exports = {
 
           -- Category 3: Home & Garden (5 products)
           (
-            '10000000-0000-0000-0000-000000000011'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000011'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'home-and-garden'),
             'Ergonomic High-Back Office Chair',
             'ergonomic-high-back-office-chair',
@@ -261,15 +266,15 @@ module.exports = {
             'USD',
             25,
             '{"dimensions_cm": "65x65x120", "color": "Charcoal Black"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000011/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000011/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000012'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000012'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'home-and-garden'),
             'Cast Iron Dutch Oven Pot',
             'cast-iron-dutch-oven-pot',
@@ -278,15 +283,15 @@ module.exports = {
             'USD',
             50,
             '{"dimensions_cm": "26x26x16", "color": "Cherry Red"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000012/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000012/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000013'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000013'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'home-and-garden'),
             'Dimmable Minimalist Desk Lamp',
             'dimmable-minimalist-desk-lamp',
@@ -295,15 +300,15 @@ module.exports = {
             'USD',
             90,
             '{"dimensions_cm": "15x15x42", "color": "Brushed Nickel"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000013/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000013/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000014'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000014'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'home-and-garden'),
             'Self-Watering Indoor Herb Planter',
             'self-watering-indoor-herb-planter',
@@ -312,15 +317,15 @@ module.exports = {
             'USD',
             65,
             '{"dimensions_cm": "40x15x18", "color": "Sage Green"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000014/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000014/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000015'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000015'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'home-and-garden'),
             'Stainless Steel Kitchen Knife Set',
             'stainless-steel-kitchen-knife-set',
@@ -329,7 +334,7 @@ module.exports = {
             'USD',
             35,
             '{"dimensions_cm": "20x15x35", "color": "Natural Wood"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000015/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000015/primary.webp',
             'published',
             now(),
             0,
@@ -338,8 +343,8 @@ module.exports = {
 
           -- Category 4: Sports (5 products)
           (
-            '10000000-0000-0000-0000-000000000016'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000016'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'sports'),
             'Adjustable Quick-Select Dumbbell',
             'adjustable-quick-select-dumbbell',
@@ -348,15 +353,15 @@ module.exports = {
             'USD',
             20,
             '{"weight_kg": 24, "color": "Black and Red"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000016/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000016/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000017'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000017'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'sports'),
             'High-Density Yoga and Pilates Mat',
             'high-density-yoga-and-pilates-mat',
@@ -365,15 +370,15 @@ module.exports = {
             'USD',
             120,
             '{"weight_kg": 1.2, "color": "Navy Blue"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000017/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000017/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000018'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000018'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'sports'),
             'Insulated Stainless Steel Water Bottle',
             'insulated-stainless-steel-water-bottle',
@@ -382,15 +387,15 @@ module.exports = {
             'USD',
             175,
             '{"weight_kg": 0.45, "color": "Cobalt Blue"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000018/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000018/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000019'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000019'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'sports'),
             'Trail Running Hydration Backpack',
             'trail-running-hydration-backpack',
@@ -399,15 +404,15 @@ module.exports = {
             'USD',
             55,
             '{"weight_kg": 0.55, "color": "Neon Lime"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000019/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000019/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000020'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000020'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'sports'),
             'Speed Jump Rope with Ball Bearings',
             'speed-jump-rope-with-ball-bearings',
@@ -416,7 +421,7 @@ module.exports = {
             'USD',
             200,
             '{"weight_kg": 0.25, "color": "Metallic Silver"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000020/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000020/primary.webp',
             'published',
             now(),
             0,
@@ -425,8 +430,8 @@ module.exports = {
 
           -- Category 5: Books (5 products)
           (
-            '10000000-0000-0000-0000-000000000021'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000021'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'books'),
             'Clean Architecture: A Craftsman Guide',
             'clean-architecture-a-craftsman-guide',
@@ -435,15 +440,15 @@ module.exports = {
             'USD',
             85,
             '{"author": "Robert C. Martin", "pages": 432, "language": "en"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000021/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000021/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000022'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000022'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'books'),
             'Designing Data-Intensive Applications',
             'designing-data-intensive-applications',
@@ -452,15 +457,15 @@ module.exports = {
             'USD',
             75,
             '{"author": "Martin Kleppmann", "pages": 616, "language": "en"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000022/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000022/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000023'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000023'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'books'),
             'Refactoring: Improving the Design of Existing Code',
             'refactoring-improving-the-design-of-existing-code',
@@ -469,15 +474,15 @@ module.exports = {
             'USD',
             60,
             '{"author": "Martin Fowler", "pages": 448, "language": "en"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000023/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000023/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000024'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000024'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'books'),
             'Domain-Driven Design: Tackling Complexity in Software',
             'domain-driven-design-tackling-complexity-in-software',
@@ -486,15 +491,15 @@ module.exports = {
             'USD',
             40,
             '{"author": "Eric Evans", "pages": 560, "language": "en"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000024/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000024/primary.webp',
             'published',
             now(),
             0,
             0
           ),
           (
-            '10000000-0000-0000-0000-000000000025'::uuid,
-            '00000000-0000-0000-0000-000000000002'::uuid,
+            '10000000-0000-4000-8000-000000000025'::uuid,
+            '00000000-0000-4000-8000-000000000002'::uuid,
             (select id from public.categories where slug = 'books'),
             'The Pragmatic Programmer: Your Journey to Mastery',
             'the-pragmatic-programmer-your-journey-to-mastery',
@@ -503,7 +508,7 @@ module.exports = {
             'USD',
             90,
             '{"author": "David Thomas, Andrew Hunt", "pages": 352, "language": "en"}'::jsonb,
-            'product-images/10000000-0000-0000-0000-000000000025/primary.webp',
+            'product-images/10000000-0000-4000-8000-000000000025/primary.webp',
             'published',
             now(),
             0,
@@ -526,13 +531,13 @@ module.exports = {
       await queryInterface.sequelize.query(
         `
         delete from public.products
-        where seller_id = '00000000-0000-0000-0000-000000000002'::uuid;
+        where seller_id = '00000000-0000-4000-8000-000000000002'::uuid;
 
         delete from public.user_roles
-        where profile_id = '00000000-0000-0000-0000-000000000002'::uuid;
+        where profile_id = '00000000-0000-4000-8000-000000000002'::uuid;
 
         delete from public.profiles
-        where id = '00000000-0000-0000-0000-000000000002'::uuid;
+        where id = '00000000-0000-4000-8000-000000000002'::uuid;
       `,
         { transaction }
       );

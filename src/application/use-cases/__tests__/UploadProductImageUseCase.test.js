@@ -20,7 +20,7 @@ describe('UploadProductImageUseCase', () => {
   let useCase;
 
   const productId = '550e8400-e29b-41d4-a716-446655440000';
-  const sellerId = 'seller-123';
+  const sellerId = '00000000-0000-4000-8000-000000000002';
   const sampleFile = {
     buffer: PNG_BUF,
     mimeType: 'image/png',

@@ -1,5 +1,7 @@
 'use strict';
 
+// Fixed development seed mapping (UUID v4 literals; stable across re-seeds):
+// admin user -> 00000000-0000-4000-8000-000000000001
 // ADR-020: auth.users row is created by supabase/seed.sql.
 // This seeder only provisions public.profiles and public.user_roles.
 
@@ -16,7 +18,7 @@ module.exports = {
       // The public.profiles insert has an FK to auth.users(id), so without it the
       // seeder fails with a cryptic FK error. Fail with an actionable message.
       const [adminAuthRows] = await queryInterface.sequelize.query(
-        `select 1 from auth.users where id = '00000000-0000-0000-0000-000000000001'::uuid limit 1`,
+        `select 1 from auth.users where id = '00000000-0000-4000-8000-000000000001'::uuid limit 1`,
         { transaction }
       );
       if (adminAuthRows.length === 0) {
@@ -31,7 +33,7 @@ module.exports = {
         `
         insert into public.profiles (id, username, full_name, email)
         values (
-          '00000000-0000-0000-0000-000000000001'::uuid,
+          '00000000-0000-4000-8000-000000000001'::uuid,
           'admin',
           'Admin User',
           'admin@example.qatu.pe'
@@ -43,7 +45,7 @@ module.exports = {
 
         insert into public.user_roles (profile_id, role_id)
         select
-          '00000000-0000-0000-0000-000000000001'::uuid,
+          '00000000-0000-4000-8000-000000000001'::uuid,
           r.id
         from public.roles r
         where r.name = 'admin'
@@ -64,10 +66,10 @@ module.exports = {
       await queryInterface.sequelize.query(
         `
         delete from public.user_roles
-        where profile_id = '00000000-0000-0000-0000-000000000001'::uuid;
+        where profile_id = '00000000-0000-4000-8000-000000000001'::uuid;
 
         delete from public.profiles
-        where id = '00000000-0000-0000-0000-000000000001'::uuid;
+        where id = '00000000-0000-4000-8000-000000000001'::uuid;
       `,
         { transaction }
       );
