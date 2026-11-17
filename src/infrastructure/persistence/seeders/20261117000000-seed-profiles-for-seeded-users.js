@@ -1,5 +1,8 @@
 'use strict';
 
+// Fixed development seed mapping (UUID v4 literals; stable across re-seeds):
+// admin user -> 00000000-0000-4000-8000-000000000001
+// seller user -> 00000000-0000-4000-8000-000000000002
 /**
  * ADR-020: Creates public.profiles and public.user_roles for the two users
  * seeded by supabase/seed.sql (admin and sample_seller).
@@ -21,18 +24,18 @@ module.exports = {
         `
         insert into public.profiles (id, username, full_name, email)
         values
-          ('00000000-0000-0000-0000-000000000001'::uuid, 'admin', 'Admin User', 'admin@example.qatu.pe'),
-          ('00000000-0000-0000-0000-000000000002'::uuid, 'sample_seller', 'Sample Seller', 'seller@example.qatu.pe')
+          ('00000000-0000-4000-8000-000000000001'::uuid, 'admin', 'Admin User', 'admin@example.qatu.pe'),
+          ('00000000-0000-4000-8000-000000000002'::uuid, 'sample_seller', 'Sample Seller', 'seller@example.qatu.pe')
         on conflict (id) do nothing;
 
         insert into public.user_roles (profile_id, role_id)
-        select '00000000-0000-0000-0000-000000000001'::uuid, r.id
+        select '00000000-0000-4000-8000-000000000001'::uuid, r.id
         from public.roles r
         where r.name = 'admin'
         on conflict (profile_id, role_id) do nothing;
 
         insert into public.user_roles (profile_id, role_id)
-        select '00000000-0000-0000-0000-000000000002'::uuid, r.id
+        select '00000000-0000-4000-8000-000000000002'::uuid, r.id
         from public.roles r
         where r.name = 'seller'
         on conflict (profile_id, role_id) do nothing;
@@ -53,14 +56,14 @@ module.exports = {
         `
         delete from public.user_roles
         where profile_id in (
-          '00000000-0000-0000-0000-000000000001'::uuid,
-          '00000000-0000-0000-0000-000000000002'::uuid
+          '00000000-0000-4000-8000-000000000001'::uuid,
+          '00000000-0000-4000-8000-000000000002'::uuid
         );
 
         delete from public.profiles
         where id in (
-          '00000000-0000-0000-0000-000000000001'::uuid,
-          '00000000-0000-0000-0000-000000000002'::uuid
+          '00000000-0000-4000-8000-000000000001'::uuid,
+          '00000000-0000-4000-8000-000000000002'::uuid
         );
       `,
         { transaction }

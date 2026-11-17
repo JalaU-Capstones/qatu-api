@@ -37,7 +37,7 @@ insert into auth.users (
 )
 values (
   '00000000-0000-0000-0000-000000000000'::uuid,
-  '00000000-0000-0000-0000-000000000001'::uuid,
+  '00000000-0000-4000-8000-000000000001'::uuid,
   'authenticated',
   'authenticated',
   'admin@example.qatu.pe',
@@ -80,7 +80,7 @@ insert into auth.users (
 )
 values (
   '00000000-0000-0000-0000-000000000000'::uuid,
-  '00000000-0000-0000-0000-000000000002'::uuid,
+  '00000000-0000-4000-8000-000000000002'::uuid,
   'authenticated',
   'authenticated',
   'seller@example.qatu.pe',
