@@ -51,7 +51,21 @@ getById:
   get:
     operationId: getProductById
     summary: Get a product by ID (public)
-    description: Returns a single product by its UUID. Public endpoint.
+    description: |
+      Returns a single product by its UUID.
+
+      Public endpoint. Anonymous callers see published products only
+      (404 for drafts, unpublished, or archived).
+
+      When called with a valid session cookie (or `Authorization: Bearer`
+      header), an authenticated seller can also retrieve their OWN
+      draft, unpublished, or archived products — this powers the seller's
+      edit-product modal pre-population.
+
+      Do NOT change `security: []` — the endpoint remains public. Auth is
+      optional and additive.
+
+      This endpoint supports optional authentication.
     tags:
       - products
     security: []

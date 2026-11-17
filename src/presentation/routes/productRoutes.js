@@ -14,6 +14,7 @@ import { SupabaseStorageService } from '../../infrastructure/storage/SupabaseSto
 import { ProductController } from '../controllers/ProductController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 import { multipartProductImageMiddleware } from '../middleware/multipartProductImageMiddleware.js';
+import { optionalAuthMiddleware } from '../middleware/optionalAuthMiddleware.js';
 import { requireSellerRole } from '../middleware/requireSellerRole.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { createProductSchema } from '../validators/createProductSchema.js';
@@ -126,7 +127,9 @@ export function createProductRouter({
     controller.list(req, res, next)
   );
 
-  router.get('/:id', (req, res, next) => controller.getById(req, res, next));
+  router.get('/:id', optionalAuthMiddleware, (req, res, next) =>
+    controller.getById(req, res, next)
+  );
 
   router.patch('/:id/publish', authMiddleware, requireSellerRole(), (req, res, next) =>
     controller.publish(req, res, next)
