@@ -1,7 +1,16 @@
 import request from 'supertest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createApp } from '../../../app.js';
+import { supabase } from '../../../infrastructure/config/supabase.js';
 import { createProductRouter } from '../productRoutes.js';
+
+vi.mock('../../../infrastructure/config/supabase.js', () => ({
+  supabase: {
+    auth: {
+      getUser: vi.fn(),
+    },
+  },
+}));
 
 describe('Product Routes Integration - GET /v1/products', () => {
   let app;
@@ -366,6 +375,7 @@ describe('Product Routes Integration - GET /v1/products', () => {
     };
 
     beforeEach(() => {
+      supabase.auth.getUser.mockReset();
       mockGetProductByIdUseCase = {
         execute: vi.fn().mockResolvedValue({
           data: sampleDetailedProduct,
@@ -398,6 +408,11 @@ describe('Product Routes Integration - GET /v1/products', () => {
     });
 
     it('should pass authenticated user id to the use case when authorization token is provided', async () => {
+      supabase.auth.getUser.mockResolvedValueOnce({
+        data: { user: { id: sampleProduct.seller_id } },
+        error: null,
+      });
+
       const response = await request(app)
         .get(`/v1/products/${sampleProduct.id}`)
         .set('Authorization', 'Bearer mock-valid-token');
@@ -406,6 +421,77 @@ describe('Product Routes Integration - GET /v1/products', () => {
       expect(mockGetProductByIdUseCase.execute).toHaveBeenCalledWith(
         expect.objectContaining({
           productId: sampleProduct.id,
+          currentUserId: sampleProduct.seller_id,
+        })
+      );
+    });
+
+    it('should return 404 for an anonymous caller requesting an unpublished product', async () => {
+      mockGetProductByIdUseCase.execute.mockRejectedValue(
+        Object.assign(new Error('Product not found'), {
+          code: 'PRODUCT_NOT_FOUND',
+          statusCode: 404,
+        })
+      );
+
+      const response = await request(app).get(`/v1/products/${sampleProduct.id}`);
+
+      expect(response.status).toBe(404);
+      expect(mockGetProductByIdUseCase.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          productId: sampleProduct.id,
+          currentUserId: null,
+        })
+      );
+    });
+
+    it("should return an owner's unpublished product to an authenticated owner", async () => {
+      const unpublishedProduct = { ...sampleDetailedProduct, state: 'unpublished' };
+      supabase.auth.getUser.mockResolvedValueOnce({
+        data: { user: { id: sampleProduct.seller_id } },
+        error: null,
+      });
+      mockGetProductByIdUseCase.execute.mockResolvedValue({
+        data: unpublishedProduct,
+        meta: { timestamp: '2026-10-15T10:00:00.000Z' },
+      });
+
+      const response = await request(app)
+        .get(`/v1/products/${sampleProduct.id}`)
+        .set('Authorization', 'Bearer owner-token');
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.state).toBe('unpublished');
+      expect(mockGetProductByIdUseCase.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          productId: sampleProduct.id,
+          currentUserId: sampleProduct.seller_id,
+        })
+      );
+    });
+
+    it("should return 404 for an authenticated seller requesting another seller's unpublished product", async () => {
+      const otherSellerId = '880e8400-e29b-41d4-a716-446655440003';
+      supabase.auth.getUser.mockResolvedValueOnce({
+        data: { user: { id: otherSellerId } },
+        error: null,
+      });
+      mockGetProductByIdUseCase.execute.mockRejectedValue(
+        Object.assign(new Error('Product not found'), {
+          code: 'PRODUCT_NOT_FOUND',
+          statusCode: 404,
+        })
+      );
+
+      const response = await request(app)
+        .get(`/v1/products/${sampleProduct.id}`)
+        .set('Authorization', 'Bearer other-seller-token');
+
+      expect(response.status).toBe(404);
+      expect(mockGetProductByIdUseCase.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          productId: sampleProduct.id,
+          currentUserId: otherSellerId,
         })
       );
     });
