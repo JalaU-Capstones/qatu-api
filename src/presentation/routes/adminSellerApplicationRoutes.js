@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { AdminListSellerApplicationsUseCase } from '../../application/use-cases/AdminListSellerApplicationsUseCase.js';
+import { AdminListSellerApplicationsUseCase } from '../../application/use-cases/AdminListSellerApplicationUseCase.js';
 import { AdminReviewSellerApplicationUseCase } from '../../application/use-cases/AdminReviewSellerApplicationUseCase.js';
 import { SequelizeTransactionManager } from '../../infrastructure/persistence/SequelizeTransactionManager.js';
 import { OutboxRepository } from '../../infrastructure/persistence/repositories/OutboxRepository.js';
@@ -13,7 +13,7 @@ import {
   adminListSellerApplicationsQuerySchema,
   adminReviewSellerApplicationBodySchema,
   adminReviewSellerApplicationParamsSchema,
-} from '../validators/adminSellerApplicationsSchema.js';
+} from '../validators/adminSellerApplicationSchema.js';
 
 export function createAdminSellerApplicationRouter({
   sellerApplicationRepository = new SellerApplicationRepository(),
