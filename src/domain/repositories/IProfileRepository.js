@@ -43,4 +43,9 @@ export class IProfileRepository {
   async update(id, fields) {
     throw new Error(`Method not implemented with ${id} and ${fields}`);
   }
+
+  // eslint-disable-next-line no-unused-vars
+  async assignRole(profileId, roleName, { assignedBy = null, transaction } = {}) {
+    throw new Error(`Method not implemented with ${profileId}, ${roleName}, ${assignedBy}`);
+  }
 }
