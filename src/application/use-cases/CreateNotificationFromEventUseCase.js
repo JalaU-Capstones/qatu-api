@@ -16,13 +16,13 @@ export class InvalidEventPayloadError extends Error {
 
 const isNonEmptyString = (value) => typeof value === 'string' && value.trim() !== '';
 
-const STATUS_LABELS = Object.freeze({
-  pending: 'pendiente',
-  confirmed: 'confirmado',
-  shipped: 'enviado',
-  delivered: 'entregado',
-  cancelled: 'cancelado',
-});
+const STATUS_LABELS = new Map([
+  ['pending', 'pendiente'],
+  ['confirmed', 'confirmado'],
+  ['shipped', 'enviado'],
+  ['delivered', 'entregado'],
+  ['cancelled', 'cancelado'],
+]);
 
 /** Maps order.* events to buyer notifications (idempotent on eventId). */
 export class CreateNotificationFromEventUseCase {
@@ -91,7 +91,7 @@ export class CreateNotificationFromEventUseCase {
       throw new InvalidEventPayloadError('order.status_changed payload is incomplete');
     }
 
-    const label = STATUS_LABELS[to_status] || to_status;
+    const label = STATUS_LABELS.get(to_status) || to_status;
     const numberPart = isNonEmptyString(order_number) ? ` ${order_number}` : '';
 
     const inserted = await this.notificationRepository.createFromEvent({

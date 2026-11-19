@@ -9,23 +9,23 @@ export const ORDER_STATUSES = Object.freeze([
 
 const TERMINAL = Object.freeze(new Set(['delivered', 'cancelled']));
 
-/** Seller transitions per */
-const SELLER_TRANSITIONS = Object.freeze({
-  pending: Object.freeze(['confirmed']),
-  confirmed: Object.freeze(['shipped', 'cancelled']),
-  shipped: Object.freeze(['delivered']),
-  delivered: Object.freeze([]),
-  cancelled: Object.freeze([]),
-});
+/** Seller transitions per current status. */
+const SELLER_TRANSITIONS = new Map([
+  ['pending', Object.freeze(['confirmed'])],
+  ['confirmed', Object.freeze(['shipped', 'cancelled'])],
+  ['shipped', Object.freeze(['delivered'])],
+  ['delivered', Object.freeze([])],
+  ['cancelled', Object.freeze([])],
+]);
 
 /** Buyer may only cancel while pending. */
-const BUYER_TRANSITIONS = Object.freeze({
-  pending: Object.freeze(['cancelled']),
-  confirmed: Object.freeze([]),
-  shipped: Object.freeze([]),
-  delivered: Object.freeze([]),
-  cancelled: Object.freeze([]),
-});
+const BUYER_TRANSITIONS = new Map([
+  ['pending', Object.freeze(['cancelled'])],
+  ['confirmed', Object.freeze([])],
+  ['shipped', Object.freeze([])],
+  ['delivered', Object.freeze([])],
+  ['cancelled', Object.freeze([])],
+]);
 
 /**
  * @param {string} fromStatus
@@ -49,7 +49,7 @@ export function canTransition(fromStatus, toStatus, actorRole) {
   }
 
   const table = actorRole === 'buyer' ? BUYER_TRANSITIONS : SELLER_TRANSITIONS;
-  const allowed = table[fromStatus] || [];
+  const allowed = table.get(fromStatus) || [];
   return allowed.includes(toStatus);
 }
 
@@ -95,5 +95,5 @@ export function timestampColumnForStatus(toStatus) {
  * @returns {string[]}
  */
 export function sellerNextStatuses(fromStatus) {
-  return [...(SELLER_TRANSITIONS[fromStatus] || [])];
+  return [...(SELLER_TRANSITIONS.get(fromStatus) || [])];
 }

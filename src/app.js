@@ -6,6 +6,7 @@ import { registerApiDocs } from './presentation/docs/swagger.js';
 import { corsMiddleware } from './presentation/middleware/corsMiddleware.js';
 import { csrfMiddleware } from './presentation/middleware/csrfMiddleware.js';
 import { errorHandler } from './presentation/middleware/errorHandler.js';
+import { adminReportRouter } from './presentation/routes/adminReportRoutes.js';
 import { adminSellerApplicationRouter } from './presentation/routes/adminSellerApplicationRoutes.js';
 import { authRouter } from './presentation/routes/authRoutes.js';
 import { cartRouter } from './presentation/routes/cartRoutes.js';
@@ -21,6 +22,7 @@ export function createApp({
   productRoutes = productRouter,
   sellerProductRoutes = sellerProductsRouter,
   sellerApplicationRoutes = sellerApplicationRouter,
+  adminReportRoutes = adminReportRouter,
   adminSellerApplicationRoutes = adminSellerApplicationRouter,
   categoryRoutes = categoryRouter,
   cartRoutes = cartRouter,
@@ -131,6 +133,7 @@ export function createApp({
   app.use('/v1/orders', orderLimiter, orderRoutes);
   app.use('/v1/profiles', publicLimiter, profileRoutes);
   app.use('/v1/seller-applications', publicLimiter, sellerApplicationRoutes);
+  app.use('/v1/admin/reports', publicLimiter, adminReportRoutes);
   app.use('/v1/admin/seller-applications', publicLimiter, adminSellerApplicationRoutes);
 
   // Global Error Handler
