@@ -106,7 +106,7 @@ export function clearSessionCookies(res) {
  * @returns {string|null}
  */
 export function getAccessTokenFromCookies(req) {
-  return req?.cookies?.[COOKIE_ACCESS_TOKEN] || null;
+  return req?.cookies?.access_token || null;
 }
 
 /**
@@ -116,7 +116,7 @@ export function getAccessTokenFromCookies(req) {
  * @returns {string|null}
  */
 export function getRefreshTokenFromCookies(req) {
-  return req?.cookies?.[COOKIE_REFRESH_TOKEN] || null;
+  return req?.cookies?.refresh_token || null;
 }
 
 /**
@@ -126,5 +126,5 @@ export function getRefreshTokenFromCookies(req) {
  * @returns {string|null}
  */
 export function getCsrfTokenFromCookies(req) {
-  return req?.cookies?.[COOKIE_CSRF_TOKEN] || null;
+  return req?.cookies?.csrf_token || null;
 }
