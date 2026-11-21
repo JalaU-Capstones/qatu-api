@@ -59,6 +59,15 @@ The Qatu Marketplace API uses automated CI pipelines on both **GitLab CI** (prim
   - Cobertura XML format configured for GitLab CI code quality integration.
 - **Why**: Kept as a distinct stage per DevOps Lab specifications to separate baseline test pass/fail status from code coverage analysis and artifact ingestion.
 
+#### Coverage exclusions
+
+The following paths are excluded from the coverage denominator (team agreement, see Sprint 7):
+
+- `src/infrastructure/persistence/migrations/**` — Sequelize migrations are schema definitions; they are exercised end-to-end by the migration runner, not by unit tests.
+- `src/infrastructure/persistence/seeders/**` — Seeders populate reference data; their effect is verified by integration tests, not by unit tests.
+
+This exclusion is configured in `vitest.config.js` under `test.coverage.exclude`. Adding new migrations or seeders does NOT lower the coverage ratio.
+
 ### 5. `build-image`
 
 - **What it runs**:
