@@ -1,17 +1,21 @@
 image: node:26
 
 stages:
-  - helloworld
-  - lint
-  - test
+  - compile
   - build
-  - security
-  - publish
+  - test
+  - coverage
+  - build-image
+  - push-image
 
 variables:
   PNPM_CACHE_FOLDER: '$CI_PROJECT_DIR/.pnpm-store'
+  DOCKER_DRIVER: overlay2
 
 cache:
+  key:
+    files:
+      - pnpm-lock.yaml
   paths:
     - .pnpm-store
 
@@ -20,40 +24,55 @@ before_script:
   - pnpm config set store-dir $PNPM_CACHE_FOLDER
   - pnpm install --frozen-lockfile
 
-helloworld:
-  stage: helloworld
-  before_script: []
+# ─────────────────────────────────────────────────────────────────
+# Stage 1: compile — static analysis (lint, format, OpenAPI, audit)
+# ─────────────────────────────────────────────────────────────────
+compile:
+  stage: compile
   script:
-    - echo "Hello World"
-  only:
-    - main
-    - develop
-    - merge_requests
-
-lint:
-  stage: lint
-  script:
+    - echo "── ESLint (JS syntax + rules) ──"
     - pnpm lint
+    - echo "── Prettier format check ──"
     - pnpm format:check
-  only:
-    - main
-    - develop
-    - merge_requests
-
-openapi:lint:
-  stage: lint
-  script:
+    - echo "── OpenAPI bundle (compiles spec to single YAML) ──"
     - pnpm openapi:bundle
-    - pnpm openapi:lint
+    - echo "── OpenAPI validate (Redocly + Spectral) ──"
     - pnpm openapi:validate
-  only:
-    - main
-    - develop
-    - merge_requests
+    - echo "── Security audit (prod deps) ──"
+    - pnpm audit --prod
+    - pnpm audit || true
+  artifacts:
+    paths:
+      - dist/openapi.bundle.yaml
+    expire_in: 1 hour
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
 
+# ─────────────────────────────────────────────────────────────────
+# Stage 2: build — validate source syntax + prod dependency install
+# (Node.js backend has no compile step; this verifies the deployable
+# artifact can be produced from source)
+# ─────────────────────────────────────────────────────────────────
+build:
+  stage: build
+  script:
+    - echo "── Syntax check (entry points) ──"
+    - node --check src/server.js
+    - node --check src/app.js
+    - node --check src/infrastructure/config/env.js
+    - echo "── Production dependencies install ──"
+    - pnpm install --prod --frozen-lockfile
+    - echo "Production artifact ready (node_modules/ from --prod install)"
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# ─────────────────────────────────────────────────────────────────
+# Stage 3: test — unit tests
+# ─────────────────────────────────────────────────────────────────
 test:
   stage: test
-  image: node:26
   services:
     - name: postgres:17-alpine
       alias: postgres
@@ -64,42 +83,44 @@ test:
     TEST_DATABASE_URL: 'postgresql://test:test@postgres:5432/qatu_test'
   script:
     - pnpm test
-  only:
-    - main
-    - develop
-    - merge_requests
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
 
-security:
-  stage: security
+# ─────────────────────────────────────────────────────────────────
+# Stage 4: coverage — coverage report (separate stage per lab)
+# ─────────────────────────────────────────────────────────────────
+coverage:
+  stage: coverage
+  services:
+    - name: postgres:17-alpine
+      alias: postgres
+  variables:
+    POSTGRES_USER: test
+    POSTGRES_PASSWORD: test
+    POSTGRES_DB: qatu_test
+    TEST_DATABASE_URL: 'postgresql://test:test@postgres:5432/qatu_test'
   script:
-    # Audit production dependencies (fails on any vulnerability).
-    # Dev-only packages like nodemon→braces have no upstream patch yet;
-    # they are excluded here because --prod skips devDependencies.
-    - pnpm audit --prod
-    # Full audit for awareness (allowed to fail on unfixable dev-only advisories).
-    - pnpm audit || true
-  only:
-    - main
-    - develop
-    - merge_requests
+    - pnpm test:coverage
+  coverage: '/All files\s*\|\s*([\d.]+)/'
+  artifacts:
+    paths:
+      - coverage/
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/cobertura-coverage.xml
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Publish the API image to the GitLab Container Registry.
-#
-# Runs only on v* tags. Pushes two tags per release:
-#   - $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG   (immutable, e.g. v0.1.0)
-#   - $CI_REGISTRY_IMAGE:latest           (mutable, always points to newest)
-#
-# Multi-arch: amd64 only (native runner). arm64 can be added later via QEMU
-# (add `docker run --privileged --rm tonistiigi/binfmt --install arm64` and
-# `--platform linux/amd64,linux/arm64`), but it's out of MVP scope.
-#
-# Pre-requisite: Container Registry must be enabled in the GitLab project
-# (Settings → General → Visibility, project features → Container Registry =
-# "Only project members"). See .docs/CONTAINERIZATION.md for details.
-# ─────────────────────────────────────────────────────────────────────────────
-publish:image:
-  stage: publish
+# ─────────────────────────────────────────────────────────────────
+# Stage 5: build-image — build container, push temp tag
+# Runs on all branches (validates Dockerfile) + tags
+# ─────────────────────────────────────────────────────────────────
+build-image:
+  stage: build-image
   image: docker:27-cli
   services:
     - name: docker:27-dind
@@ -108,24 +129,79 @@ publish:image:
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ''
-    DOCKER_DRIVER: overlay2
-    IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
-    IMAGE_LATEST: $CI_REGISTRY_IMAGE:latest
+    TEMP_TAG: $CI_REGISTRY_IMAGE:pipeline-$CI_PIPELINE_ID
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
   script:
-    - echo "Building image for tag $CI_COMMIT_TAG"
+    - echo "Building container image (validation + temp tag push)"
     - docker build
       --target runtime
-      --tag "$IMAGE_TAG"
-      --tag "$IMAGE_LATEST"
+      --tag "$TEMP_TAG"
       --label "org.opencontainers.image.source=$CI_PROJECT_URL"
       --label "org.opencontainers.image.revision=$CI_COMMIT_SHA"
       --label "org.opencontainers.image.title=Qatu API"
       .
-    - docker push "$IMAGE_TAG"
-    - docker push "$IMAGE_LATEST"
-    - echo "Pushed $IMAGE_TAG and $IMAGE_LATEST"
+    - docker push "$TEMP_TAG"
+    - echo "Image built and pushed to $TEMP_TAG"
+  after_script:
+    - docker logout "$CI_REGISTRY" || true
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+  needs:
+    - job: test
+    - job: coverage
+
+# ─────────────────────────────────────────────────────────────────
+# Stage 6: push-image — re-tag with SemVer + push final tags
+# Only on v* tag pushes (release events)
+# ─────────────────────────────────────────────────────────────────
+push-image:
+  stage: push-image
+  image: docker:27-cli
+  services:
+    - name: docker:27-dind
+      alias: docker
+      command: ['--tls=false']
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ''
+    TEMP_TAG: $CI_REGISTRY_IMAGE:pipeline-$CI_PIPELINE_ID
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+  script:
+    # ── Compute VERSION ─────────────────────────────────────────
+    - |
+      echo "── Resolving SemVer ──"
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        VERSION="${CI_COMMIT_TAG#v}"
+        echo "Source: git tag → ${CI_COMMIT_TAG} → version ${VERSION}"
+      else
+        VERSION=$(node -p "require('./package.json').version")
+        echo "Source: package.json → version ${VERSION}"
+      fi
+      # Verify source consistency (tag vs package.json)
+      PKG_VERSION=$(node -p "require('./package.json').version")
+      if [ -n "$CI_COMMIT_TAG" ] && [ "${CI_COMMIT_TAG#v}" != "$PKG_VERSION" ]; then
+        echo "::error::VERSION MISMATCH — git tag v${PKG_VERSION} does not match package.json ${PKG_VERSION}"
+        echo "Tag: ${CI_COMMIT_TAG}, package.json: ${PKG_VERSION}"
+        exit 1
+      fi
+      DEV_TAG="DEV-${VERSION}"
+      V_TAG="v${VERSION}"
+      echo "DEV_TAG=${DEV_TAG}" > .env.tags
+      echo "V_TAG=${V_TAG}" >> .env.tags
+      echo "Resolved: DEV_TAG=${DEV_TAG}, V_TAG=${V_TAG}, latest=latest"
+    # ── Load image + re-tag + push ──────────────────────────────
+    - source .env.tags
+    - docker pull "$TEMP_TAG"
+    - docker tag "$TEMP_TAG" "$CI_REGISTRY_IMAGE:$DEV_TAG"
+    - docker tag "$TEMP_TAG" "$CI_REGISTRY_IMAGE:$V_TAG"
+    - docker tag "$TEMP_TAG" "$CI_REGISTRY_IMAGE:latest"
+    - docker push "$CI_REGISTRY_IMAGE:$DEV_TAG"
+    - docker push "$CI_REGISTRY_IMAGE:$V_TAG"
+    - docker push "$CI_REGISTRY_IMAGE:latest"
+    - 'echo "Pushed 3 tags: $DEV_TAG, $V_TAG, latest"'
   after_script:
     - docker logout "$CI_REGISTRY" || true
   rules:
@@ -133,6 +209,5 @@ publish:image:
       when: on_success
     - when: never
   needs:
-    - job: security
-      optional: true
-  allow_failure: false
+    - job: build-image
+      artifacts: false
