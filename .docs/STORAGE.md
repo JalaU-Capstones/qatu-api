@@ -155,6 +155,37 @@ The affected DTOs include:
 - `LoginDTO` (`LoginResponseDTO`)
 - `RegisterDTO` (`RegisterResponseDTO`)
 
+### Response shape: raw path vs resolved URL
+
+The DB stores raw relative paths (e.g.
+`product-images/{productId}/{file}.webp`). Every API response that
+exposes an image field resolves it to a full URL at read time via
+`resolveImageUrl()` inside the corresponding DTO:
+
+- `GET /v1/products/:id` → `ProductDetailDTO` resolves
+  `primary_image_path` and `images[].path`
+- `GET /v1/products/:id/images` → `ProductImageDTO` resolves each
+  `path`
+- `POST /v1/products/:id/images` → `ProductImageDTO` resolves `path`
+- `GET /v1/profiles/me` → `ProfileDTO` resolves `avatar_path`
+- `POST /v1/profiles/me/avatar` → `ProfileResponseDTO` resolves
+  `avatar_path`
+
+**Do NOT** build URLs manually in controllers, use cases, or
+repositories. If you need a URL, use the DTO.
+
+#### Which URL does `path` resolve to?
+
+`resolveImageUrl()` respects `PUBLIC_APP_URL`:
+
+| `PUBLIC_APP_URL` | Resolved URL origin                                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------- |
+| empty / unset    | `{SUPABASE_STORAGE_PUBLIC_URL}` (e.g. `http://localhost:54321/storage/v1/object/public`) |
+| set              | `{PUBLIC_APP_URL}` (e.g. `http://localhost:5173`)                                        |
+
+If `PUBLIC_APP_URL` is set, the client must proxy `/{bucket}/*` to
+Supabase Storage — see [URL Origin Toggle](#url-origin-toggle).
+
 ### URL Origin Toggle
 
 `resolveImageUrl()` dynamically computes the fully-qualified public URL depending on the `PUBLIC_APP_URL` environment configuration:

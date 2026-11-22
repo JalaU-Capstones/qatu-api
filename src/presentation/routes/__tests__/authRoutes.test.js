@@ -456,6 +456,8 @@ describe('Auth Routes Integration', () => {
 
       // supabase.auth.getUser is mocked globally — configure it for atk-1
       supabase.auth.getUser.mockImplementation(async (token) => {
+        // Fixture comparison in a test double, same as the mock above.
+        // eslint-disable-next-line security/detect-possible-timing-attacks
         if (token === 'atk-1') {
           return {
             data: {
@@ -574,6 +576,8 @@ describe('Auth Routes Integration', () => {
       let validAccessToken = 'atk-initial';
 
       supabase.auth.getUser.mockImplementation(async (token) => {
+        // Fixture comparison in a test double, same as the mock above.
+        // eslint-disable-next-line security/detect-possible-timing-attacks
         if (token === validAccessToken) {
           return {
             data: {

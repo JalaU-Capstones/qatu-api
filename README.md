@@ -139,6 +139,76 @@ Publishing is triggered by pushing a `v*` tag (e.g. `git tag v0.1.0 && git push 
 
 See [`.docs/CONTAINERIZATION.md`](./.docs/CONTAINERIZATION.md) for prerequisites, all three environment modes (Supabase CLI on host / fully containerized / Supabase Cloud), debugging, and the "add a new service" checklist.
 
+## CI/CD Pipeline
+
+The API uses **GitLab CI** with 6 stages, plus a mirror on **GitHub Actions** for open-source distribution. See [.docs/CI.md](.docs/CI.md) for the full guide.
+
+### Pipeline stages
+
+| #   | Stage         | Purpose                                                              | Runs on             |
+| --- | ------------- | -------------------------------------------------------------------- | ------------------- |
+| 1   | `compile`     | ESLint + Prettier + OpenAPI bundle/validate + security audit         | all branches + tags |
+| 2   | `build`       | Source syntax check (`node --check`) + production dependency install | all branches + tags |
+| 3   | `test`        | Unit tests with Postgres 17 service                                  | all branches + tags |
+| 4   | `coverage`    | Coverage report (Cobertura artifact)                                 | all branches + tags |
+| 5   | `build-image` | Docker image build + temp tag push (Dockerfile validation)           | all branches + tags |
+| 6   | `push-image`  | Final image tags pushed to GitLab Container Registry                 | `v*` tags only      |
+
+### Image tags
+
+Each release publishes **3 tags** to `$CI_REGISTRY_IMAGE`:
+
+| Tag             | Format                  | Example     | Mutability |
+| --------------- | ----------------------- | ----------- | ---------- |
+| SemVer (Lab 4)  | `DEV-MAJOR.MINOR.PATCH` | `DEV-2.0.0` | Immutable  |
+| Backward compat | `vMAJOR.MINOR.PATCH`    | `v2.0.0`    | Immutable  |
+| Latest alias    | `latest`                | `latest`    | Mutable    |
+
+The version is computed at pipeline runtime from `$CI_COMMIT_TAG` (primary) or `package.json` (fallback). If both exist and disagree, the pipeline fails — this prevents tag/package drift.
+
+### Releasing a new version
+
+```bash
+# From develop, create the release branch
+git checkout develop && git pull
+git checkout -b release/v2.0.0
+
+# Bump package.json version (0.1.0 → 2.0.0) in both api and client
+# ... edit package.json ...
+
+# Commit, push branch
+git add package.json
+git commit -m "chore(release): v2.0.0"
+git push origin release/v2.0.0
+
+# Create and push the release tag
+git tag v2.0.0
+git push origin v2.0.0
+# → Pipeline runs → DEV-2.0.0 published
+
+# Merge release branch to main
+git checkout main
+git merge --no-ff release/v2.0.0
+git push origin main
+```
+
+### Versioning policy
+
+Qatu uses **Semantic Versioning 2.0.0**:
+
+- **MAJOR** — breaking changes (API contract, DB schema, deployment topology)
+- **MINOR** — new features, backward compatible
+- **PATCH** — bug fixes, backward compatible
+
+**v2.0.0 (current)** — major bump from v0.1.0 because:
+
+- ADR-012 changed session storage (Bearer tokens → HttpOnly cookies)
+- ADR-018 introduced three-network isolation (front-end/back-end/qatu-net)
+- ADR-019 changed image URL strategy (raw path → resolved URL)
+- ADR-020 changed database topology (single Postgres, two schema owners)
+
+See `Architecture/DevOps` (wiki) for the full versioning policy.
+
 ## Available Scripts
 
 Check the `Makefile` for available commands by running:

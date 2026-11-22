@@ -44,7 +44,12 @@ describe('CreateProductUseCase', () => {
             created_at: '2026-11-14T12:00:00.000Z',
           },
         ],
-        seller: { id: 'seller-1', username: 's', full_name: 'S', avatar_path: null },
+        seller: {
+          id: '00000000-0000-4000-8000-000000000002',
+          username: 's',
+          full_name: 'S',
+          avatar_path: null,
+        },
         category: { id: 'cat-1', name: 'Cat', slug: 'cat' },
       }),
     };
@@ -93,7 +98,12 @@ describe('CreateProductUseCase', () => {
       findByIdWithDetails: vi.fn().mockResolvedValue({
         ...createdRow,
         images: [],
-        seller: { id: 'seller-1', username: 's', full_name: 'S', avatar_path: null },
+        seller: {
+          id: '00000000-0000-4000-8000-000000000002',
+          username: 's',
+          full_name: 'S',
+          avatar_path: null,
+        },
         category: { id: 'cat-1', name: 'Cat', slug: 'cat' },
       }),
     };
@@ -157,7 +167,12 @@ describe('CreateProductUseCase', () => {
       findByIdWithDetails: vi.fn().mockResolvedValue({
         ...createdRow,
         images: [],
-        seller: { id: 'seller-1', username: 's', full_name: 'S', avatar_path: null },
+        seller: {
+          id: '00000000-0000-4000-8000-000000000002',
+          username: 's',
+          full_name: 'S',
+          avatar_path: null,
+        },
         category: { id: 'cat-1', name: 'Cat', slug: 'cat' },
       }),
     };

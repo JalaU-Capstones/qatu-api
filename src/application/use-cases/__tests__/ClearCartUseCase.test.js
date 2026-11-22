@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ClearCartUseCase } from '../ClearCartUseCase.js';
 
 describe('ClearCartUseCase', () => {
-  const userId = '00000000-0000-0000-0000-000000000002';
+  const userId = '00000000-0000-4000-8000-000000000002';
 
   it('Scenario 1: Execute clear cart -> calls cartRepository.clearCart with userId', async () => {
     const cartRepository = {

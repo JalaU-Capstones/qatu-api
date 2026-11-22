@@ -51,7 +51,21 @@ getById:
   get:
     operationId: getProductById
     summary: Get a product by ID (public)
-    description: Returns a single product by its UUID. Public endpoint.
+    description: |
+      Returns a single product by its UUID.
+
+      Public endpoint. Anonymous callers see published products only
+      (404 for drafts, unpublished, or archived).
+
+      When called with a valid session cookie (or `Authorization: Bearer`
+      header), an authenticated seller can also retrieve their OWN
+      draft, unpublished, or archived products — this powers the seller's
+      edit-product modal pre-population.
+
+      Do NOT change `security: []` — the endpoint remains public. Auth is
+      optional and additive.
+
+      This endpoint supports optional authentication.
     tags:
       - products
     security: []
@@ -203,8 +217,6 @@ create:
 update:
   patch:
     operationId: updateProduct
-    x-status: planned
-    x-status-reason: UpdateProductUseCase not yet implemented (Sprint 7)
     summary: Update a product
     description: |
       Updates a product by ID. Only the seller who owns the product may update it.
@@ -236,6 +248,10 @@ update:
                 format: double
                 minimum: 0.01
                 example: 179.99
+              currency:
+                type: string
+                enum: [USD, EUR, BOB, PEN, ARS, COP, MXN, BRL]
+                example: 'USD'
               stock:
                 type: integer
                 minimum: 0
@@ -244,6 +260,11 @@ update:
                 type: string
                 format: uuid
                 example: 'b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'
+              attributes:
+                type: object
+                additionalProperties: true
+                example:
+                  color: 'black'
     responses:
       '200':
         description: Product updated successfully.
@@ -265,6 +286,29 @@ update:
         $ref: '../components/responses/errors.yaml#/Forbidden'
       '404':
         $ref: '../components/responses/errors.yaml#/NotFound'
+      '409':
+        description: Product update conflict due to state or currency guard.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              archived:
+                summary: Product is archived
+                value:
+                  error:
+                    code: 'INVALID_STATE_TRANSITION'
+                    message: "Cannot edit a product in state 'archived'"
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
+              currencyPublished:
+                summary: Cannot change currency on published product
+                value:
+                  error:
+                    code: 'CANNOT_CHANGE_CURRENCY_ON_PUBLISHED'
+                    message: 'Cannot change currency on a published product. Unpublish it first.'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '422':
         description: Product semantic validation failed.
         content:
@@ -272,6 +316,14 @@ update:
             schema:
               $ref: '../components/schemas/Error.yaml'
             examples:
+              invalidCategory:
+                summary: Category not found
+                value:
+                  error:
+                    code: 'INVALID_CATEGORY'
+                    message: 'Category not found'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
               validation:
                 summary: Semantic validation failure
                 value:
@@ -289,8 +341,6 @@ update:
 delete:
   delete:
     operationId: deleteProduct
-    x-status: planned
-    x-status-reason: DeleteProductUseCase not yet implemented (Sprint 7)
     summary: Delete a product
     description: Deletes a product by ID. Only the owning seller may delete it.
     tags:
@@ -357,16 +407,14 @@ publish:
         $ref: '../components/responses/errors.yaml#/NotFound'
       '409':
         description: |
-          The product is not in a `draft` state. Possible causes:
-          already published, unpublished, or archived. Publishing from any
-          non-draft state is rejected.
+          Cannot publish a product in state 'published' or 'archived'. Only draft or unpublished products can be published. Use unpublish to move a published product to unpublished.
         content:
           application/json:
             schema:
               $ref: '../components/schemas/Error.yaml'
             examples:
               invalidState:
-                summary: Cannot publish a non-draft product
+                summary: Cannot publish an already published or archived product
                 value:
                   error:
                     code: 'INVALID_STATE_TRANSITION'
@@ -396,7 +444,10 @@ unpublish:
     operationId: unpublishProduct
     summary: Unpublish a product
     description: |
-      Changes a product's status from `published` back to `draft`, hiding it from the catalog.
+      Changes a product's status from `published` to `unpublished`,
+      hiding it from the public catalog. The product can be re-published
+      via `PATCH /products/:id/publish` — `published_at` is preserved
+      across the unpublish/republish cycle.
       Only the owning seller may unpublish it.
     tags:
       - products
@@ -416,14 +467,44 @@ unpublish:
                   $ref: '../components/schemas/Product.yaml'
                 meta:
                   $ref: '../components/schemas/shared.yaml#/Meta'
+      '400':
+        $ref: '../components/responses/errors.yaml#/BadRequest'
       '401':
         $ref: '../components/responses/errors.yaml#/Unauthorized'
       '403':
-        $ref: '../components/responses/errors.yaml#/Forbidden'
+        description: The authenticated seller does not own this product.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              forbidden:
+                summary: Seller does not own product
+                value:
+                  error:
+                    code: 'FORBIDDEN'
+                    message: 'You do not own this product'
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '404':
         $ref: '../components/responses/errors.yaml#/NotFound'
       '409':
-        $ref: '../components/responses/errors.yaml#/Conflict'
+        description: |
+          The product is not in a `published` state. Only published
+          products can be unpublished.
+        content:
+          application/json:
+            schema:
+              $ref: '../components/schemas/Error.yaml'
+            examples:
+              invalidState:
+                summary: Cannot unpublish a non-published product
+                value:
+                  error:
+                    code: 'INVALID_STATE_TRANSITION'
+                    message: "Cannot unpublish a product in state 'draft'"
+                  meta:
+                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
 
@@ -444,7 +525,7 @@ sellerList:
         description: Filter by product status.
         schema:
           type: string
-          enum: [draft, published]
+          enum: [draft, published, unpublished]
     responses:
       '200':
         description: Paginated list of the seller's products.

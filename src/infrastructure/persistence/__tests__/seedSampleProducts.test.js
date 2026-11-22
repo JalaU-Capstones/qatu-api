@@ -67,7 +67,7 @@ describe('seed-sample-products', () => {
 
     const productsInsert = queries.find((q) => q.includes('insert into public.products'));
     expect(productsInsert).toBeDefined();
-    expect(productsInsert).toContain('00000000-0000-0000-0000-000000000002');
+    expect(productsInsert).toContain('00000000-0000-4000-8000-000000000002');
   });
 
   it('up() does nothing in production', async () => {

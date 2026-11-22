@@ -120,7 +120,7 @@ describe('Product Entity', () => {
   it('should accept camelCase constructor parameters as alternatives', () => {
     const product = new Product({
       id: 'uuid-1',
-      sellerId: 'seller-1',
+      sellerId: '00000000-0000-4000-8000-000000000002',
       categoryId: 'cat-1',
       name: 'Camel Test',
       slug: 'camel-test',
@@ -134,7 +134,7 @@ describe('Product Entity', () => {
       updatedAt: '2026-10-01T00:00:00.000Z',
     });
 
-    expect(product.seller_id).toBe('seller-1');
+    expect(product.seller_id).toBe('00000000-0000-4000-8000-000000000002');
     expect(product.category_id).toBe('cat-1');
     expect(product.price).toBe(50.5);
     expect(product.stock).toBe(10);

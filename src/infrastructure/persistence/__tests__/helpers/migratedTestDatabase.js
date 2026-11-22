@@ -1,4 +1,4 @@
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, URL } from 'node:url';
@@ -9,6 +9,10 @@ const require = createRequire(import.meta.url);
 const MIGRATIONS_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../../migrations'
+);
+const TEST_AUTH_SHIM_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  'testAuthShim.sql'
 );
 
 /**
@@ -174,6 +178,10 @@ export async function createMigratedTestDatabase(suffix) {
 
   await ensureAuthSchema(sequelize);
   await runMigrations(sequelize);
+  if (!process.env.TEST_DATABASE_URL) {
+    const shimSql = readFileSync(TEST_AUTH_SHIM_PATH, 'utf8');
+    await sequelize.query(shimSql);
+  }
   await ensureHandleNewUserTrigger(sequelize);
 
   return {

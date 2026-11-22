@@ -93,7 +93,7 @@ describe('PublishProductUseCase', () => {
     expect(productRepository.publish).not.toHaveBeenCalled();
   });
 
-  it.each(['published', 'unpublished', 'archived'])(
+  it.each(['published', 'archived'])(
     'rejects publishing a product currently in %s state',
     async (state) => {
       productRepository.findById.mockResolvedValue(product({ state }));
@@ -108,6 +108,38 @@ describe('PublishProductUseCase', () => {
       expect(productRepository.publish).not.toHaveBeenCalled();
     }
   );
+
+  it('re-publishes an unpublished seller product and returns product detail', async () => {
+    productRepository.findById.mockResolvedValue(
+      product({
+        state: 'unpublished',
+        primary_image_path: 'product-images/x/y.png',
+        published_at: '2026-10-15T10:00:00.000Z',
+      })
+    );
+    const updated = product({
+      primary_image_path: 'product-images/x/y.png',
+      state: 'published',
+      published_at: '2026-10-15T10:00:00.000Z',
+      updated_at: '2026-10-16T10:00:00.000Z',
+    });
+    productRepository.publish.mockResolvedValue(updated);
+    productRepository.findByIdWithDetails.mockResolvedValue({
+      ...updated,
+      images: [],
+      seller: { id: SELLER_ID, username: 's', full_name: 'S', avatar_path: null },
+      category: { id: 'cat-1', name: 'Cat', slug: 'cat' },
+    });
+
+    const result = await useCase.execute({ productId: PRODUCT_ID, sellerId: SELLER_ID });
+
+    expect(result.data.state).toBe('published');
+    expect(result.data.published_at).toBe('2026-10-15T10:00:00.000Z');
+    expect(productRepository.publish).toHaveBeenCalledWith({
+      productId: PRODUCT_ID,
+      sellerId: SELLER_ID,
+    });
+  });
 
   it('rejects a draft product without a primary image before publish', async () => {
     productRepository.findById.mockResolvedValue(product({ primary_image_path: null }));

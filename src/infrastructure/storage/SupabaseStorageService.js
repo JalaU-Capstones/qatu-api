@@ -251,6 +251,44 @@ export class SupabaseStorageService extends IStorageService {
     };
   }
 
+  /**
+   * Deletes a product image file from the product-images bucket using a
+   * user-scoped Supabase client. Best-effort: logs on failure and returns
+   * `{ deleted: false, error }`. Does NOT throw.
+   *
+   * @param {string} accessToken - JWT from req.cookies.access_token
+   * @param {string} path - object key, e.g. `product-images/{productId}/{file}.webp`
+   * @returns {Promise<{ deleted: boolean, error?: Error }>}
+   */
+  async deleteProductImage(accessToken, path) {
+    if (!accessToken) {
+      const err = new Error('accessToken is required to delete a product image');
+      err.code = 'UNAUTHORIZED';
+      err.statusCode = 401;
+      throw err;
+    }
+    if (!path) {
+      const err = new Error('path is required to delete a product image');
+      err.code = 'VALIDATION_ERROR';
+      err.statusCode = 400;
+      throw err;
+    }
+    try {
+      const client = createUserScopedSupabaseClient(accessToken);
+      const { error } = await client.storage.from('product-images').remove([path]);
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error('[storage] product image delete failed:', { path, error });
+        return { deleted: false, error };
+      }
+      return { deleted: true };
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('[storage] product image delete threw:', { path, error });
+      return { deleted: false, error };
+    }
+  }
+
   async _uploadToStorage({ client, bucket, objectKey, buffer, contentType, upsert, uploadType }) {
     const targetClient = client || this.client;
     if (targetClient?.storage && typeof targetClient.storage.from === 'function') {

@@ -279,4 +279,22 @@ export class ProfileRepository extends IProfileRepository {
 
     return this.toDomain(rows[0]);
   }
+
+  async assignRole(profileId, roleName, { assignedBy = null, transaction } = {}) {
+    await this.db.query(
+      `INSERT INTO public.user_roles (profile_id, role_id, assigned_by)
+       SELECT :profile_id, r.id, :assigned_by
+       FROM public.roles r
+       WHERE r.name = :role_name
+       ON CONFLICT (profile_id, role_id) DO NOTHING`,
+      {
+        replacements: {
+          profile_id: profileId,
+          role_name: roleName,
+          assigned_by: assignedBy,
+        },
+        transaction,
+      }
+    );
+  }
 }

@@ -6,8 +6,8 @@ import { AddToCartRequestDTO } from '../../dtos/AddToCartDTO.js';
 import { AddToCartUseCase } from '../AddToCartUseCase.js';
 
 describe('AddToCartUseCase', () => {
-  const userId = '00000000-0000-0000-0000-000000000001';
-  const productId = '10000000-0000-0000-0000-000000000001';
+  const userId = '00000000-0000-4000-8000-000000000001';
+  const productId = '10000000-0000-4000-8000-000000000001';
 
   it('should throw an error when dependencies are missing', () => {
     expect(() => new AddToCartUseCase()).toThrow('cartRepository is required');

@@ -36,7 +36,14 @@ upload:
                 example: 0
     responses:
       '201':
-        description: Image uploaded successfully.
+        description: |
+          Image uploaded successfully.
+          Image record with resolved public URL.
+          The `path` field is resolved at read time via `resolveImageUrl()`
+          (ADR-019). In development with `PUBLIC_APP_URL=''` (default), it
+          points to Supabase Storage (`:54321`). With `PUBLIC_APP_URL` set
+          (e.g. `http://localhost:5173`), it points to the SPA origin and
+          relies on the client's `/product-images/*` proxy.
         content:
           application/json:
             schema:
@@ -54,7 +61,7 @@ upload:
                   data:
                     id: '8f3c0b7d-2e3e-4c7f-9d4b-0e6a2f3b5c8d'
                     product_id: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
-                    path: 'product-images/7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c/8f3c0b7d.webp'
+                    path: 'http://localhost:54321/storage/v1/object/public/product-images/7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c/8f3c0b7d.webp'
                     alt_text: 'Front view of ergonomic chair'
                     position: 0
                     created_at: '2026-10-14T12:00:00.000Z'

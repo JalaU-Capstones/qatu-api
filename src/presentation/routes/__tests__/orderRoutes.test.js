@@ -19,7 +19,7 @@ describe('Order Routes Integration - /v1/orders', () => {
   let mockGetOrderByIdUseCase;
   let mockCreateOrderUseCase;
 
-  const buyerId = '00000000-0000-0000-0000-000000000002';
+  const buyerId = '00000000-0000-4000-8000-000000000002';
   const orderId = '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a';
 
   const validToken = 'fake-valid-supabase-token';

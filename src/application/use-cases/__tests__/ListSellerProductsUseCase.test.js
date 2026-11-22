@@ -6,7 +6,7 @@ describe('ListSellerProductsUseCase', () => {
   it('returns paginated seller product data', async () => {
     const product = new Product({
       id: 'p-1',
-      seller_id: 'seller-123',
+      seller_id: '00000000-0000-4000-8000-000000000002',
       name: 'Desk Lamp',
       slug: 'desk-lamp',
       price: 29.99,
@@ -23,9 +23,12 @@ describe('ListSellerProductsUseCase', () => {
     };
 
     const useCase = new ListSellerProductsUseCase({ productRepository: mockRepo });
-    const result = await useCase.execute('seller-123', { page: 2, limit: 10 });
+    const result = await useCase.execute('00000000-0000-4000-8000-000000000002', {
+      page: 2,
+      limit: 10,
+    });
 
-    expect(mockRepo.listBySeller).toHaveBeenCalledWith('seller-123', {
+    expect(mockRepo.listBySeller).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000002', {
       page: 2,
       limit: 10,
       status: undefined,
@@ -47,9 +50,13 @@ describe('ListSellerProductsUseCase', () => {
     };
 
     const useCase = new ListSellerProductsUseCase({ productRepository: mockRepo });
-    await useCase.execute('seller-123', { page: 1, limit: 20, status: 'draft' });
+    await useCase.execute('00000000-0000-4000-8000-000000000002', {
+      page: 1,
+      limit: 20,
+      status: 'draft',
+    });
 
-    expect(mockRepo.listBySeller).toHaveBeenCalledWith('seller-123', {
+    expect(mockRepo.listBySeller).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000002', {
       page: 1,
       limit: 20,
       status: 'draft',
@@ -62,9 +69,9 @@ describe('ListSellerProductsUseCase', () => {
     };
 
     const useCase = new ListSellerProductsUseCase({ productRepository: mockRepo });
-    await useCase.execute('seller-123', { page: 1, limit: 999 });
+    await useCase.execute('00000000-0000-4000-8000-000000000002', { page: 1, limit: 999 });
 
-    expect(mockRepo.listBySeller).toHaveBeenCalledWith('seller-123', {
+    expect(mockRepo.listBySeller).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000002', {
       page: 1,
       limit: 100,
       status: undefined,
@@ -77,9 +84,9 @@ describe('ListSellerProductsUseCase', () => {
     };
 
     const useCase = new ListSellerProductsUseCase({ productRepository: mockRepo });
-    await useCase.execute('seller-123');
+    await useCase.execute('00000000-0000-4000-8000-000000000002');
 
-    expect(mockRepo.listBySeller).toHaveBeenCalledWith('seller-123', {
+    expect(mockRepo.listBySeller).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000002', {
       page: 1,
       limit: 20,
       status: undefined,

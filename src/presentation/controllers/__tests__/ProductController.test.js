@@ -117,7 +117,7 @@ describe('ProductController', () => {
       createProductUseCaseMock.execute.mockResolvedValue(mockResult);
 
       const req = {
-        user: { id: 'seller-123', roles: ['seller'] },
+        user: { id: '00000000-0000-4000-8000-000000000002', roles: ['seller'] },
         body: { name: 'X', price: 10, category_id: '11111111-1111-4111-8111-111111111111' },
       };
       const json = vi.fn();
@@ -132,7 +132,7 @@ describe('ProductController', () => {
       expect(createProductUseCaseMock.execute).toHaveBeenCalledTimes(1);
       const dto = createProductUseCaseMock.execute.mock.calls[0][0];
       expect(dto).toBeInstanceOf(CreateProductRequestDTO);
-      expect(dto.sellerId).toBe('seller-123');
+      expect(dto.sellerId).toBe('00000000-0000-4000-8000-000000000002');
       expect(next).not.toHaveBeenCalled();
     });
 
@@ -141,7 +141,7 @@ describe('ProductController', () => {
       createProductUseCaseMock.execute.mockRejectedValue(error);
 
       const req = {
-        user: { id: 'seller-123', roles: ['seller'] },
+        user: { id: '00000000-0000-4000-8000-000000000002', roles: ['seller'] },
         body: { name: 'X', price: 10, category_id: '11111111-1111-4111-8111-111111111111' },
       };
       const res = { status: vi.fn() };
@@ -159,7 +159,7 @@ describe('ProductController', () => {
       });
 
       const req = {
-        user: { id: 'seller-123', roles: ['seller'] },
+        user: { id: '00000000-0000-4000-8000-000000000002', roles: ['seller'] },
         body: { name: 'X', price: 10, category_id: '11111111-1111-4111-8111-111111111111' },
       };
       const res = {};
@@ -207,14 +207,17 @@ describe('ProductController', () => {
 
       const req = {
         params: { id: productId },
-        user: { id: 'seller-123' },
+        user: { id: '00000000-0000-4000-8000-000000000002' },
       };
       const res = { status: vi.fn().mockReturnValue({ json: vi.fn() }) };
 
       await controller.getById(req, res, vi.fn());
 
       expect(getByIdUseCaseMock.execute).toHaveBeenCalledWith(
-        expect.objectContaining({ productId, currentUserId: 'seller-123' })
+        expect.objectContaining({
+          productId,
+          currentUserId: '00000000-0000-4000-8000-000000000002',
+        })
       );
     });
 
@@ -261,7 +264,7 @@ describe('ProductController', () => {
       publishProductUseCaseMock.execute.mockResolvedValue(result);
 
       const req = {
-        user: { id: 'seller-1', roles: ['seller'] },
+        user: { id: '00000000-0000-4000-8000-000000000002', roles: ['seller'] },
         params: { id: productId },
       };
       const json = vi.fn();
@@ -274,7 +277,7 @@ describe('ProductController', () => {
       expect(json).toHaveBeenCalledWith(result);
       expect(publishProductUseCaseMock.execute).toHaveBeenCalledWith({
         productId,
-        sellerId: 'seller-1',
+        sellerId: '00000000-0000-4000-8000-000000000002',
       });
       expect(next).not.toHaveBeenCalled();
     });
@@ -289,7 +292,7 @@ describe('ProductController', () => {
       const status = vi.fn();
       const next = vi.fn();
       await controller.publish(
-        { user: { id: 'seller-1' }, params: { id: productId } },
+        { user: { id: '00000000-0000-4000-8000-000000000002' }, params: { id: productId } },
         { status },
         next
       );
@@ -305,7 +308,7 @@ describe('ProductController', () => {
       const next = vi.fn();
 
       await controllerWithoutPublish.publish(
-        { user: { id: 'seller-1' }, params: { id: productId } },
+        { user: { id: '00000000-0000-4000-8000-000000000002' }, params: { id: productId } },
         {},
         next
       );
@@ -328,7 +331,7 @@ describe('ProductController', () => {
       uploadProductImageUseCaseMock.execute.mockResolvedValue(payload);
 
       const req = {
-        user: { id: 'seller-1', roles: ['seller'] },
+        user: { id: '00000000-0000-4000-8000-000000000002', roles: ['seller'] },
         params: { id: productId },
         body: { alt_text: 'Front view', position: 0 },
         file: { buffer: Buffer.from('x'), size: 1, mimeType: 'image/png', originalName: 'a.png' },
@@ -346,7 +349,7 @@ describe('ProductController', () => {
       expect(json).toHaveBeenCalledWith({ data: payload.data, meta: payload.meta });
       expect(uploadProductImageUseCaseMock.execute).toHaveBeenCalledWith({
         productId,
-        sellerId: 'seller-1',
+        sellerId: '00000000-0000-4000-8000-000000000002',
         file: req.file,
         altText: 'Front view',
         position: 0,
@@ -364,7 +367,7 @@ describe('ProductController', () => {
       uploadProductImageUseCaseMock.execute.mockResolvedValue(payload);
 
       const req = {
-        user: { id: 'seller-1', roles: ['seller'] },
+        user: { id: '00000000-0000-4000-8000-000000000002', roles: ['seller'] },
         params: { id: productId },
         body: { alt_text: 'Front view', position: 0 },
         file: { buffer: Buffer.from('x'), size: 1, mimeType: 'image/png', originalName: 'a.png' },
@@ -389,7 +392,7 @@ describe('ProductController', () => {
 
     it('returns 401 UNAUTHORIZED when both cookie and Bearer are missing', async () => {
       const req = {
-        user: { id: 'seller-1', roles: ['seller'] },
+        user: { id: '00000000-0000-4000-8000-000000000002', roles: ['seller'] },
         params: { id: productId },
         file: { buffer: Buffer.from('x'), size: 1, mimeType: 'image/png', originalName: 'a.png' },
         cookies: {},
@@ -421,7 +424,7 @@ describe('ProductController', () => {
 
       await controller.uploadImage(
         {
-          user: { id: 'seller-1' },
+          user: { id: '00000000-0000-4000-8000-000000000002' },
           params: { id: productId },
           file: { buffer: Buffer.from('x') },
           cookies: { access_token: 'valid-token' },
@@ -441,7 +444,11 @@ describe('ProductController', () => {
       const next = vi.fn();
 
       await controllerWithoutUpload.uploadImage(
-        { user: { id: 'seller-1' }, params: { id: productId }, file: { buffer: Buffer.from('x') } },
+        {
+          user: { id: '00000000-0000-4000-8000-000000000002' },
+          params: { id: productId },
+          file: { buffer: Buffer.from('x') },
+        },
         {},
         next
       );

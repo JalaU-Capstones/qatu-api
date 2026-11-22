@@ -23,3 +23,7 @@ overrides:
   qs: '>=6.16.1'
   # Force joi to patched version (GHSA-4528-x5fx-h6hg DoS)
   joi: '>=18.3.1'
+  # Force glob and minimatch to patched versions (GHSA-7r5v-9x3c-2q4g DoS)
+  glob: '>=14.0.2'
+  # Force minimatch to patched version (GHSA-7r5v-9x3c-2q4g DoS)
+  minimatch: '>=11.0.1'

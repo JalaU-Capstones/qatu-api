@@ -84,7 +84,7 @@ describe('CreateNotificationFromEventUseCase', () => {
       buyer_id: payload.buyer_id,
       from_status: 'confirmed',
       to_status: 'shipped',
-      changed_by: 'seller-1',
+      changed_by: '00000000-0000-4000-8000-000000000002',
     };
 
     const result = await useCase.execute({
@@ -106,7 +106,7 @@ describe('CreateNotificationFromEventUseCase', () => {
         order_number: payload.order_number,
         from_status: 'confirmed',
         to_status: 'shipped',
-        changed_by: 'seller-1',
+        changed_by: '00000000-0000-4000-8000-000000000002',
       },
     });
   });
