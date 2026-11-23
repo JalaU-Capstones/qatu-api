@@ -12,6 +12,7 @@ import { adminSellerApplicationRouter } from './presentation/routes/adminSellerA
 import { authRouter } from './presentation/routes/authRoutes.js';
 import { cartRouter } from './presentation/routes/cartRoutes.js';
 import { categoryRouter } from './presentation/routes/categoryRoutes.js';
+import { conversationRouter } from './presentation/routes/conversationRoutes.js';
 import { orderRouter } from './presentation/routes/orderRoutes.js';
 import { productRouter } from './presentation/routes/productRoutes.js';
 import { profileRouter } from './presentation/routes/profileRoutes.js';
@@ -29,6 +30,8 @@ export function createApp({
   cartRoutes = cartRouter,
   orderRoutes = orderRouter,
   profileRoutes = profileRouter,
+  adminCategoryRoutes = adminCategoryRouter,
+  conversationRoutes = conversationRouter,
 } = {}) {
   const app = express();
 
@@ -136,7 +139,8 @@ export function createApp({
   app.use('/v1/seller-applications', publicLimiter, sellerApplicationRoutes);
   app.use('/v1/admin/reports', publicLimiter, adminReportRoutes);
   app.use('/v1/admin/seller-applications', publicLimiter, adminSellerApplicationRoutes);
-  app.use('/v1/admin/categories', publicLimiter, adminCategoryRouter);
+  app.use('/v1/admin/categories', publicLimiter, adminCategoryRoutes);
+  app.use('/v1/conversations', orderLimiter, conversationRoutes);
 
   // Global Error Handler
   app.use(errorHandler);
