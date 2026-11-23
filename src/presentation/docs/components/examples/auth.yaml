@@ -97,6 +97,9 @@ sellerApplicationCreate:
   value:
     business_name: 'Andean Artisan Crafts'
     business_description: 'We produce hand-woven alpaca wool textiles and ceramic homeware sourced directly from local cooperatives.'
+    country_code: '+591'
+    phone_number: '71234567'
+    contact_email: 'contact@andeanartisan.com'
 
 sellerApplicationResponse:
   summary: Seller application created

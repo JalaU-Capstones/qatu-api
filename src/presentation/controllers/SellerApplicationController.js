@@ -27,7 +27,10 @@ export class SellerApplicationController {
         profileId: userId,
         business_name: body.business_name,
         business_description: body.business_description,
-        contact_phone: body.contact_phone || null,
+        contact_phone:
+          body.country_code && body.phone_number
+            ? `${body.country_code}${body.phone_number}`
+            : body.contact_phone || null,
         contact_email: body.contact_email || null,
       });
 

@@ -14,5 +14,13 @@ export const applySellerSchema = Joi.object({
     'any.required': 'Business description is required.',
   }),
   contact_phone: Joi.string().trim().max(40).allow(null, '').optional(),
+  country_code: Joi.string()
+    .pattern(/^\+\d{1,4}$/)
+    .allow(null, '')
+    .optional(),
+  phone_number: Joi.string()
+    .pattern(/^\d{1,15}$/)
+    .allow(null, '')
+    .optional(),
   contact_email: Joi.string().trim().email().max(255).allow(null, '').optional(),
-});
+}).and('country_code', 'phone_number');

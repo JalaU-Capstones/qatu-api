@@ -29,6 +29,19 @@ create:
                 minLength: 20
                 maxLength: 2000
                 example: 'We produce hand-woven alpaca wool textiles and ceramic homeware sourced directly from local cooperatives.'
+              country_code:
+                type: string
+                pattern: '^\+[0-9]{1,4}$'
+                example: '+591'
+              phone_number:
+                type: string
+                pattern: '^[0-9]{1,15}$'
+                example: '71234567'
+              contact_email:
+                type: string
+                format: email
+                maxLength: 255
+                example: 'contact@andeanartisan.com'
           examples:
             sellerApplicationCreate:
               $ref: '../components/examples/auth.yaml#/sellerApplicationCreate'
