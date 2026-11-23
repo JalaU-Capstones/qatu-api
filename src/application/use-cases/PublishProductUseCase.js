@@ -52,7 +52,7 @@ export class PublishProductUseCase {
 
     if (product.seller_id !== sellerId) throw forbiddenError();
 
-    if (product.state !== 'draft') throw invalidStateError(product.state);
+    if (!['draft', 'unpublished'].includes(product.state)) throw invalidStateError(product.state);
 
     if (!product.primary_image_path) {
       const err = new Error('A product must have at least one image before being published');

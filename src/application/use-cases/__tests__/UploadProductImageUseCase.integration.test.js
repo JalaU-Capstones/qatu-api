@@ -1,5 +1,6 @@
 import { QueryTypes } from 'sequelize';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { env } from '../../../infrastructure/config/env.js';
 import { createMigratedTestDatabase } from '../../../infrastructure/persistence/__tests__/helpers/migratedTestDatabase.js';
 import { ProductRepository } from '../../../infrastructure/persistence/repositories/ProductRepository.js';
 import { UploadProductImageUseCase } from '../UploadProductImageUseCase.js';
@@ -9,6 +10,10 @@ const OTHER_SELLER = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const CATEGORY_ID = '11111111-1111-4111-8111-111111111111';
 const PRODUCT_ID = '10000000-0000-4000-8000-000000000001';
 const PUBLISHED_PRODUCT_ID = '10000000-0000-4000-8000-000000000002';
+
+const PNG_BUF = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+const JPEG_BUF = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+const ZIP_BUF = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0x00]);
 
 describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 30_000 }, () => {
   let database;
@@ -67,6 +72,8 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
   });
 
   beforeEach(async () => {
+    env.PUBLIC_APP_URL = '';
+    env.SUPABASE_STORAGE_PUBLIC_URL = 'http://localhost:54321/storage/v1/object/public';
     await sequelize.query('delete from public.product_images;');
     await sequelize.query('delete from public.products;');
     await sequelize.query('delete from public.user_roles;');
@@ -116,9 +123,9 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
       }),
     };
     const file = {
-      buffer: Buffer.from('first-image'),
+      buffer: PNG_BUF,
       mimeType: 'image/png',
-      size: 12,
+      size: PNG_BUF.length,
       originalName: 'first.png',
     };
 
@@ -134,7 +141,7 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
     );
 
     expect(row.primary_image_path).toBe(`product-images/${PRODUCT_ID}/first.png`);
-    expect(result.data.path).toBe(`product-images/${PRODUCT_ID}/first.png`);
+    expect(result.data.path).toMatch(/^https?:\/\/.+\/product-images\/.+\/first\.png$/);
     expect(result.meta.timestamp).toEqual(expect.any(String));
     expect(result.location).toBe(`/v1/products/${PRODUCT_ID}/images/${result.data.id}`);
     expect(storageService.uploadProductImage).toHaveBeenCalledWith(
@@ -142,7 +149,7 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
         productId: PRODUCT_ID,
         mimeType: 'image/png',
         originalName: 'first.png',
-        size: 12,
+        size: PNG_BUF.length,
       })
     );
   });
@@ -170,9 +177,9 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
       productId: PRODUCT_ID,
       sellerId: SELLER,
       file: {
-        buffer: Buffer.from('second-image'),
+        buffer: PNG_BUF,
         mimeType: 'image/png',
-        size: 14,
+        size: PNG_BUF.length,
         originalName: 'two.png',
       },
     });
@@ -182,7 +189,7 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
       { productId: PRODUCT_ID }
     );
 
-    expect(result.data.path).toBe(path2);
+    expect(result.data.path).toMatch(/^https?:\/\/.+\/product-images\/.+\/two\.png$/);
     expect(row.primary_image_path).toBe(path1);
     expect(await productRepository.countImages(PRODUCT_ID)).toBe(2);
   });
@@ -207,9 +214,9 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
         productId: PRODUCT_ID,
         sellerId: SELLER,
         file: {
-          buffer: Buffer.from('limit-hit'),
+          buffer: PNG_BUF,
           mimeType: 'image/png',
-          size: 10,
+          size: PNG_BUF.length,
           originalName: 'limit.png',
         },
       })
@@ -227,9 +234,9 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
         productId: PRODUCT_ID,
         sellerId: OTHER_SELLER,
         file: {
-          buffer: Buffer.from('not-allowed'),
+          buffer: PNG_BUF,
           mimeType: 'image/png',
-          size: 12,
+          size: PNG_BUF.length,
           originalName: 'nope.png',
         },
       })
@@ -247,9 +254,9 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
         productId: '10000000-0000-4000-8000-000000000099',
         sellerId: SELLER,
         file: {
-          buffer: Buffer.from('missing'),
+          buffer: PNG_BUF,
           mimeType: 'image/png',
-          size: 7,
+          size: PNG_BUF.length,
           originalName: 'missing.png',
         },
       })
@@ -281,9 +288,9 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
       productId: PUBLISHED_PRODUCT_ID,
       sellerId: SELLER,
       file: {
-        buffer: Buffer.from('published-upload'),
+        buffer: PNG_BUF,
         mimeType: 'image/png',
-        size: 18,
+        size: PNG_BUF.length,
         originalName: 'new.png',
       },
     });
@@ -291,5 +298,82 @@ describe('UploadProductImageUseCase (integration, real PostgreSQL)', { timeout: 
     expect(result.data.product_id).toBe(PUBLISHED_PRODUCT_ID);
     expect(result.location).toBe(`/v1/products/${PUBLISHED_PRODUCT_ID}/images/${result.data.id}`);
     expect(await productRepository.countImages(PUBLISHED_PRODUCT_ID)).toBe(2);
+  });
+
+  it('rejects uploads with unknown magic bytes (ZIP file) with 422 INVALID_FILE_FORMAT and does not touch storage', async () => {
+    const storageService = { uploadProductImage: vi.fn() };
+
+    await expect(
+      buildUseCase(storageService).execute({
+        productId: PRODUCT_ID,
+        sellerId: SELLER,
+        file: {
+          buffer: ZIP_BUF,
+          mimeType: 'image/png',
+          size: ZIP_BUF.length,
+          originalName: 'exploit.png',
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_FILE_FORMAT',
+      statusCode: 422,
+      message: 'File content is not a valid JPEG, PNG, or WebP image.',
+    });
+
+    expect(storageService.uploadProductImage).not.toHaveBeenCalled();
+    expect(await productRepository.countImages(PRODUCT_ID)).toBe(0);
+  });
+
+  it('rejects uploads when declared MIME does not match magic bytes with 422 INVALID_FILE_FORMAT', async () => {
+    const storageService = { uploadProductImage: vi.fn() };
+
+    await expect(
+      buildUseCase(storageService).execute({
+        productId: PRODUCT_ID,
+        sellerId: SELLER,
+        file: {
+          buffer: JPEG_BUF,
+          mimeType: 'image/png',
+          size: JPEG_BUF.length,
+          originalName: 'mismatch.png',
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_FILE_FORMAT',
+      statusCode: 422,
+      message: 'File content does not match the declared image format.',
+    });
+
+    expect(storageService.uploadProductImage).not.toHaveBeenCalled();
+    expect(await productRepository.countImages(PRODUCT_ID)).toBe(0);
+  });
+
+  it('successfully uploads valid JPEG image with matching declared MIME type and persists in database', async () => {
+    const storageService = {
+      uploadProductImage: vi.fn().mockResolvedValue({
+        bucket: 'product-images',
+        path: `product-images/${PRODUCT_ID}/valid.jpg`,
+        publicUrl: 'https://example.com/valid.jpg',
+      }),
+    };
+
+    const result = await buildUseCase(storageService).execute({
+      productId: PRODUCT_ID,
+      sellerId: SELLER,
+      file: {
+        buffer: JPEG_BUF,
+        mimeType: 'image/jpeg',
+        size: JPEG_BUF.length,
+        originalName: 'valid.jpg',
+      },
+    });
+
+    expect(result.data.path).toMatch(/^https?:\/\/.+\/product-images\/.+\/valid\.jpg$/);
+    expect(await productRepository.countImages(PRODUCT_ID)).toBe(1);
+    const [row] = await runQuery(
+      `SELECT primary_image_path FROM public.products WHERE id = :productId`,
+      { productId: PRODUCT_ID }
+    );
+    expect(row.primary_image_path).toBe(`product-images/${PRODUCT_ID}/valid.jpg`);
   });
 });

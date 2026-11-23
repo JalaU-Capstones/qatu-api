@@ -12,7 +12,7 @@ export const listSellerProductsSchema = Joi.object({
     'number.min': 'limit must be at least 1',
     'number.max': 'limit must be at most 100',
   }),
-  status: Joi.string().valid('draft', 'published').optional().messages({
-    'any.only': 'status must be either draft or published',
+  status: Joi.string().valid('draft', 'published', 'unpublished').optional().messages({
+    'any.only': 'status must be either draft, published, or unpublished',
   }),
 });

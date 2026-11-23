@@ -173,12 +173,16 @@ if (process.env.NODE_ENV === 'production') {
 
 The seeders provided are:
 
-| #   | File                                     | Data                                                          |
-| --- | ---------------------------------------- | ------------------------------------------------------------- |
-| 23  | `20261010000023-seed-roles.js`           | 3 roles: buyer, seller, admin                                 |
-| 24  | `20261010000024-seed-categories.js`      | 5 root categories                                             |
-| 25  | `20261010000025-seed-admin-user.js`      | Admin user in `auth.users`, `profiles`, `user_roles`          |
-| 26  | `20261010000026-seed-sample-products.js` | 1 sample seller user + 25 published products (5 per category) |
+| #   | File                                               | Data                                                                                   |
+| --- | -------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 23  | `20261010000023-seed-roles.js`                     | 3 roles: buyer, seller, admin                                                          |
+| 24  | `20261010000024-seed-categories.js`                | 5 root categories                                                                      |
+| 25  | `20261010000025-seed-admin-user.js`                | Admin user in `public.profiles`, `public.user_roles` (no `auth.users` insert, ADR-020) |
+| 26  | `20261010000026-seed-sample-products.js`           | Sample seller profile/role + 25 published products (no `auth.users` insert, ADR-020)   |
+| 27  | `20261117000000-seed-profiles-for-seeded-users.js` | Idempotent profile + role setup for users seeded by `supabase/seed.sql` (ADR-020)      |
+
+> [!NOTE]
+> Per ADR-020, seeders 25 and 26 no longer insert into `auth.users`; the `auth.users` rows come from `supabase/seed.sql` during `npx supabase db reset`. The new seeder `20261117000000-seed-profiles-for-seeded-users.js` provisions `public.profiles` and `public.user_roles` for those seeded users after `pnpm db:migrate`.
 
 ### Data Migrations
 
@@ -232,7 +236,7 @@ See [SP-19](../Methodology/Spikes-and-PoC/SP-19-Supabase-Schema-Ownership) and [
 
 Integration tests (`pnpm test:integration`) require a PostgreSQL database with the `auth` schema:
 
-- **Default (Offline / Testcontainers):** Leave `TEST_DATABASE_URL` unset or commented out in `.env`. Vitest spins up an isolated PostgreSQL container via Testcontainers, automatically runs all migrations and seeds the auth schema stub, and tears it down after tests finish. Requires a running Docker daemon.
+- **Default (Offline / Testcontainers):** Leave `TEST_DATABASE_URL` unset or commented out in `.env`. Vitest spins up an isolated PostgreSQL container via Testcontainers, runs all Sequelize migrations, then installs a minimal `auth` shim via `src/infrastructure/persistence/__tests__/helpers/testAuthShim.sql` (Testcontainers-only; never applied in Modo A or production), and tears it down after tests finish. Requires a running Docker daemon.
 - **Dedicated Test DB:** Set `TEST_DATABASE_URL=postgresql://postgres:postgres@host.docker.internal:54322/postgres` (or a dedicated test database URL). When set, tests reuse the running database directly (creating temporary test databases), which is faster but requires Supabase CLI to be running.
 
 ---

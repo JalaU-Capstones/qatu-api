@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { RemoveCartItemUseCase } from '../RemoveCartItemUseCase.js';
 
 describe('RemoveCartItemUseCase', () => {
-  const userId = '00000000-0000-0000-0000-000000000002';
+  const userId = '00000000-0000-4000-8000-000000000002';
   const cartItemId = 'c4b3a2d1-0000-0000-0000-000000000001';
   const mockCartItem = { id: cartItemId, userId, productId: 'some-prod-id', quantity: 2 };
 

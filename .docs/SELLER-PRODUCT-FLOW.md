@@ -23,6 +23,29 @@ Publishing requires at least one image (enforced by the
 - Ownership: only the owning seller can upload / publish. Cross-seller
   attempts return `403 FORBIDDEN`.
 
+## Owner visibility of unpublished products
+
+`GET /v1/products/:id` is a public endpoint, but its response varies
+with authentication:
+
+- **Anonymous caller**: published products only. Any non-published
+  product → 404 `PRODUCT_NOT_FOUND`.
+- **Authenticated seller (own product)**: can retrieve their own
+  `draft`, `unpublished`, or `archived` products (200 OK).
+- **Authenticated seller (another seller's product)**: same as
+  anonymous — 404 for non-published products.
+
+This optional authentication is what powers the client edit-product
+modal: the modal pre-populates via `GET /v1/products/:id` before
+`PATCH /v1/products/:id` is called. Without this, a seller couldn't
+edit their own drafts or unpublished products (they'd get 404 on
+pre-population).
+
+Implementation: `src/presentation/middleware/optionalAuthMiddleware.js`
+populates `req.user` when a valid session cookie/Bearer token is
+present but never rejects the request. The route
+`GET /v1/products/:id` uses it instead of `authMiddleware`.
+
 ## Constraints
 
 - Max 5 images per product → `422 IMAGE_LIMIT_REACHED` on the 6th.

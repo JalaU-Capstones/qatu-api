@@ -3,8 +3,8 @@ import { GetCartRequestDTO } from '../../dtos/GetCartDTO.js';
 import { GetCartUseCase } from '../GetCartUseCase.js';
 
 describe('GetCartUseCase', () => {
-  const userId = '00000000-0000-0000-0000-000000000002';
-  const productId = '10000000-0000-0000-0000-000000000001';
+  const userId = '00000000-0000-4000-8000-000000000002';
+  const productId = '10000000-0000-4000-8000-000000000001';
   const sellerId = '660e8400-e29b-41d4-a716-446655440001';
   const cartItemId = 'c4b3a2d1-0000-0000-0000-000000000001';
 

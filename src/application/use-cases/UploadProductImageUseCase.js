@@ -1,4 +1,6 @@
 import path from 'node:path';
+import { detectImageMimeType } from '../../domain/utils/imageMagicBytes.js';
+import { ProductImageDTO } from '../dtos/ProductImageDTO.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_IMAGES = 5;
@@ -64,6 +66,21 @@ export class UploadProductImageUseCase {
       throw errors.imageLimitError();
     }
 
+    const declaredMime = (file?.mimeType || '').toLowerCase();
+    const detectedMime = detectImageMimeType(file?.buffer);
+    if (!detectedMime) {
+      const err = new Error('File content is not a valid JPEG, PNG, or WebP image.');
+      err.code = 'INVALID_FILE_FORMAT';
+      err.statusCode = 422;
+      throw err;
+    }
+    if (detectedMime !== declaredMime) {
+      const err = new Error('File content does not match the declared image format.');
+      err.code = 'INVALID_FILE_FORMAT';
+      err.statusCode = 422;
+      throw err;
+    }
+
     const extension = this.#extensionFromMime(file.mimeType, file.originalName);
 
     let upload;
@@ -96,7 +113,7 @@ export class UploadProductImageUseCase {
     await this.productRepository.setPrimaryImageIfNull({ productId, path: upload.path });
 
     return {
-      data: image,
+      data: new ProductImageDTO(image).toJSON(),
       meta: { timestamp: new Date().toISOString() },
       location: `/v1/products/${productId}/images/${image.id}`,
     };

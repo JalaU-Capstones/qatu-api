@@ -4,7 +4,12 @@ salesReport:
     summary: Get sales report (admin)
     description: |
       Returns aggregated sales data for a date range. Admin only.
-      Includes total revenue, order counts, top products, and top sellers.
+      Cancelled and refunded orders are excluded.
+      `total_revenue`, `period_breakdown`, `top_products`, and `top_sellers`
+      use the currency with the highest revenue in the range (`currency`).
+      Other currencies are listed in `revenue_by_currency`.
+      `total_orders` counts every included order, in every currency.
+      Periods are truncated in UTC. The series includes empty periods.
     tags:
       - admin
     parameters:
@@ -43,13 +48,33 @@ salesReport:
                 data:
                   type: object
                   properties:
+                    currency:
+                      type: [string, 'null']
+                      description: Currency of the headline figures. Null when the range has no sales.
+                      example: USD
                     total_revenue:
                       type: number
                       format: float
+                      description: Revenue in `currency`.
                       example: 48750.50
                     total_orders:
                       type: integer
                       example: 342
+                    revenue_by_currency:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          currency:
+                            type: string
+                            example: USD
+                          revenue:
+                            type: number
+                            format: float
+                            example: 48750.50
+                          order_count:
+                            type: integer
+                            example: 342
                     period_breakdown:
                       type: array
                       items:
@@ -100,8 +125,13 @@ salesReport:
                 summary: Monthly sales report
                 value:
                   data:
+                    currency: USD
                     total_revenue: 48750.50
                     total_orders: 342
+                    revenue_by_currency:
+                      - currency: USD
+                        revenue: 48750.50
+                        order_count: 342
                     period_breakdown:
                       - period: '2026-10'
                         revenue: 5420.00
@@ -131,7 +161,13 @@ usersReport:
     operationId: adminGetUsersReport
     summary: Get users report (admin)
     description: |
-      Returns aggregated user registration and activity metrics. Admin only.
+      Returns user metrics for the admin dashboard.
+      `buyer_count` and `seller_count` are current role totals. A seller keeps
+      the buyer role, so that person is counted in both.
+      `pending_seller_applications` is the current pending queue.
+      `new_registrations`, `active_buyers`, and `active_sellers` follow `from`/`to`.
+      Active buyers placed a non-cancelled order in the range. Active sellers
+      had at least one line item on such an order.
     tags:
       - admin
     parameters:
@@ -169,11 +205,21 @@ usersReport:
                     new_registrations:
                       type: integer
                       example: 87
+                    buyer_count:
+                      type: integer
+                      description: Profiles that currently have the buyer role.
+                      example: 1200
+                    seller_count:
+                      type: integer
+                      description: Profiles that currently have the seller role.
+                      example: 45
                     active_buyers:
                       type: integer
+                      description: Distinct buyers with a counted order in the date range.
                       example: 312
                     active_sellers:
                       type: integer
+                      description: Distinct sellers with a counted line item in the date range.
                       example: 45
                     pending_seller_applications:
                       type: integer
@@ -187,6 +233,8 @@ usersReport:
                   data:
                     total_users: 1248
                     new_registrations: 87
+                    buyer_count: 1200
+                    seller_count: 45
                     active_buyers: 312
                     active_sellers: 45
                     pending_seller_applications: 12
@@ -206,8 +254,11 @@ productsReport:
     operationId: adminGetProductsReport
     summary: Get products report (admin)
     description: |
-      Returns aggregated product metrics including listings, categories distribution,
-      and top-rated products. Admin only.
+      Returns catalog metrics for the admin dashboard.
+      State counts (`published`, `draft`, `unpublished`, `archived`) and the
+      category and rating lists are a current snapshot. Deleted products are excluded.
+      `new_listings` and `top_selling_products` follow `from`/`to`.
+      Top sellers are ranked by units, across every currency.
     tags:
       - admin
     parameters:
@@ -248,9 +299,27 @@ productsReport:
                     draft_products:
                       type: integer
                       example: 144
+                    unpublished_products:
+                      type: integer
+                      example: 20
+                    archived_products:
+                      type: integer
+                      example: 8
                     new_listings:
                       type: integer
                       example: 63
+                    top_selling_products:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          product_id:
+                            type: string
+                            format: uuid
+                          title:
+                            type: string
+                          units_sold:
+                            type: integer
                     top_categories:
                       type: array
                       items:
@@ -288,7 +357,13 @@ productsReport:
                     total_products: 856
                     published_products: 712
                     draft_products: 144
+                    unpublished_products: 20
+                    archived_products: 8
                     new_listings: 63
+                    top_selling_products:
+                      - product_id: '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c'
+                        title: 'Handcrafted Leather Wallet'
+                        units_sold: 40
                     top_categories:
                       - category_id: 'b2d3c4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e'
                         name: Electronics

@@ -29,7 +29,7 @@ const shouldRun = process.env.TEST_SUPABASE_STORAGE === 'true' || isSupabaseRunn
 describe.skipIf(!shouldRun)('SupabaseStorageService (integration, real Supabase CLI)', () => {
   let storageService;
   let sellerAccessToken;
-  const sellerId = '00000000-0000-0000-0000-000000000002';
+  const sellerId = '00000000-0000-4000-8000-000000000002';
 
   beforeAll(async () => {
     storageService = new SupabaseStorageService();
