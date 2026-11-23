@@ -2,6 +2,22 @@ import { Category } from '../../../domain/entities/Category.js';
 import { ICategoryRepository } from '../../../domain/repositories/ICategoryRepository.js';
 import { sequelize } from '../../config/sequelize.js';
 
+const CATEGORY_COLUMNS = `
+  c.id, c.name, c.slug, c.description, c.parent_id, c.position,
+  c.is_active, c.created_at, c.updated_at
+`;
+
+function mapUniqueViolation(error) {
+  const pgCode = error?.parent?.code || error?.original?.code || error?.code;
+  if (pgCode === '23505') {
+    const conflict = new Error('A category with this name or slug already exists');
+    conflict.statusCode = 409;
+    conflict.code = 'CONFLICT';
+    return conflict;
+  }
+  return error;
+}
+
 export class CategoryRepository extends ICategoryRepository {
   /**
    * @param {Object} [options]
@@ -13,7 +29,7 @@ export class CategoryRepository extends ICategoryRepository {
   }
 
   /**
-   *Maps a database row to a domain Category entity
+   * Maps a database row to a domain Category entity.
    *
    * @param {Object} row
    * @returns {Category|null}
@@ -36,7 +52,6 @@ export class CategoryRepository extends ICategoryRepository {
 
   /**
    * Lists active categories ordered by position, then name.
-   * The total is counted in its own query so it stays accurate for out-of-range pages.
    *
    * @param {Object} [params]
    * @param {number} [params.page=1]
@@ -52,13 +67,12 @@ export class CategoryRepository extends ICategoryRepository {
       this.db.query('SELECT COUNT(*) AS total FROM public.categories c WHERE c.is_active = true'),
       this.db.query(
         `
-  SELECT c.id, c.name, c.slug, c.description, c.parent_id, c.position,
-         c.is_active, c.created_at, c.updated_at
-  FROM public.categories c
-  WHERE c.is_active = true
-  ORDER BY c.position ASC, c.name ASC, c.id ASC
-  LIMIT :limit OFFSET :offset
-`,
+        SELECT ${CATEGORY_COLUMNS}
+        FROM public.categories c
+        WHERE c.is_active = true
+        ORDER BY c.position ASC, c.name ASC, c.id ASC
+        LIMIT :limit OFFSET :offset
+        `,
         { replacements: { limit: limitNumber, offset: offsetNumber } }
       ),
     ]);
@@ -68,5 +82,143 @@ export class CategoryRepository extends ICategoryRepository {
     const rows = Array.isArray(rowsResult?.[0]) ? rowsResult[0] : [];
 
     return { items: rows.map((row) => this.toDomain(row)), total };
+  }
+
+  async findById(id) {
+    const result = await this.db.query(
+      `
+      SELECT ${CATEGORY_COLUMNS}
+      FROM public.categories c
+      WHERE c.id = :id
+      LIMIT 1
+      `,
+      { replacements: { id } }
+    );
+    const rows = Array.isArray(result?.[0]) ? result[0] : [];
+    return this.toDomain(rows[0] || null);
+  }
+
+  async findByName(name) {
+    const result = await this.db.query(
+      `
+      SELECT ${CATEGORY_COLUMNS}
+      FROM public.categories c
+      WHERE LOWER(c.name) = LOWER(:name)
+      LIMIT 1
+      `,
+      { replacements: { name } }
+    );
+    const rows = Array.isArray(result?.[0]) ? result[0] : [];
+    return this.toDomain(rows[0] || null);
+  }
+
+  async findBySlug(slug) {
+    const result = await this.db.query(
+      `
+      SELECT ${CATEGORY_COLUMNS}
+      FROM public.categories c
+      WHERE c.slug = :slug
+      LIMIT 1
+      `,
+      { replacements: { slug } }
+    );
+    const rows = Array.isArray(result?.[0]) ? result[0] : [];
+    return this.toDomain(rows[0] || null);
+  }
+
+  async create({
+    name,
+    slug,
+    description = null,
+    parent_id = null,
+    position = 0,
+    is_active = true,
+  }) {
+    try {
+      const result = await this.db.query(
+        `
+        INSERT INTO public.categories (name, slug, description, parent_id, position, is_active)
+        VALUES (:name, :slug, :description, :parent_id, :position, :is_active)
+        RETURNING id, name, slug, description, parent_id, position, is_active, created_at, updated_at
+        `,
+        {
+          replacements: {
+            name,
+            slug,
+            description: description ?? null,
+            parent_id: parent_id ?? null,
+            position: Number(position) || 0,
+            is_active: is_active !== undefined ? Boolean(is_active) : true,
+          },
+        }
+      );
+      const rows = Array.isArray(result?.[0]) ? result[0] : [];
+      return this.toDomain(rows[0] || null);
+    } catch (error) {
+      throw mapUniqueViolation(error);
+    }
+  }
+
+  async update(id, updates = {}) {
+    const allowedFields = ['name', 'slug', 'description', 'parent_id', 'position', 'is_active'];
+    const setClauses = [];
+    const replacements = { id };
+
+    for (const field of allowedFields) {
+      if (Object.prototype.hasOwnProperty.call(updates, field)) {
+        setClauses.push(`${field} = :${field}`);
+        // eslint-disable-next-line security/detect-object-injection
+        replacements[field] = updates[field];
+      }
+    }
+
+    if (setClauses.length === 0) {
+      return this.findById(id);
+    }
+
+    setClauses.push('updated_at = now()');
+
+    try {
+      const result = await this.db.query(
+        `
+        UPDATE public.categories
+        SET ${setClauses.join(', ')}
+        WHERE id = :id
+        RETURNING id, name, slug, description, parent_id, position, is_active, created_at, updated_at
+        `,
+        { replacements }
+      );
+      const rows = Array.isArray(result?.[0]) ? result[0] : [];
+      return this.toDomain(rows[0] || null);
+    } catch (error) {
+      throw mapUniqueViolation(error);
+    }
+  }
+
+  async hasProducts(id) {
+    const result = await this.db.query(
+      `
+      SELECT 1 AS found
+      FROM public.products p
+      WHERE p.category_id = :id AND p.deleted_at IS NULL
+      LIMIT 1
+      `,
+      { replacements: { id } }
+    );
+    const rows = Array.isArray(result?.[0]) ? result[0] : [];
+    return rows.length > 0;
+  }
+
+  async delete(id) {
+    const result = await this.db.query(
+      `
+      DELETE FROM public.categories
+      WHERE id = :id
+      RETURNING id
+      `,
+      { replacements: { id } }
+    );
+    const rows = Array.isArray(result?.[0]) ? result[0] : [];
+    return rows.length > 0;
   }
 }
