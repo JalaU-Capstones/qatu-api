@@ -21,6 +21,13 @@ export class ApplyAsSellerUseCase {
     const { profileId, businessName, businessDescription, contactPhone, contactEmail } = requestDto;
 
     const roleNames = await this.profileRepository.getRoleNames(profileId);
+    if (roleNames.includes(ROLES.ADMIN)) {
+      const err = new Error('Administrators cannot submit seller applications');
+      err.code = 'FORBIDDEN';
+      err.statusCode = 403;
+      throw err;
+    }
+
     if (roleNames.includes(ROLES.SELLER)) {
       const err = new Error('You are already a seller');
       err.code = 'ALREADY_SELLER';
