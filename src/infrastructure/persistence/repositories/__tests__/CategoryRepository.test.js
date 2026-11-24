@@ -316,6 +316,51 @@ describe('CategoryRepository (unit)', () => {
     });
   });
 
+  describe('defensive result handling', () => {
+    it('normalizes null description and invalid pagination', async () => {
+      const category = repository.toDomain({ ...sampleRow, description: null });
+      expect(category.description).toBeNull();
+
+      mockDb.query.mockResolvedValueOnce([[{ total: '2' }]]).mockResolvedValueOnce([[sampleRow]]);
+      await repository.findAll({ page: 'bad', limit: 0 });
+
+      expect(mockDb.query.mock.calls[1][1].replacements).toEqual({ limit: 20, offset: 0 });
+    });
+
+    it('tolerates undefined query results in single-row lookups', async () => {
+      mockDb.query.mockResolvedValueOnce(undefined);
+      await expect(repository.findById(CATEGORY_ID)).resolves.toBeNull();
+
+      mockDb.query.mockResolvedValueOnce(undefined);
+      await expect(repository.findByName('Electronics')).resolves.toBeNull();
+
+      mockDb.query.mockResolvedValueOnce(undefined);
+      await expect(repository.findBySlug('electronics')).resolves.toBeNull();
+    });
+
+    it('returns null when create or update returns an empty row', async () => {
+      mockDb.query.mockResolvedValueOnce(undefined);
+      await expect(repository.create({ name: 'X', slug: 'x' })).resolves.toBeNull();
+
+      mockDb.query.mockResolvedValueOnce([[null]]);
+      await expect(repository.create({ name: 'X', slug: 'x' })).resolves.toBeNull();
+
+      mockDb.query.mockResolvedValueOnce(undefined);
+      await expect(repository.update(CATEGORY_ID, { name: 'X' })).resolves.toBeNull();
+
+      mockDb.query.mockResolvedValueOnce([[null]]);
+      await expect(repository.update(CATEGORY_ID, { name: 'X' })).resolves.toBeNull();
+    });
+
+    it('tolerates undefined results in existence checks', async () => {
+      mockDb.query.mockResolvedValueOnce(undefined);
+      await expect(repository.hasProducts(CATEGORY_ID)).resolves.toBe(false);
+
+      mockDb.query.mockResolvedValueOnce(undefined);
+      await expect(repository.delete(CATEGORY_ID)).resolves.toBe(false);
+    });
+  });
+
   describe('ICategoryRepository interface', () => {
     it('should throw Method not implemented when calling findAll', async () => {
       await expect(new ICategoryRepository().findAll({})).rejects.toThrow('Method not implemented');

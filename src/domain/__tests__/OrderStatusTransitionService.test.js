@@ -60,4 +60,29 @@ describe('OrderStatusTransitionService', () => {
     expect(sellerNextStatuses('confirmed')).toEqual(['shipped', 'cancelled']);
     expect(sellerNextStatuses('delivered')).toEqual([]);
   });
+
+  it('rejects unknown statuses, identical statuses and unknown actor roles', () => {
+    expect(canTransition('unknown', 'confirmed', 'admin')).toBe(false);
+    expect(canTransition('pending', 'unknown', 'admin')).toBe(false);
+    expect(canTransition('pending', 'pending', 'admin')).toBe(false);
+    expect(canTransition('pending', 'confirmed', 'unsupported-role')).toBe(true);
+    expect(canTransition('pending', 'shipped', 'unsupported-role')).toBe(false);
+  });
+
+  it('does nothing when assertTransition receives an allowed transition', () => {
+    expect(() => assertTransition('pending', 'confirmed', 'seller')).not.toThrow();
+  });
+
+  it('maps delivered, cancelled and unknown statuses to timestamp columns', () => {
+    expect(timestampColumnForStatus('delivered')).toBe('delivered_at');
+    expect(timestampColumnForStatus('cancelled')).toBe('cancelled_at');
+    expect(timestampColumnForStatus('pending')).toBeNull();
+    expect(timestampColumnForStatus('unknown')).toBeNull();
+  });
+
+  it('returns an empty list of next seller statuses for unknown statuses', () => {
+    expect(sellerNextStatuses('unknown')).toEqual([]);
+    expect(sellerNextStatuses('cancelled')).toEqual([]);
+    expect(sellerNextStatuses('pending')).toEqual(['confirmed']);
+  });
 });

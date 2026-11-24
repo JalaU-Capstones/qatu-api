@@ -41,6 +41,11 @@ describe('ConversationRepository', () => {
     repository = new ConversationRepository({ db });
   });
 
+  it('toDomain returns null for a missing row', () => {
+    expect(repository.toDomain(null)).toBeNull();
+    expect(repository.toDomain(undefined)).toBeNull();
+  });
+
   describe('findOrCreate', () => {
     it('returns created: true when the INSERT returns a row', async () => {
       db.query.mockResolvedValueOnce([conversationRow]);
@@ -228,6 +233,11 @@ describe('MessageRepository', () => {
     repository = new MessageRepository({ db });
   });
 
+  it('toDomain returns null for a missing row', () => {
+    expect(repository.toDomain(null)).toBeNull();
+    expect(repository.toDomain(undefined)).toBeNull();
+  });
+
   describe('create', () => {
     it('inserts the message and forwards the transaction', async () => {
       const transaction = { id: 'tx-1' };
@@ -329,6 +339,15 @@ describe('MessageRepository', () => {
       expect(result.items).toHaveLength(1);
       expect(result.items[0]).toBeInstanceOf(Message);
       expect(result.items[0].id).toBe(MESSAGE_ID);
+    });
+
+    it('uses zero when the count row has no total', async () => {
+      db.query.mockResolvedValueOnce([{}]).mockResolvedValueOnce([]);
+
+      await expect(repository.listByConversation(CONVERSATION_ID)).resolves.toEqual({
+        items: [],
+        total: 0,
+      });
     });
 
     it('defaults to page 1 / limit 20 and maps an empty result', async () => {

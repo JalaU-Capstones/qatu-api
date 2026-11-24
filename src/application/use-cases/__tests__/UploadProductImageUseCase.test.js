@@ -63,6 +63,158 @@ describe('UploadProductImageUseCase', () => {
     });
   });
 
+  it('requires productRepository and storageService', () => {
+    expect(() => new UploadProductImageUseCase()).toThrow('productRepository is required');
+    expect(
+      () => new UploadProductImageUseCase({ productRepository: mockProductRepository })
+    ).toThrow('storageService is required');
+  });
+
+  it.each([
+    [
+      { accessToken: 'token', productId: 'not-a-uuid', sellerId, file: sampleFile },
+      'productId must be a valid UUID',
+    ],
+    [{ accessToken: 'token', productId, file: sampleFile }, 'sellerId is required'],
+    [{ accessToken: 'token', productId, sellerId, file: null }, 'image file is required'],
+    [
+      { accessToken: 'token', productId, sellerId, file: { ...sampleFile, size: 0 } },
+      'image file is required',
+    ],
+  ])('rejects an invalid command (%s)', async (command, message) => {
+    await expect(useCase.execute(command)).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      statusCode: 400,
+      message,
+    });
+    expect(mockStorageService.uploadProductImage).not.toHaveBeenCalled();
+  });
+
+  it('throws 404 PRODUCT_NOT_FOUND when the product does not exist', async () => {
+    mockProductRepository.findById.mockResolvedValue(null);
+
+    await expect(
+      useCase.execute({ productId, sellerId, file: sampleFile, accessToken: 'token' })
+    ).rejects.toMatchObject({
+      code: 'PRODUCT_NOT_FOUND',
+      statusCode: 404,
+      message: 'Product not found',
+    });
+  });
+
+  it('throws 403 FORBIDDEN when the seller does not own the product', async () => {
+    mockProductRepository.findById.mockResolvedValue({
+      id: productId,
+      seller_id: 'another-seller',
+      state: 'draft',
+    });
+
+    await expect(
+      useCase.execute({ productId, sellerId, file: sampleFile, accessToken: 'token' })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      statusCode: 403,
+      message: 'You do not own this product',
+    });
+  });
+
+  it('rejects uploads to an archived product', async () => {
+    mockProductRepository.findById.mockResolvedValue({
+      id: productId,
+      seller_id: sellerId,
+      state: 'archived',
+    });
+
+    await expect(
+      useCase.execute({ productId, sellerId, file: sampleFile, accessToken: 'token' })
+    ).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      statusCode: 400,
+      message: 'Cannot upload images to an archived product',
+    });
+  });
+
+  it('throws 422 IMAGE_LIMIT_REACHED when the product already has five images', async () => {
+    mockProductRepository.countImages.mockResolvedValue(5);
+
+    await expect(
+      useCase.execute({ productId, sellerId, file: sampleFile, accessToken: 'token' })
+    ).rejects.toMatchObject({
+      code: 'IMAGE_LIMIT_REACHED',
+      statusCode: 422,
+      message: 'A product can have at most 5 images',
+    });
+    expect(mockStorageService.uploadProductImage).not.toHaveBeenCalled();
+  });
+
+  it('rethrows an Error from the storage service unchanged', async () => {
+    const storageError = new Error('storage down');
+    mockStorageService.uploadProductImage.mockRejectedValue(storageError);
+
+    await expect(
+      useCase.execute({ productId, sellerId, file: sampleFile, accessToken: 'token' })
+    ).rejects.toBe(storageError);
+  });
+
+  it('wraps a non-Error rejection from the storage service', async () => {
+    mockStorageService.uploadProductImage.mockRejectedValue('boom');
+
+    await expect(
+      useCase.execute({ productId, sellerId, file: sampleFile, accessToken: 'token' })
+    ).rejects.toMatchObject({
+      message: `Failed to upload product image for ${productId}`,
+      cause: 'boom',
+    });
+  });
+
+  it('defaults the declared MIME to an empty string when it is missing', async () => {
+    await expect(
+      useCase.execute({
+        productId,
+        sellerId,
+        file: { buffer: PNG_BUF, mimeType: undefined, size: PNG_BUF.length },
+        accessToken: 'token',
+      })
+    ).rejects.toMatchObject({
+      code: 'INVALID_FILE_FORMAT',
+      message: 'File content does not match the declared image format.',
+    });
+  });
+
+  it('uses the supplied position when uploading an image', async () => {
+    await useCase.execute({
+      productId,
+      sellerId,
+      file: sampleFile,
+      position: '2',
+      accessToken: 'token',
+    });
+
+    expect(mockProductRepository.addImage).toHaveBeenCalledWith(
+      expect.objectContaining({ position: 2 })
+    );
+  });
+
+  it.each([
+    ['IMAGE/JPEG', 'photo.jpg', 'jpg'],
+    ['IMAGE/JPEG', 'photo.gif', 'jpg'],
+    ['IMAGE/JPEG', undefined, 'jpg'],
+  ])(
+    'derives the extension from the file name for a non-canonical MIME %s',
+    async (mimeType, originalName, extension) => {
+      await useCase.execute({
+        productId,
+        sellerId,
+        file: { buffer: JPEG_BUF, mimeType, originalName, size: JPEG_BUF.length },
+        accessToken: 'token',
+      });
+
+      expect(mockStorageService.uploadProductImage).toHaveBeenCalledWith(
+        expect.objectContaining({ extension })
+      );
+    }
+  );
+
   it('throws 400 VALIDATION_ERROR when accessToken is missing', async () => {
     await expect(
       useCase.execute({

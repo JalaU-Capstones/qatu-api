@@ -148,7 +148,7 @@ export class CategoryRepository extends ICategoryRepository {
             description: description ?? null,
             parent_id: parent_id ?? null,
             position: Number(position) || 0,
-            is_active: is_active !== undefined ? Boolean(is_active) : true,
+            is_active: Boolean(is_active),
           },
         }
       );

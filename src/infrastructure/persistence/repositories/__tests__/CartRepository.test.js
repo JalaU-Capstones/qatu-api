@@ -1,5 +1,6 @@
 import { QueryTypes } from 'sequelize';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CartItem } from '../../../../domain/entities/CartItem.js';
 import { CartRepository } from '../CartRepository.js';
 
 describe('CartRepository', () => {
@@ -273,6 +274,180 @@ describe('CartRepository', () => {
       mockDb.query.mockResolvedValue([]);
 
       await expect(repository.findCheckoutLines(userId)).resolves.toEqual([]);
+    });
+  });
+});
+
+const USER_ID = 'user-1';
+const PRODUCT_ID = 'product-1';
+
+const cartRow = (overrides = {}) => ({
+  id: 'item-1',
+  user_id: USER_ID,
+  product_id: PRODUCT_ID,
+  quantity: '2',
+  created_at: '2026-11-01T00:00:00.000Z',
+  updated_at: '2026-11-02T00:00:00.000Z',
+  ...overrides,
+});
+
+const checkoutRow = (overrides = {}) => ({
+  cart_item_id: 'item-1',
+  product_id: PRODUCT_ID,
+  seller_id: 'seller-1',
+  name: 'Chair',
+  price: '10.50',
+  currency: 'USD',
+  quantity: '2',
+  primary_image_path: 'product-images/chair.webp',
+  state: 'published',
+  deleted_at: null,
+  ...overrides,
+});
+
+describe('CartRepository — remaining branches', () => {
+  it('uses the shared sequelize instance by default', () => {
+    expect(new CartRepository().db).toBeDefined();
+  });
+
+  describe('toDomain', () => {
+    it('returns null for a missing row', () => {
+      const repository = new CartRepository({ db: { query: vi.fn() } });
+      expect(repository.toDomain(null)).toBeNull();
+    });
+
+    it('leaves timestamps null when the row omits them', () => {
+      const repository = new CartRepository({ db: { query: vi.fn() } });
+      const item = repository.toDomain(cartRow({ created_at: null, updated_at: null }));
+
+      expect(item).toBeInstanceOf(CartItem);
+      expect(item.quantity).toBe(2);
+      expect(item.createdAt).toBeNull();
+      expect(item.updatedAt).toBeNull();
+    });
+  });
+
+  describe('findByUserAndProduct', () => {
+    it('returns null when the query returns no rows', async () => {
+      const db = { query: vi.fn().mockResolvedValue([]) };
+      const repository = new CartRepository({ db });
+
+      await expect(
+        repository.findByUserAndProduct({ userId: USER_ID, productId: PRODUCT_ID })
+      ).resolves.toBeNull();
+      expect(db.query.mock.calls[0][1].replacements).toEqual({
+        userId: USER_ID,
+        productId: PRODUCT_ID,
+      });
+    });
+
+    it('returns null for an undefined result set', async () => {
+      const db = { query: vi.fn().mockResolvedValue(undefined) };
+      const repository = new CartRepository({ db });
+
+      await expect(
+        repository.findByUserAndProduct({ userId: USER_ID, productId: PRODUCT_ID })
+      ).resolves.toBeNull();
+    });
+
+    it('maps the matching row to a CartItem', async () => {
+      const db = { query: vi.fn().mockResolvedValue([cartRow()]) };
+      const repository = new CartRepository({ db });
+
+      const item = await repository.findByUserAndProduct({
+        userId: USER_ID,
+        productId: PRODUCT_ID,
+      });
+
+      expect(item).toBeInstanceOf(CartItem);
+      expect(item.quantity).toBe(2);
+    });
+  });
+
+  describe('incrementQuantity', () => {
+    it('throws when the atomic upsert returns no row', async () => {
+      const db = { query: vi.fn().mockResolvedValue([]) };
+      const repository = new CartRepository({ db });
+
+      await expect(
+        repository.incrementQuantity({ userId: USER_ID, productId: PRODUCT_ID, delta: 1 })
+      ).rejects.toThrow('Failed to increment cart item quantity: no row returned');
+      expect(db.query.mock.calls[0][1].type).toBe(QueryTypes.SELECT);
+    });
+
+    it('maps the returned row', async () => {
+      const db = { query: vi.fn().mockResolvedValue([cartRow()]) };
+      const repository = new CartRepository({ db });
+
+      await expect(
+        repository.incrementQuantity({ userId: USER_ID, productId: PRODUCT_ID, delta: 2 })
+      ).resolves.toBeInstanceOf(CartItem);
+    });
+  });
+
+  describe('findCheckoutLines', () => {
+    it('marks unavailable lines and defaults a missing image path', async () => {
+      const db = {
+        query: vi.fn().mockResolvedValue([
+          checkoutRow({ primary_image_path: undefined, state: 'draft' }),
+          checkoutRow({
+            primary_image_path: null,
+            deleted_at: new Date('2026-11-01T00:00:00.000Z'),
+          }),
+        ]),
+      };
+      const repository = new CartRepository({ db });
+
+      const lines = await repository.findCheckoutLines(USER_ID);
+
+      expect(lines[0]).toMatchObject({
+        cartItemId: 'item-1',
+        unitPrice: 10.5,
+        quantity: 2,
+        imagePath: null,
+        isAvailable: false,
+      });
+      expect(lines[1].isAvailable).toBe(false);
+      expect(db.query.mock.calls[0][0]).toContain('FOR UPDATE OF ci');
+    });
+
+    it('returns an empty list for an unexpected result and forwards a transaction', async () => {
+      const db = { query: vi.fn().mockResolvedValue(undefined) };
+      const repository = new CartRepository({ db });
+      const transaction = { id: 'tx' };
+
+      await expect(repository.findCheckoutLines(USER_ID, { transaction })).resolves.toEqual([]);
+      expect(db.query.mock.calls[0][1]).toMatchObject({ transaction });
+    });
+  });
+
+  describe('countByUser', () => {
+    it('returns zero for empty results and defaults a missing total', async () => {
+      const db = { query: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([{}]) };
+      const repository = new CartRepository({ db });
+
+      await expect(repository.countByUser(USER_ID)).resolves.toBe(0);
+      await expect(repository.countByUser(USER_ID)).resolves.toBe(0);
+    });
+
+    it('converts a string total to a number', async () => {
+      const db = { query: vi.fn().mockResolvedValue([{ total: '3' }]) };
+      const repository = new CartRepository({ db });
+
+      await expect(repository.countByUser(USER_ID)).resolves.toBe(3);
+    });
+  });
+
+  describe('clearCart', () => {
+    it('omits the transaction when none is provided', async () => {
+      const db = { query: vi.fn().mockResolvedValue(undefined) };
+      const repository = new CartRepository({ db });
+
+      await repository.clearCart(USER_ID);
+      expect(db.query.mock.calls[0][1]).toEqual({
+        replacements: { userId: USER_ID },
+        type: QueryTypes.DELETE,
+      });
     });
   });
 });

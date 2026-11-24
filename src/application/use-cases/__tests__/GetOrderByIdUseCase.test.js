@@ -74,6 +74,20 @@ describe('GetOrderByIdUseCase', () => {
     expect(result.data.order_number).toBe('ORD-00100042');
   });
 
+  it('throws 404 when an admin requests an order that does not exist', async () => {
+    const mockRepo = { findById: vi.fn().mockResolvedValue(null) };
+    const profileRepository = {
+      findById: vi.fn().mockResolvedValue({ roles: [{ name: 'admin' }] }),
+    };
+    const useCase = new GetOrderByIdUseCase({ orderRepository: mockRepo, profileRepository });
+
+    await expect(useCase.execute({ orderId, userId: otherBuyerId })).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'NOT_FOUND',
+      message: 'Order not found',
+    });
+  });
+
   it('allows admin (role stored in user_roles) to view another buyers order', async () => {
     const mockRepo = {
       findById: vi.fn().mockResolvedValue(mockOrder),
@@ -135,5 +149,37 @@ describe('GetOrderByIdUseCase', () => {
     const result = await useCase.execute({ orderId, userId: sellerId });
     expect(result.data.id).toBe(orderId);
     expect(mockRepo.findByIdForSeller).toHaveBeenCalledWith(orderId, sellerId);
+  });
+
+  it('ignores malformed profile role entries when resolving admin roles', async () => {
+    const adminId = 'd3bbda00-9d2b-5ef8-bb6d-7bb9bd380d44';
+    const mockRepo = {
+      findById: vi.fn().mockResolvedValue(mockOrder),
+    };
+    const profileRepository = {
+      findById: vi.fn().mockResolvedValue({
+        roles: [{ name: 'admin' }, null, { name: '' }],
+      }),
+    };
+    const useCase = new GetOrderByIdUseCase({ orderRepository: mockRepo, profileRepository });
+
+    const result = await useCase.execute({ orderId, userId: adminId });
+
+    expect(result.data.id).toBe(orderId);
+    expect(profileRepository.findById).toHaveBeenCalledWith(adminId);
+  });
+
+  it('tolerates a profile without roles when resolving role names', async () => {
+    const userId = buyerId;
+    const mockRepo = {
+      findById: vi.fn().mockResolvedValue(mockOrder),
+      findByIdForSeller: vi.fn().mockResolvedValue(null),
+    };
+    const profileRepository = { findById: vi.fn().mockResolvedValue({ roles: null }) };
+    const useCase = new GetOrderByIdUseCase({ orderRepository: mockRepo, profileRepository });
+
+    const result = await useCase.execute({ orderId, userId });
+
+    expect(result.data.id).toBe(orderId);
   });
 });

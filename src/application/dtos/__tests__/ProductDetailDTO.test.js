@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ProductDetailDTO } from '../ProductDetailDTO.js';
+import { GetProductDetailRequestDTO, ProductDetailDTO } from '../ProductDetailDTO.js';
 
 describe('ProductDetailDTO image resolution', () => {
   const rawProduct = {
@@ -68,5 +68,56 @@ describe('ProductDetailDTO image resolution', () => {
     const dto = new ProductDetailDTO({ ...rawProduct, seller: null, category: null }).toJSON();
     expect(dto.seller).toBeNull();
     expect(dto.category).toBeNull();
+  });
+
+  it('normalizes a non-string productId in the request DTO', () => {
+    expect(new GetProductDetailRequestDTO({ productId: 123 }).productId).toBe('');
+    expect(new GetProductDetailRequestDTO().productId).toBe('');
+  });
+
+  it('applies safe defaults when raw data is minimal', () => {
+    const dto = new ProductDetailDTO({ id: 'p2', seller_id: 's2' }).toJSON();
+
+    expect(dto).toMatchObject({
+      category_id: null,
+      description: null,
+      price: 0,
+      currency: 'USD',
+      stock: 0,
+      attributes: {},
+      primary_image_path: null,
+      images: [],
+      seller: null,
+      category: null,
+      state: 'draft',
+      average_rating: 0,
+      ratings_count: 0,
+      published_at: null,
+    });
+    expect(dto.created_at).toEqual(expect.any(String));
+    expect(dto.updated_at).toEqual(expect.any(String));
+  });
+
+  it('uses fallback identifiers and accepts pre-formatted timestamps', () => {
+    const dto = new ProductDetailDTO({
+      ...rawProduct,
+      attributes: ['not', 'an', 'object'],
+      images: null,
+      seller: { id: '', username: '', full_name: '', avatar_path: null },
+      category: { id: '', name: '', slug: '' },
+      state: null,
+      published_at: '2026-11-23T10:00:00.000Z',
+      created_at: '2026-11-20T10:00:00.000Z',
+      updated_at: '2026-11-21T10:00:00.000Z',
+    }).toJSON();
+
+    expect(dto.attributes).toEqual({});
+    expect(dto.images).toEqual([]);
+    expect(dto.seller).toMatchObject({ id: 's1', username: null, full_name: null });
+    expect(dto.category).toMatchObject({ id: 'c1', name: null, slug: null });
+    expect(dto.state).toBe('draft');
+    expect(dto.published_at).toBe('2026-11-23T10:00:00.000Z');
+    expect(dto.created_at).toBe('2026-11-20T10:00:00.000Z');
+    expect(dto.updated_at).toBe('2026-11-21T10:00:00.000Z');
   });
 });

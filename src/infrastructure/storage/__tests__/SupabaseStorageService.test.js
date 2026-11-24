@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_AVATAR_SIZE_BYTES } from '../../../application/use-cases/UploadAvatarUseCase.js';
 import { env } from '../../config/env.js';
 import { createUserScopedSupabaseClient } from '../../config/supabase.js';
@@ -454,5 +454,177 @@ describe('SupabaseStorageService', () => {
         upsert: true,
       });
     });
+  });
+
+  describe('fallback branches', () => {
+    it('uses the configured public URL when an empty storageUrl is supplied', () => {
+      const fallbackService = new SupabaseStorageService({ client: mockClient, storageUrl: '' });
+
+      expect(fallbackService.storageUrl).toBe(env.SUPABASE_STORAGE_PUBLIC_URL);
+    });
+
+    it('derives the avatar extension from the MIME type when no extension is supplied', async () => {
+      await service.uploadAvatar({
+        userId,
+        buffer: sampleBuffer,
+        mimeType: 'image/png',
+        accessToken: 'test-jwt',
+      });
+
+      expect(mockUpload).toHaveBeenCalledWith(
+        `${userId}/${fixedUuid}.png`,
+        sampleBuffer,
+        expect.objectContaining({ contentType: 'image/png' })
+      );
+    });
+
+    it('uses the MIME extension when the supplied extension is blank', async () => {
+      await service.uploadAvatar({
+        userId,
+        buffer: sampleBuffer,
+        mimeType: 'image/png',
+        extension: '',
+        accessToken: 'test-jwt',
+      });
+
+      expect(mockUpload).toHaveBeenCalledWith(
+        `${userId}/${fixedUuid}.png`,
+        sampleBuffer,
+        expect.objectContaining({ contentType: 'image/png' })
+      );
+    });
+
+    it('rejects a missing MIME type on both upload paths', async () => {
+      await expect(
+        service.uploadAvatar({ userId, buffer: sampleBuffer, accessToken: 'test-jwt' })
+      ).rejects.toMatchObject({ code: 'INVALID_FILE_FORMAT', statusCode: 422 });
+      await expect(
+        service.uploadProductImage({
+          productId: 'prod-uuid',
+          buffer: Buffer.from('x'),
+          accessToken: 'test-jwt',
+        })
+      ).rejects.toMatchObject({ code: 'INVALID_FILE_FORMAT', statusCode: 422 });
+      expect(mockUpload).not.toHaveBeenCalled();
+    });
+
+    it('uses an explicit numeric size for product images', async () => {
+      await expect(
+        service.uploadProductImage({
+          productId: 'prod-uuid',
+          buffer: Buffer.from('x'),
+          mimeType: 'image/webp',
+          size: 1,
+          accessToken: 'test-jwt',
+        })
+      ).resolves.toMatchObject({ bucket: 'product-images' });
+    });
+  });
+
+  describe('deleteProductImage', () => {
+    let errorSpy;
+
+    beforeEach(() => {
+      errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    it('rejects a missing access token', async () => {
+      await expect(service.deleteProductImage('', 'product-images/a.webp')).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+        statusCode: 401,
+        message: 'accessToken is required to delete a product image',
+      });
+      expect(createUserScopedSupabaseClient).not.toHaveBeenCalled();
+    });
+
+    it('rejects a missing path', async () => {
+      await expect(service.deleteProductImage('jwt', '')).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        statusCode: 400,
+        message: 'path is required to delete a product image',
+      });
+    });
+
+    it('deletes the object with a user-scoped client', async () => {
+      const remove = vi.fn().mockResolvedValue({ error: null });
+      mockClient.storage.from.mockReturnValue({ remove });
+
+      await expect(service.deleteProductImage('jwt', 'product-images/a.webp')).resolves.toEqual({
+        deleted: true,
+      });
+      expect(createUserScopedSupabaseClient).toHaveBeenCalledWith('jwt');
+      expect(remove).toHaveBeenCalledWith(['product-images/a.webp']);
+    });
+
+    it('reports a storage error without throwing', async () => {
+      const error = { message: 'not found' };
+      mockClient.storage.from.mockReturnValue({
+        remove: vi.fn().mockResolvedValue({ error }),
+      });
+
+      await expect(service.deleteProductImage('jwt', 'product-images/a.webp')).resolves.toEqual({
+        deleted: false,
+        error,
+      });
+      expect(errorSpy).toHaveBeenCalled();
+    });
+
+    it('reports an unexpected throw without throwing', async () => {
+      const error = new Error('network');
+      createUserScopedSupabaseClient.mockImplementationOnce(() => {
+        throw error;
+      });
+
+      await expect(service.deleteProductImage('jwt', 'product-images/a.webp')).resolves.toEqual({
+        deleted: false,
+        error,
+      });
+      expect(errorSpy).toHaveBeenCalled();
+    });
+  });
+
+  it('falls back to the default Supabase public URL when no URL is configured', () => {
+    const originalStorageUrl = env.SUPABASE_STORAGE_PUBLIC_URL;
+    const originalSupabaseUrl = env.SUPABASE_URL;
+    env.SUPABASE_STORAGE_PUBLIC_URL = '';
+    env.SUPABASE_URL = '';
+
+    const fallbackService = new SupabaseStorageService({
+      client: mockClient,
+      bucket: 'avatars',
+      storageUrl: '',
+      uuidGenerator: () => fixedUuid,
+    });
+
+    expect(fallbackService.getPublicUrl('avatars', 'avatar.png')).toBe(
+      'http://localhost:54321/storage/v1/object/public/avatars/avatar.png'
+    );
+
+    env.SUPABASE_STORAGE_PUBLIC_URL = originalStorageUrl;
+    env.SUPABASE_URL = originalSupabaseUrl;
+  });
+});
+
+describe('SupabaseStorageService environment fallbacks', () => {
+  afterEach(() => {
+    vi.doUnmock('../../config/env.js');
+    vi.resetModules();
+  });
+
+  it('falls back to avatars and a derived public URL when the env omits them', async () => {
+    vi.doMock('../../config/env.js', () => ({
+      env: {
+        SUPABASE_STORAGE_BUCKET: '',
+        SUPABASE_STORAGE_PUBLIC_URL: '',
+        SUPABASE_URL: 'https://project.supabase.co/',
+      },
+    }));
+    vi.resetModules();
+    const { DEFAULT_AVATAR_BUCKET, SupabaseStorageService: FreshService } =
+      await import('../SupabaseStorageService.js');
+    const service = new FreshService();
+
+    expect(DEFAULT_AVATAR_BUCKET).toBe('avatars');
+    expect(service.storageUrl).toBe('https://project.supabase.co/storage/v1/object/public');
   });
 });

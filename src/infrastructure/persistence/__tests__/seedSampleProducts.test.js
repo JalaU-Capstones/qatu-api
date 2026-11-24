@@ -1,8 +1,7 @@
-import { createRequire } from 'node:module';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const require = createRequire(import.meta.url);
-const seeder = require('../seeders/20261010000026-seed-sample-products.js');
+const seederModule = await import('../seeders/20261010000026-seed-sample-products.js');
+const seeder = seederModule.default ?? seederModule;
 
 /**
  * The seeder builds one big SQL string inside a JS template literal. A stray backtick in a SQL
@@ -10,7 +9,7 @@ const seeder = require('../seeders/20261010000026-seed-sample-products.js');
  * (`SELLER_EMAIL.local is not a function`), which no unit test noticed because the integration
  * tests need Docker. Running `up`/`down` against a fake query interface catches that class of bug.
  */
-function fakeQueryInterface() {
+function fakeQueryInterface(authRows = [{ ok: 1 }]) {
   const transaction = { commit: vi.fn(), rollback: vi.fn() };
   const queries = [];
   const queryInterface = {
@@ -20,7 +19,7 @@ function fakeQueryInterface() {
         queries.push(sql);
         // Sequelize query() returns [rows, metadata]; the seeder destructures
         // `[rows]` for its defensive auth.users check.
-        return [[{ ok: 1 }], {}];
+        return [authRows, {}];
       }),
     },
   };
@@ -92,6 +91,15 @@ describe('seed-sample-products', () => {
     expect(transaction.commit).not.toHaveBeenCalled();
   });
 
+  it('fails clearly when the seller auth user is missing', async () => {
+    const { queryInterface, transaction } = fakeQueryInterface([]);
+
+    await expect(seeder.up(queryInterface)).rejects.toThrow(/auth\.users row is missing/);
+
+    expect(transaction.rollback).toHaveBeenCalled();
+    expect(transaction.commit).not.toHaveBeenCalled();
+  });
+
   it('down() runs and commits', async () => {
     const { queryInterface, transaction, queries } = fakeQueryInterface();
 
@@ -99,5 +107,15 @@ describe('seed-sample-products', () => {
 
     expect(queries.length).toBeGreaterThan(0);
     expect(transaction.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it('down() rolls back and rethrows when the SQL fails', async () => {
+    const { queryInterface, transaction } = fakeQueryInterface();
+    queryInterface.sequelize.query.mockRejectedValueOnce(new Error('boom'));
+
+    await expect(seeder.down(queryInterface)).rejects.toThrow('boom');
+
+    expect(transaction.rollback).toHaveBeenCalledTimes(1);
+    expect(transaction.commit).not.toHaveBeenCalled();
   });
 });

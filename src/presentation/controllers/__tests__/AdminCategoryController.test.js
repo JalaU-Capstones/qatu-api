@@ -37,6 +37,26 @@ describe('AdminCategoryController', () => {
     ).toThrow('deleteCategoryUseCase is required');
   });
 
+  it('falls back to empty objects when params and body are missing', async () => {
+    createCategoryUseCase.execute.mockResolvedValue({ data: {}, meta: {} });
+    updateCategoryUseCase.execute.mockResolvedValue({ data: {}, meta: {} });
+    deleteCategoryUseCase.execute.mockResolvedValue(undefined);
+    const res = createMockResponse();
+
+    await controller.create({}, res, vi.fn());
+    await controller.update({}, res, vi.fn());
+    await controller.delete({}, res, vi.fn());
+
+    expect(createCategoryUseCase.execute).toHaveBeenCalledWith({
+      name: undefined,
+      slug: undefined,
+      description: undefined,
+      parent_id: undefined,
+    });
+    expect(updateCategoryUseCase.execute).toHaveBeenCalledWith({ categoryId: undefined });
+    expect(deleteCategoryUseCase.execute).toHaveBeenCalledWith({ categoryId: undefined });
+  });
+
   describe('create', () => {
     it('should respond with 201 and the use case result', async () => {
       const result = {

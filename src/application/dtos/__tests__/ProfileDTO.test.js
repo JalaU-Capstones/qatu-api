@@ -22,9 +22,9 @@ describe('ProfileDTO', () => {
       expect(dto2.profileId).toBe('uuid-2');
     });
 
-    it('should default to empty string when missing', () => {
-      const dto = new GetProfileByIdRequestDTO();
-      expect(dto.profileId).toBe('');
+    it('should default to empty string when missing or not a string', () => {
+      expect(new GetProfileByIdRequestDTO().profileId).toBe('');
+      expect(new GetProfileByIdRequestDTO({ profileId: 123 }).profileId).toBe('');
     });
   });
 
@@ -47,6 +47,32 @@ describe('ProfileDTO', () => {
         avatar_path: 'avatars/jane.webp',
         locale: 'es',
       });
+    });
+
+    it('should preserve top-level aliases and non-string values', () => {
+      const dto = new UpdateProfileRequestDTO({
+        userId: 123,
+        requestingUserId: 456,
+        fullName: 'Alias Name',
+        bio: 7,
+        avatar_path: 8,
+        locale: 9,
+      });
+
+      expect(dto.userId).toBe('');
+      expect(dto.requestingUserId).toBe('');
+      expect(dto.updates).toEqual({
+        full_name: 'Alias Name',
+        bio: 7,
+        avatar_path: 8,
+        locale: 9,
+      });
+    });
+
+    it('should preserve a non-string full name', () => {
+      const dto = new UpdateProfileRequestDTO({ userId: 'user-123', full_name: 123 });
+
+      expect(dto.updates.full_name).toBe(123);
     });
 
     it('should convert empty string bio and avatar_path to null', () => {
@@ -83,6 +109,31 @@ describe('ProfileDTO', () => {
       expect(dto.buffer).toBe(buf);
       expect(dto.mimeType).toBe('image/png');
       expect(dto.originalName).toBe('avatar.png');
+      expect(dto.size).toBe(4);
+    });
+
+    it('should default mimeType when neither casing is provided', () => {
+      const dto = new UploadAvatarRequestDTO({
+        userId: 'user-1',
+        file: { buffer: Buffer.from('x') },
+      });
+
+      expect(dto.mimeType).toBe('');
+      expect(dto.size).toBe(1);
+    });
+
+    it('should accept lowercase file aliases and derive the size from the buffer', () => {
+      const buf = Buffer.from('abcd');
+      const dto = new UploadAvatarRequestDTO({
+        targetUserId: 123,
+        requestingUserId: 456,
+        file: { buffer: buf, mimetype: ' IMAGE/JPEG ', originalname: ' avatar.jpg ' },
+      });
+
+      expect(dto.userId).toBe('');
+      expect(dto.requestingUserId).toBe('');
+      expect(dto.mimeType).toBe('image/jpeg');
+      expect(dto.originalName).toBe('avatar.jpg');
       expect(dto.size).toBe(4);
     });
   });
@@ -129,6 +180,20 @@ describe('ProfileDTO', () => {
     it('keeps avatar_path null when null', () => {
       const dto = new ProfileResponseDTO({ avatar_path: null });
       expect(dto.avatar_path).toBeNull();
+    });
+
+    it('uses camelCase aliases for full name and timestamps', () => {
+      const dto = new ProfileResponseDTO({
+        fullName: 'Alias Name',
+        avatarPath: 'avatars/alias.webp',
+        createdAt: '2026-10-01T00:00:00.000Z',
+        updatedAt: '2026-10-02T00:00:00.000Z',
+      });
+
+      expect(dto.full_name).toBe('Alias Name');
+      expect(dto.avatar_path).toContain('avatars/alias.webp');
+      expect(dto.created_at).toBe('2026-10-01T00:00:00.000Z');
+      expect(dto.updated_at).toBe('2026-10-02T00:00:00.000Z');
     });
   });
 });

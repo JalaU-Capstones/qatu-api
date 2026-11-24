@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { slugify } from '../../../domain/utils/slugify.js';
+import { CreateProductRequestDTO } from '../../dtos/CreateProductDTO.js';
 import { CreateProductUseCase } from '../CreateProductUseCase.js';
 
 describe('CreateProductUseCase', () => {
@@ -86,6 +87,156 @@ describe('CreateProductUseCase', () => {
     expect(result.data.seller).not.toBeNull();
     expect(result.data.category).not.toBeNull();
     expect(result.meta.timestamp).toEqual(expect.any(String));
+  });
+
+  it('accepts a CreateProductRequestDTO instance', async () => {
+    const createdRow = createRow();
+    const productRepository = {
+      create: vi.fn().mockResolvedValue(createdRow),
+      findByIdWithDetails: vi.fn().mockResolvedValue(createdRow),
+    };
+    const useCase = new CreateProductUseCase({ productRepository });
+    const dto = new CreateProductRequestDTO({
+      sellerId: 'f1a3f2c8-bd68-4d7f-a506-5d45817d2d4b',
+      categoryId: '3bb8de4a-7845-4cb8-b3ca-4c11a3908dfe',
+      name: 'Premium Headphones',
+      slug: 'dto-slug',
+    });
+
+    await expect(useCase.execute(dto)).resolves.toMatchObject({ data: { id: createdRow.id } });
+    expect(productRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ slug: 'dto-slug' })
+    );
+  });
+
+  it('rejects an undefined dto with its own validation error', async () => {
+    const productRepository = { create: vi.fn(), findByIdWithDetails: vi.fn() };
+    const useCase = new CreateProductUseCase({ productRepository });
+
+    await expect(useCase.execute()).rejects.toThrow('sellerId is required');
+    expect(productRepository.create).not.toHaveBeenCalled();
+  });
+
+  it('applies currency, stock and attributes defaults and falls back to the created row', async () => {
+    const createdRow = createRow({ currency: 'USD', stock: 0, attributes: {} });
+    const productRepository = {
+      create: vi.fn().mockResolvedValue(createdRow),
+      findByIdWithDetails: vi.fn().mockResolvedValue(null),
+    };
+    const useCase = new CreateProductUseCase({ productRepository });
+
+    const result = await useCase.execute({
+      sellerId: 'f1a3f2c8-bd68-4d7f-a506-5d45817d2d4b',
+      categoryId: '3bb8de4a-7845-4cb8-b3ca-4c11a3908dfe',
+      name: 'Premium Headphones',
+      slug: 'defaults-slug',
+      currency: '',
+      stock: undefined,
+      attributes: undefined,
+    });
+
+    expect(productRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ currency: 'USD', stock: 0, attributes: {} })
+    );
+    expect(result.data.id).toBe(createdRow.id);
+  });
+
+  it('accepts DTO-normalized currency and stock values without losing them', async () => {
+    const createdRow = createRow({ currency: 'BOB', stock: 7, attributes: { color: 'red' } });
+    const productRepository = {
+      create: vi.fn().mockResolvedValue(createdRow),
+      findByIdWithDetails: vi.fn().mockResolvedValue(null),
+    };
+    const useCase = new CreateProductUseCase({ productRepository });
+    const request = new CreateProductRequestDTO({
+      sellerId: 'f1a3f2c8-bd68-4d7f-a506-5d45817d2d4b',
+      categoryId: '3bb8de4a-7845-4cb8-b3ca-4c11a3908dfe',
+      name: 'Premium Headphones',
+      slug: 'dto-values-slug',
+      price: 399.99,
+      currency: 'BOB',
+      stock: 7,
+      attributes: { color: 'red' },
+    });
+
+    await useCase.execute(request);
+
+    expect(productRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ currency: 'BOB', stock: 7, attributes: { color: 'red' } })
+    );
+  });
+
+  it('applies defaults when a DTO exposes falsy optional values', async () => {
+    const createdRow = createRow();
+    const productRepository = {
+      create: vi.fn().mockResolvedValue(createdRow),
+      findByIdWithDetails: vi.fn().mockResolvedValue(null),
+    };
+    const useCase = new CreateProductUseCase({ productRepository });
+    const request = new CreateProductRequestDTO({
+      sellerId: 'f1a3f2c8-bd68-4d7f-a506-5d45817d2d4b',
+      categoryId: '3bb8de4a-7845-4cb8-b3ca-4c11a3908dfe',
+      name: 'Premium Headphones',
+      slug: 'falsy-values-slug',
+      price: 399.99,
+    });
+    request.currency = '';
+    request.stock = undefined;
+    request.attributes = undefined;
+
+    await useCase.execute(request);
+
+    expect(productRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ currency: 'USD', stock: 0, attributes: {} })
+    );
+  });
+
+  it('throws SLUG_ALREADY_EXISTS when a unique-violation retry chain ends without an explicit throw', async () => {
+    const duplicateError = Object.assign(new Error('duplicate slug'), {
+      parent: { code: '23505', constraint: 'products_seller_id_slug_key' },
+    });
+    let reads = 0;
+    const candidates = {
+      0: 'base-slug',
+      get length() {
+        reads += 1;
+        if (reads === 1) return 3;
+        if (reads === 2) return 4;
+        return 1;
+      },
+    };
+    const productRepository = { create: vi.fn().mockRejectedValue(duplicateError) };
+    const useCase = new CreateProductUseCase({ productRepository });
+    vi.spyOn(useCase, '_buildSlugCandidates').mockReturnValue(candidates);
+
+    await expect(
+      useCase.execute({
+        sellerId: 'f1a3f2c8-bd68-4d7f-a506-5d45817d2d4b',
+        categoryId: '3bb8de4a-7845-4cb8-b3ca-4c11a3908dfe',
+        name: 'Wireless Noise-Canceling Headphones',
+        price: 399.99,
+      })
+    ).rejects.toMatchObject({ code: 'SLUG_ALREADY_EXISTS', statusCode: 409 });
+  });
+
+  it('rethrows a unique violation that is not related to the slug', async () => {
+    const error = Object.assign(new Error('duplicate category'), {
+      code: '23505',
+      constraint: 'products_category_id_key',
+    });
+    const productRepository = {
+      create: vi.fn().mockRejectedValue(error),
+      findByIdWithDetails: vi.fn(),
+    };
+    const useCase = new CreateProductUseCase({ productRepository });
+
+    await expect(
+      useCase.execute({
+        sellerId: 'f1a3f2c8-bd68-4d7f-a506-5d45817d2d4b',
+        categoryId: '3bb8de4a-7845-4cb8-b3ca-4c11a3908dfe',
+        name: 'Premium Headphones',
+      })
+    ).rejects.toBe(error);
   });
 
   it('should auto-generate a slug when no custom slug is provided', async () => {
@@ -225,6 +376,37 @@ describe('CreateProductUseCase', () => {
       message: 'Slug already exists',
     });
     expect(productRepository.create).toHaveBeenCalledTimes(5);
+  });
+
+  it('should rethrow an unexpected repository error unchanged', async () => {
+    const unexpected = new Error('connection reset');
+    const productRepository = { create: vi.fn().mockRejectedValue(unexpected) };
+    const useCase = new CreateProductUseCase({ productRepository });
+
+    await expect(
+      useCase.execute({
+        sellerId: 'f1a3f2c8-bd68-4d7f-a506-5d45817d2d4b',
+        categoryId: '3bb8de4a-7845-4cb8-b3ca-4c11a3908dfe',
+        name: 'Premium Headphones',
+        price: 399.99,
+      })
+    ).rejects.toBe(unexpected);
+  });
+
+  it('should surface the creation failure when no slug candidates are generated', async () => {
+    const productRepository = { create: vi.fn() };
+    const useCase = new CreateProductUseCase({ productRepository });
+    vi.spyOn(useCase, '_buildSlugCandidates').mockReturnValue([]);
+
+    await expect(
+      useCase.execute({
+        sellerId: 'f1a3f2c8-bd68-4d7f-a506-5d45817d2d4b',
+        categoryId: '3bb8de4a-7845-4cb8-b3ca-4c11a3908dfe',
+        name: 'Premium Headphones',
+        price: 399.99,
+      })
+    ).rejects.toThrow('Product creation failed');
+    expect(productRepository.create).not.toHaveBeenCalled();
   });
 
   it('should throw VALIDATION_ERROR when sellerId is missing', async () => {

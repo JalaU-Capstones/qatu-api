@@ -273,6 +273,17 @@ describe('CreateOrderUseCase', () => {
       expect(deps.cartRepository.clearCart).not.toHaveBeenCalled();
     });
 
+    it('rejects own products exposed with a snake_case seller id', async () => {
+      deps.cartRepository.findCheckoutLines.mockResolvedValue([
+        { ...line({ sellerId: undefined }), seller_id: BUYER_ID, name: 'Legacy Own Book' },
+      ]);
+
+      await expect(useCase.execute(request)).rejects.toMatchObject({
+        code: 'CANNOT_BUY_OWN_PRODUCT',
+        message: 'You cannot purchase your own product: Legacy Own Book',
+      });
+    });
+
     it('allows checkout when all items belong to other sellers', async () => {
       deps.cartRepository.findCheckoutLines.mockResolvedValue([
         line({ productId: 'p-1', sellerId: SELLER_1 }),

@@ -84,5 +84,5 @@ const FORMAT_TO_MIME = Object.freeze({
 export function detectImageMimeType(buffer) {
   const fmt = detectImageFormat(buffer);
   // eslint-disable-next-line security/detect-object-injection
-  return fmt ? (FORMAT_TO_MIME[fmt] ?? null) : null;
+  return fmt ? FORMAT_TO_MIME[fmt] : null;
 }

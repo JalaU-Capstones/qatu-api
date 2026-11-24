@@ -34,6 +34,15 @@ describe('requireSellerRole middleware', () => {
     expect(err.statusCode).toBe(403);
   });
 
+  it('forwards repository errors to next', async () => {
+    const error = new Error('db down');
+    const profileRepository = { getRoleNames: vi.fn().mockRejectedValue(error) };
+
+    await requireSellerRole({ profileRepository })(req, {}, next);
+
+    expect(next).toHaveBeenCalledWith(error);
+  });
+
   it('rejects unauthenticated users with 401 UNAUTHORIZED', async () => {
     const profileRepository = { getRoleNames: vi.fn() };
     req.user = {};

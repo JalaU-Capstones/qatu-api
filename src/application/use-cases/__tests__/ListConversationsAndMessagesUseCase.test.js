@@ -244,6 +244,24 @@ describe('ListMessagesUseCase', () => {
     });
   });
 
+  it('falls back to default pagination for non-numeric values', async () => {
+    messageRepository.listByConversation.mockResolvedValue({ items: [], total: 0 });
+
+    const result = await useCase.execute({
+      conversationId: CONVERSATION_ID,
+      userId: USER_ID,
+      page: 'abc',
+      limit: null,
+    });
+
+    expect(messageRepository.listByConversation).toHaveBeenCalledWith(CONVERSATION_ID, {
+      page: 1,
+      limit: 20,
+    });
+    expect(result.meta.page).toBe(1);
+    expect(result.meta.per_page).toBe(20);
+  });
+
   it('returns 404 NOT_FOUND when the conversation does not exist', async () => {
     conversationRepository.findById.mockResolvedValue(null);
 

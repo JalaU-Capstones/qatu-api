@@ -406,3 +406,299 @@ describe('SupabaseAuthService', () => {
     });
   });
 });
+
+const makeClient = (overrides = {}) => ({
+  auth: {
+    admin: {
+      createUser: vi.fn(),
+      listUsers: vi.fn(),
+      signOut: vi.fn(),
+    },
+    signInWithPassword: vi.fn(),
+    signUp: vi.fn(),
+    refreshSession: vi.fn(),
+    getUser: vi.fn(),
+    ...overrides,
+  },
+});
+
+const session = (overrides = {}) => ({
+  access_token: 'access-jwt',
+  refresh_token: 'refresh-uuid',
+  ...overrides,
+});
+
+describe('SupabaseAuthService — remaining branches', () => {
+  let client;
+  let service;
+
+  beforeEach(() => {
+    client = makeClient();
+    service = new SupabaseAuthService({ client });
+  });
+
+  it('throws for every method when the client is not initialized', async () => {
+    const empty = new SupabaseAuthService();
+
+    await expect(empty.registerUser({ email: 'a@b.com' })).rejects.toThrow(
+      'Supabase client not initialized'
+    );
+    await expect(empty.loginUser({ email: 'a@b.com', password: 'pw' })).rejects.toThrow(
+      'Supabase client not initialized'
+    );
+    await expect(empty.refreshSession('token')).rejects.toThrow('Supabase client not initialized');
+    await expect(empty.logoutUser({})).rejects.toThrow('Supabase client not initialized');
+    await expect(empty.emailExists('a@b.com')).rejects.toThrow('Supabase client not initialized');
+    await expect(empty.exchangeOAuthToken('access', 'refresh')).rejects.toThrow(
+      'Supabase client not initialized'
+    );
+  });
+
+  describe('registerUser', () => {
+    it('defaults created_at and merges metadata through the admin path', async () => {
+      client.auth.admin.createUser.mockResolvedValue({
+        data: { user: { id: 'u-1', email: 'a@b.com' } },
+        error: null,
+      });
+      client.auth.signInWithPassword.mockResolvedValue({
+        data: { session: session() },
+        error: null,
+      });
+
+      const result = await service.registerUser({
+        email: 'a@b.com',
+        password: 'pw',
+        metadata: { full_name: 'Test' },
+      });
+
+      expect(result.created_at).toEqual(expect.any(String));
+      expect(client.auth.admin.createUser.mock.calls[0][0].user_metadata).toEqual({
+        full_name: 'Test',
+        role: 'buyer',
+      });
+    });
+
+    it('defaults created_at and role through the signUp path', async () => {
+      const signUpClient = makeClient({ admin: undefined });
+      delete signUpClient.auth.admin;
+      signUpClient.auth.signUp.mockResolvedValue({
+        data: { user: { id: 'u-2', email: 'b@b.com' } },
+        error: null,
+      });
+      signUpClient.auth.signInWithPassword.mockResolvedValue({
+        data: { session: session() },
+        error: null,
+      });
+      const signUpService = new SupabaseAuthService({ client: signUpClient });
+
+      const result = await signUpService.registerUser({ email: 'b@b.com', password: 'pw' });
+
+      expect(result.created_at).toEqual(expect.any(String));
+      expect(signUpClient.auth.signUp.mock.calls[0][0].options.data).toEqual({ role: 'buyer' });
+    });
+
+    it('reports a missing session when signIn returns no error and no token', async () => {
+      client.auth.admin.createUser.mockResolvedValue({
+        data: { user: { id: 'u-1', email: 'a@b.com' } },
+        error: null,
+      });
+      client.auth.signInWithPassword.mockResolvedValue({ data: {}, error: null });
+
+      await expect(service.registerUser({ email: 'a@b.com', password: 'pw' })).rejects.toThrow(
+        'Failed to sign in newly created user: No session returned'
+      );
+    });
+
+    it('maps conflict messages with mixed casing on both creation paths', async () => {
+      client.auth.admin.createUser.mockResolvedValue({
+        data: null,
+        error: { message: 'ALREADY REGISTERED' },
+      });
+      await expect(
+        service.registerUser({ email: 'a@b.com', password: 'pw' })
+      ).rejects.toMatchObject({
+        code: 'EMAIL_ALREADY_EXISTS',
+        statusCode: 409,
+      });
+
+      const signUpClient = { auth: { signUp: vi.fn(), signInWithPassword: vi.fn() } };
+      signUpClient.auth.signUp.mockResolvedValue({
+        data: null,
+        error: { status: 409 },
+      });
+      const signUpService = new SupabaseAuthService({ client: signUpClient });
+      await expect(
+        signUpService.registerUser({ email: 'a@b.com', password: 'pw' })
+      ).rejects.toMatchObject({ code: 'EMAIL_ALREADY_EXISTS' });
+    });
+  });
+
+  describe('loginUser', () => {
+    it('normalizes the email and defaults optional user fields', async () => {
+      client.auth.signInWithPassword.mockResolvedValue({
+        data: { session: session(), user: { id: 'u-1' } },
+        error: null,
+      });
+
+      const result = await service.loginUser({ email: '  USER@Example.COM ', password: 'pw' });
+
+      expect(client.auth.signInWithPassword).toHaveBeenCalledWith({
+        email: 'user@example.com',
+        password: 'pw',
+      });
+      expect(result.email).toBe('user@example.com');
+      expect(result.created_at).toEqual(expect.any(String));
+      expect(result.user_metadata).toEqual({});
+    });
+
+    it('maps unconfirmed emails to EMAIL_NOT_CONFIRMED', async () => {
+      for (const message of ['Email not confirmed', 'Account NOT CONFIRMED']) {
+        client.auth.signInWithPassword.mockResolvedValueOnce({
+          data: {},
+          error: { message },
+        });
+        await expect(service.loginUser({ email: 'a@b.com', password: 'pw' })).rejects.toMatchObject(
+          {
+            code: 'EMAIL_NOT_CONFIRMED',
+            statusCode: 401,
+            message: 'Please confirm your email before logging in',
+          }
+        );
+      }
+    });
+
+    it('maps other failures and incomplete sessions to UNAUTHORIZED', async () => {
+      client.auth.signInWithPassword
+        .mockResolvedValueOnce({ data: {}, error: { message: 'Invalid credentials' } })
+        .mockResolvedValueOnce({ data: { session: session() }, error: null })
+        .mockResolvedValueOnce({ data: { session: null }, error: null })
+        .mockResolvedValueOnce({ data: { user: { id: 'u-1' } }, error: null });
+
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        await expect(service.loginUser({ email: 'a@b.com', password: 'pw' })).rejects.toMatchObject(
+          {
+            code: 'UNAUTHORIZED',
+            statusCode: 401,
+          }
+        );
+      }
+    });
+  });
+
+  describe('refreshSession', () => {
+    it('defaults userId and expiresAt when the session omits them', async () => {
+      client.auth.refreshSession.mockResolvedValue({
+        data: { session: session() },
+        error: null,
+      });
+
+      await expect(service.refreshSession('token')).resolves.toMatchObject({
+        userId: null,
+        expiresAt: null,
+      });
+    });
+
+    it('rejects a session missing the rotated refresh token', async () => {
+      client.auth.refreshSession.mockResolvedValue({
+        data: { session: { access_token: 'access' } },
+        error: null,
+      });
+
+      await expect(service.refreshSession('token')).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+      });
+    });
+  });
+
+  describe('logoutUser', () => {
+    it('succeeds via refresh when no access token is available', async () => {
+      client.auth.refreshSession.mockResolvedValue({
+        data: { session: session() },
+        error: null,
+      });
+      client.auth.admin.signOut.mockResolvedValue({ error: null });
+
+      await expect(service.logoutUser({ refreshToken: 'refresh' })).resolves.toEqual({
+        success: true,
+      });
+      expect(client.auth.admin.signOut).toHaveBeenCalledWith('access-jwt');
+    });
+
+    it('fails when the refresh step errors or returns no session', async () => {
+      client.auth.refreshSession
+        .mockResolvedValueOnce({ data: null, error: { message: 'expired' } })
+        .mockResolvedValueOnce({ data: { session: null }, error: null });
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        await expect(service.logoutUser({ refreshToken: 'refresh' })).resolves.toEqual({
+          success: false,
+          reason: 'revocation_failed',
+        });
+      }
+    });
+
+    it('fails when signOut after a successful refresh returns an error', async () => {
+      client.auth.refreshSession.mockResolvedValue({ data: { session: session() }, error: null });
+      client.auth.admin.signOut.mockResolvedValue({ error: { message: 'forbidden' } });
+
+      await expect(service.logoutUser({ refreshToken: 'refresh' })).resolves.toEqual({
+        success: false,
+        reason: 'revocation_failed',
+      });
+    });
+  });
+
+  describe('emailExists', () => {
+    it('compares emails case-insensitively and tolerates missing users', async () => {
+      client.auth.admin.listUsers.mockResolvedValueOnce({
+        data: { users: [{ email: 'User@Example.com' }] },
+        error: null,
+      });
+      await expect(service.emailExists('user@example.com')).resolves.toBe(true);
+
+      client.auth.admin.listUsers.mockResolvedValueOnce({ data: {}, error: null });
+      await expect(service.emailExists('user@example.com')).resolves.toBe(false);
+    });
+  });
+
+  describe('exchangeOAuthToken', () => {
+    it('requires both tokens as non-empty strings', async () => {
+      await expect(service.exchangeOAuthToken('', 'refresh')).rejects.toMatchObject({
+        message: 'accessToken is required',
+        statusCode: 400,
+      });
+      await expect(service.exchangeOAuthToken(123, 'refresh')).rejects.toMatchObject({
+        status: 400,
+      });
+      await expect(service.exchangeOAuthToken('access', null)).rejects.toMatchObject({
+        message: 'refreshToken is required',
+        statusCode: 400,
+      });
+      await expect(service.exchangeOAuthToken('access', {})).rejects.toMatchObject({
+        status: 400,
+      });
+      expect(client.auth.getUser).not.toHaveBeenCalled();
+    });
+
+    it('rejects invalid or expired access tokens', async () => {
+      client.auth.getUser.mockResolvedValueOnce({ data: {}, error: { message: 'expired' } });
+      await expect(service.exchangeOAuthToken('access', 'refresh')).rejects.toMatchObject({
+        code: 'UNAUTHORIZED',
+        statusCode: 401,
+        message: 'Invalid or expired OAuth access token',
+      });
+    });
+
+    it('returns the verified user and both tokens', async () => {
+      const user = { id: 'u-1', email: 'a@b.com' };
+      client.auth.getUser.mockResolvedValue({ data: { user }, error: null });
+
+      await expect(service.exchangeOAuthToken('access', 'refresh')).resolves.toEqual({
+        user,
+        accessToken: 'access',
+        refreshToken: 'refresh',
+      });
+      expect(client.auth.getUser).toHaveBeenCalledWith('access');
+    });
+  });
+});

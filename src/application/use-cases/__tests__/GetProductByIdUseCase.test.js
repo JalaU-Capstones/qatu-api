@@ -79,6 +79,24 @@ describe('GetProductByIdUseCase', () => {
     expect(result.data.id).toBe(validId);
   });
 
+  it('should fall back to productId and reject non-string identifiers', async () => {
+    const sampleProduct = createSampleProduct();
+    const mockRepo = { findById: vi.fn().mockResolvedValue(sampleProduct) };
+    const useCase = new GetProductByIdUseCase({ productRepository: mockRepo });
+
+    await expect(useCase.execute({ id: null, productId: validId })).resolves.toMatchObject({
+      data: { id: validId },
+    });
+
+    for (const input of [{ id: 123 }, {}, { id: null, productId: null }]) {
+      await expect(useCase.execute(input)).rejects.toMatchObject({
+        code: 'PRODUCT_NOT_FOUND',
+        statusCode: 404,
+      });
+    }
+    expect(mockRepo.findById).toHaveBeenCalledTimes(1);
+  });
+
   it('should throw 404 PRODUCT_NOT_FOUND without querying DB when id is not a valid UUID', async () => {
     const mockRepo = {
       findById: vi.fn(),

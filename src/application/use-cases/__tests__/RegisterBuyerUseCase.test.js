@@ -102,6 +102,76 @@ describe('RegisterBuyerUseCase', () => {
     expect(result.response.user.id).toBe('auth-uuid-123');
   });
 
+  it('uses camelCase aliases and generated timestamps when the saved profile omits snake_case fields', async () => {
+    authServiceMock.registerUser.mockResolvedValue({
+      id: 'auth-uuid-456',
+      email: 'buyer@example.com',
+      token: 'access',
+      refresh_token: 'refresh',
+    });
+    profileRepositoryMock.create.mockResolvedValue({
+      id: 'profile-456',
+      username: 'buyer_jane',
+      fullName: null,
+      full_name: 'Jane Snake',
+      email: null,
+      avatarPath: null,
+      bio: null,
+      locale: null,
+    });
+
+    const request = new RegisterRequestDTO({
+      ...validPayload,
+      full_name: undefined,
+      fullName: 'Camel Name',
+    });
+    const result = await useCase.execute(request);
+
+    expect(authServiceMock.registerUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ full_name: 'Camel Name', fullName: 'Camel Name' }),
+      })
+    );
+    expect(result.response.data.user.created_at).toEqual(expect.any(String));
+    expect(result.response.data.profile).toMatchObject({
+      full_name: 'Jane Snake',
+      email: 'buyer@example.com',
+      avatar_path: null,
+      bio: null,
+      locale: 'en',
+    });
+    expect(result.response.data.profile.created_at).toEqual(expect.any(String));
+    expect(result.response.data.profile.updated_at).toEqual(expect.any(String));
+  });
+
+  it('falls back to the username when no full name is provided', async () => {
+    profileRepositoryMock.create.mockResolvedValue({
+      id: 'profile-789',
+      username: 'buyer_jane',
+      fullName: 'Persisted Name',
+      email: 'buyer@example.com',
+      avatarPath: 'avatars/buyer.webp',
+      bio: 'Bio',
+      locale: 'es',
+    });
+
+    const payloadWithoutName = { ...validPayload };
+    delete payloadWithoutName.full_name;
+    const result = await useCase.execute(new RegisterRequestDTO(payloadWithoutName));
+
+    expect(authServiceMock.registerUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ full_name: 'buyer_jane', fullName: 'buyer_jane' }),
+      })
+    );
+    expect(result.response.data.profile).toMatchObject({
+      full_name: 'Persisted Name',
+      avatar_path: expect.stringContaining('avatars/buyer.webp'),
+      bio: 'Bio',
+      locale: 'es',
+    });
+  });
+
   it('should throw an error if email already exists without creating user or profile', async () => {
     authServiceMock.emailExists.mockResolvedValue(true);
 

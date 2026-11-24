@@ -73,6 +73,11 @@ describe('ProfileRepository', () => {
       expect(entity.locale).toBe('en');
     });
 
+    it('falls back to the username when full_name is missing', () => {
+      const profile = repository.toDomain({ ...sampleDbRow, full_name: null });
+      expect(profile.fullName).toBe(sampleDbRow.username);
+    });
+
     it('should support mapRowToEntity alias', () => {
       const entity = repository.mapRowToEntity(sampleDbRow);
       expect(entity).toBeInstanceOf(Profile);
@@ -132,6 +137,40 @@ describe('ProfileRepository', () => {
       expect(sql).toContain(':full_name');
       expect(sql).not.toContain('DROP TABLE');
       expect(options.replacements.full_name).toBe(payload);
+    });
+
+    it('falls back to snake_case fields and null avatar when camelCase is absent', async () => {
+      mockDb.query.mockResolvedValue([[]]);
+      const profile = {
+        id: sampleDbRow.id,
+        username: sampleDbRow.username,
+        email: sampleDbRow.email,
+        full_name: 'Snake Case',
+        avatar_path: 'avatars/snake.png',
+      };
+
+      await repository.create(profile);
+
+      expect(JSON.parse(mockDb.query.mock.calls[0][1].replacements.metadata).full_name).toBe(
+        'Snake Case'
+      );
+      expect(mockDb.query.mock.calls[1][1].replacements).toMatchObject({
+        full_name: 'Snake Case',
+        avatar_path: 'avatars/snake.png',
+      });
+    });
+
+    it('uses a null avatar when neither camelCase nor snake_case is provided', async () => {
+      mockDb.query.mockResolvedValue([[]]);
+      const profile = {
+        id: sampleDbRow.id,
+        username: sampleDbRow.username,
+        email: sampleDbRow.email,
+      };
+
+      await repository.create(profile);
+
+      expect(mockDb.query.mock.calls[1][1].replacements.avatar_path).toBeNull();
     });
 
     it('should propagate error when database query fails during create', async () => {
@@ -294,6 +333,58 @@ describe('ProfileRepository', () => {
         bio: 'No user',
       });
       expect(result).toBeNull();
+    });
+  });
+
+  describe('getRoleNames', () => {
+    it('returns an empty list when the user id is missing', async () => {
+      await expect(repository.getRoleNames('')).resolves.toEqual([]);
+      expect(mockDb.query).not.toHaveBeenCalled();
+    });
+
+    it('maps role rows and drops empty names', async () => {
+      mockDb.query.mockResolvedValueOnce([[{ name: 'buyer' }, { name: null }, { name: 'seller' }]]);
+
+      await expect(repository.getRoleNames(sampleDbRow.id)).resolves.toEqual(['buyer', 'seller']);
+      expect(mockDb.query.mock.calls[0][1].replacements).toEqual({ userId: sampleDbRow.id });
+    });
+
+    it('tolerates an undefined rows collection', async () => {
+      mockDb.query.mockResolvedValueOnce([undefined]);
+      await expect(repository.getRoleNames(sampleDbRow.id)).resolves.toEqual([]);
+    });
+  });
+
+  describe('assignRole', () => {
+    it('uses null as the default assignedBy and forwards a transaction', async () => {
+      const transaction = { id: 'tx' };
+
+      await repository.assignRole(sampleDbRow.id, 'seller', { transaction });
+
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.stringContaining('ON CONFLICT (profile_id, role_id) DO NOTHING'),
+        {
+          replacements: {
+            profile_id: sampleDbRow.id,
+            role_name: 'seller',
+            assigned_by: null,
+          },
+          transaction,
+        }
+      );
+    });
+
+    it('forwards an explicit assignedBy without a transaction', async () => {
+      await repository.assignRole(sampleDbRow.id, 'buyer', { assignedBy: 'admin-1' });
+
+      expect(mockDb.query.mock.calls[0][1]).toEqual({
+        replacements: {
+          profile_id: sampleDbRow.id,
+          role_name: 'buyer',
+          assigned_by: 'admin-1',
+        },
+        transaction: undefined,
+      });
     });
   });
 });

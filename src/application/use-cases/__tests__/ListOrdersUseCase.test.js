@@ -151,6 +151,31 @@ describe('ListOrdersUseCase', () => {
     expect(mockOrderRepo.findAll).toHaveBeenCalled();
   });
 
+  it('allows seller view for an admin and ignores malformed role entries', async () => {
+    const mockOrderRepo = {
+      findBySellerId: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+    };
+    const profileRepository = {
+      findById: vi.fn().mockResolvedValue({ roles: [null, { name: 'admin' }, { name: '' }] }),
+    };
+    const useCase = new ListOrdersUseCase({ orderRepository: mockOrderRepo, profileRepository });
+
+    await useCase.execute(new ListOrdersRequestDTO({ userId: buyerId, view: 'seller' }));
+    expect(mockOrderRepo.findBySellerId).toHaveBeenCalled();
+  });
+
+  it('defaults a missing view to buyer and tolerates a profile without roles', async () => {
+    const mockOrderRepo = {
+      findByBuyerId: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+    };
+    const profileRepository = { findById: vi.fn().mockResolvedValue({ roles: undefined }) };
+    const useCase = new ListOrdersUseCase({ orderRepository: mockOrderRepo, profileRepository });
+
+    await useCase.execute({ userId: buyerId, page: 1, limit: 20 });
+
+    expect(mockOrderRepo.findByBuyerId).toHaveBeenCalled();
+  });
+
   it('rejects seller view without seller role', async () => {
     const mockOrderRepo = { findBySellerId: vi.fn() };
     const profileRepository = {

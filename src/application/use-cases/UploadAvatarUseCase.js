@@ -92,7 +92,7 @@ export class UploadAvatarUseCase {
       throw err;
     }
 
-    const declaredMime = (mimeType || '').toLowerCase();
+    const declaredMime = mimeType;
     const detectedMime = detectImageMimeType(buffer);
     if (!detectedMime) {
       const err = new Error('File content is not a valid JPEG, PNG, or WebP image.');
@@ -110,19 +110,17 @@ export class UploadAvatarUseCase {
     const uploadParams = {
       userId: resolvedTargetId,
       buffer,
-      mimeType,
+      mimeType: declaredMime,
       extension: mappedExt,
       originalName,
       size,
     };
-    if (accessToken) {
-      Object.defineProperty(uploadParams, 'accessToken', {
-        value: accessToken,
-        enumerable: false,
-        writable: true,
-        configurable: true,
-      });
-    }
+    Object.defineProperty(uploadParams, 'accessToken', {
+      value: accessToken,
+      enumerable: false,
+      writable: true,
+      configurable: true,
+    });
 
     const { path: avatarPath } = await this.storageService.uploadAvatar(uploadParams);
 

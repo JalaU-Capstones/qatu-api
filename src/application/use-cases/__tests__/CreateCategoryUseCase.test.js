@@ -38,6 +38,19 @@ describe('CreateCategoryUseCase', () => {
     expect(() => new CreateCategoryUseCase({})).toThrow('categoryRepository is required');
   });
 
+  it('pads a one-character auto-generated slug with the -cat suffix', async () => {
+    categoryRepository.create.mockImplementation(async (entity) =>
+      buildCategory({ slug: entity.slug })
+    );
+
+    await useCase.execute({ name: 'A!' });
+
+    expect(categoryRepository.findBySlug).toHaveBeenCalledWith('a-cat');
+    expect(categoryRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ slug: 'a-cat' })
+    );
+  });
+
   it('should create a category with only a name and auto-generate the slug', async () => {
     categoryRepository.create.mockResolvedValue(buildCategory());
 
@@ -59,6 +72,17 @@ describe('CreateCategoryUseCase', () => {
       parent_id: null,
     });
     expect(result.meta.timestamp).toEqual(expect.any(String));
+  });
+
+  it('trims a provided description before persisting it', async () => {
+    categoryRepository.create.mockResolvedValue(buildCategory({ description: 'Gadgets' }));
+
+    const result = await useCase.execute({ name: 'Electronics', description: '  Gadgets  ' });
+
+    expect(categoryRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'Gadgets' })
+    );
+    expect(result.data.description).toBe('Gadgets');
   });
 
   it('should resolve a slug collision by appending a numeric suffix', async () => {

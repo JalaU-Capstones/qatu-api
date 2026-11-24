@@ -84,6 +84,12 @@ describe('ProfileController', () => {
     });
   });
 
+  it('falls back to an empty params object in getById', async () => {
+    await controller.getById({ user: req.user }, res, next);
+
+    expect(mockGetProfileByIdUseCase.execute.mock.calls[0][0].profileId).toBe('');
+  });
+
   describe('updateMe', () => {
     it('should return 200 with updated profile data for authenticated user', async () => {
       req.validatedBody = {
@@ -126,6 +132,22 @@ describe('ProfileController', () => {
       await controller.updateMe(req, res, next);
       expect(next).toHaveBeenCalledWith(err);
     });
+  });
+
+  it('forwards an error when uploadAvatarUseCase is not configured', async () => {
+    const controllerWithoutUpload = new ProfileController({
+      getProfileByIdUseCase: mockGetProfileByIdUseCase,
+      updateProfileUseCase: mockUpdateProfileUseCase,
+    });
+    req.user = { id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' };
+    req.cookies = { access_token: 'cookie-jwt-token' };
+    req.file = { buffer: Buffer.from('png-bytes'), size: 9, mimeType: 'image/png' };
+
+    await controllerWithoutUpload.uploadAvatar(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'uploadAvatarUseCase is not configured' })
+    );
   });
 
   describe('uploadAvatar', () => {
@@ -202,6 +224,24 @@ describe('ProfileController', () => {
           code: 'UNAUTHORIZED',
           statusCode: 401,
         })
+      );
+      expect(mockUploadAvatarUseCase.execute).not.toHaveBeenCalled();
+    });
+
+    it('treats a whitespace-only Bearer header as an absent token', async () => {
+      req.cookies = {};
+      req.headers = { authorization: 'Bearer    ' };
+      req.file = {
+        buffer: Buffer.from('png-bytes'),
+        mimeType: 'image/png',
+        originalName: 'avatar.png',
+        size: 9,
+      };
+
+      await controller.uploadAvatar(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'UNAUTHORIZED', statusCode: 401 })
       );
       expect(mockUploadAvatarUseCase.execute).not.toHaveBeenCalled();
     });

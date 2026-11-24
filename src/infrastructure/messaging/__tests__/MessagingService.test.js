@@ -114,6 +114,12 @@ describe('MessagingService', () => {
   it('requires its dependencies', () => {
     expect(() => new MessagingService({})).toThrow('RabbitMQ url is required');
     expect(() => new MessagingService({ url: 'amqp://x' })).toThrow('topology is required');
+    expect(() => new MessagingService({ url: 'amqp://x', topology })).toThrow(
+      'outboxPublisher is required'
+    );
+    expect(() => new MessagingService({ url: 'amqp://x', topology, outboxPublisher })).toThrow(
+      'notificationConsumer is required'
+    );
   });
 
   it('connects, asserts the topology and wires publisher and consumer', async () => {
@@ -201,6 +207,68 @@ describe('MessagingService', () => {
     expect(outboxPublisher.stop).toHaveBeenCalled();
     expect(notificationConsumer.stop).toHaveBeenCalled();
     expect(connection.close).toHaveBeenCalled();
+    expect(connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('stop() is safe before a connection exists', async () => {
+    const service = build();
+
+    await expect(service.stop()).resolves.toBeUndefined();
+    expect(outboxPublisher.detach).toHaveBeenCalled();
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it("uses the unref'd default sleep implementation when no sleepFn is supplied", async () => {
+    const service = build({ sleepFn: undefined });
+
+    await expect(service._sleep(0)).resolves.toBeUndefined();
+  });
+
+  it('does not start twice or open a duplicate reconnect loop', async () => {
+    const service = build();
+    await service.start();
+    await service.start();
+
+    service._connecting = true;
+    await service._connectWithBackoff();
+
+    expect(outboxPublisher.start).toHaveBeenCalledTimes(1);
+    expect(connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('tolerates a rejected close while stopping', async () => {
+    const service = build();
+    await service.start();
+    const [connection] = connections;
+    connection.close.mockRejectedValueOnce(new Error('already closed'));
+
+    await expect(service.stop()).resolves.toBeUndefined();
+  });
+
+  it('closes the connection even when closing rejects during a failed attach', async () => {
+    const broken = makeConnection();
+    broken.createConfirmChannel.mockRejectedValue(new Error('boom'));
+    broken.close.mockRejectedValue(new Error('already closed'));
+    const service = build();
+    connect.mockResolvedValueOnce(broken).mockImplementationOnce(async () => {
+      service._stopped = true;
+      return makeConnection();
+    });
+
+    await service.start();
+
+    expect(broken.close).toHaveBeenCalled();
+    expect(connections[1].close).toHaveBeenCalled();
+  });
+
+  it('does not reconnect when the connection closes after stopping', async () => {
+    const service = build();
+    await service.start();
+    const [connection] = connections;
+    service._stopped = true;
+
+    service._onConnectionClosed(connection);
+
     expect(connect).toHaveBeenCalledTimes(1);
   });
 });

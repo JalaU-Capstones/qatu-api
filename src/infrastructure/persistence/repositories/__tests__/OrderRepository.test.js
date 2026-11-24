@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { Order } from '../../../../domain/entities/Order.js';
 import { OrderRepository } from '../OrderRepository.js';
 
 describe('OrderRepository', () => {
@@ -87,6 +88,20 @@ describe('OrderRepository', () => {
       expect(order.orderNumber).toBe('ORD-00100042');
       expect(order.total).toBe(44.99);
       expect(order.items).toHaveLength(1);
+      expect(order.items[0].subtotal).toBe(40);
+    });
+
+    it('recomputes a null generated subtotal from quantity and unit price', async () => {
+      const mockDb = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([orderRow])
+          .mockResolvedValueOnce([{ ...itemRow, subtotal: null }]),
+      };
+      const repo = new OrderRepository({ db: mockDb });
+
+      const order = await repo.createWithItems(params);
+
       expect(order.items[0].subtotal).toBe(40);
     });
 
@@ -330,5 +345,289 @@ describe('OrderRepository', () => {
     expect(result).not.toBeNull();
     expect(result.id).toBe(orderId);
     expect(result.status).toBe('confirmed');
+  });
+});
+
+const BUYER_ID = 'buyer-1';
+const SELLER_ID = 'seller-1';
+const ORDER_ID = '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a';
+
+const orderRow = (overrides = {}) => ({
+  id: ORDER_ID,
+  order_number: 'ORD-1',
+  buyer_id: BUYER_ID,
+  status: 'pending',
+  currency: 'USD',
+  subtotal: '10',
+  shipping_cost: '1',
+  tax: '0',
+  total: '11',
+  created_at: '2026-11-01T00:00:00.000Z',
+  updated_at: '2026-11-01T00:00:00.000Z',
+  ...overrides,
+});
+
+const itemRow = (overrides = {}) => ({
+  id: 'oi-1',
+  order_id: ORDER_ID,
+  product_id: 'p-1',
+  product_name: 'Chair',
+  product_image_path: null,
+  quantity: 2,
+  unit_price: '5.00',
+  subtotal: null,
+  created_at: '2026-11-01T00:00:00.000Z',
+  ...overrides,
+});
+
+describe('OrderRepository — remaining branches', () => {
+  it('uses the shared sequelize instance by default', () => {
+    expect(new OrderRepository().db).toBeDefined();
+  });
+
+  describe('_pagination through findAll', () => {
+    it('sanitizes invalid page and limit values', async () => {
+      const db = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([{ total: '1' }])
+          .mockResolvedValueOnce([]),
+      };
+      const repository = new OrderRepository({ db });
+
+      await repository.findAll({ page: 'bad', limit: 0, status: 'shipped' });
+
+      expect(db.query.mock.calls[0][1].replacements).toEqual({ status: 'shipped' });
+      expect(db.query.mock.calls[1][1].replacements).toMatchObject({
+        limit: 20,
+        offset: 0,
+        status: 'shipped',
+      });
+      expect(db.query.mock.calls[1][0]).toContain('WHERE status = :status');
+    });
+
+    it('caps the limit at 100 and returns early for a zero count', async () => {
+      const db = { query: vi.fn().mockResolvedValue([{ total: 0 }]) };
+      const repository = new OrderRepository({ db });
+
+      await expect(repository.findAll({ limit: 500 })).resolves.toEqual({ items: [], total: 0 });
+      expect(db.query).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('defensive branches', () => {
+    it('tolerates a missing count result in every listing', async () => {
+      const db = { query: vi.fn().mockResolvedValue(undefined) };
+      const repository = new OrderRepository({ db });
+
+      await expect(repository.findAll()).resolves.toEqual({ items: [], total: 0 });
+      await expect(repository.findByBuyerId({ buyerId: BUYER_ID })).resolves.toEqual({
+        items: [],
+        total: 0,
+      });
+      await expect(repository.findBySellerId({ sellerId: SELLER_ID })).resolves.toEqual({
+        items: [],
+        total: 0,
+      });
+    });
+
+    it('maps orders whose items disappeared after the count', async () => {
+      const db = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([{ total: '1' }])
+          .mockResolvedValueOnce([orderRow()])
+          .mockResolvedValueOnce([{ total: '1' }])
+          .mockResolvedValueOnce([orderRow()])
+          .mockResolvedValueOnce([{ total: '1' }])
+          .mockResolvedValueOnce([orderRow()]),
+      };
+      const repository = new OrderRepository({ db });
+      vi.spyOn(repository, '_loadItemsByOrderIds').mockResolvedValue(new Map());
+
+      await expect(repository.findAll()).resolves.toMatchObject({ total: 1 });
+      await expect(repository.findByBuyerId({ buyerId: BUYER_ID })).resolves.toMatchObject({
+        total: 1,
+      });
+      await expect(repository.findBySellerId({ sellerId: SELLER_ID })).resolves.toMatchObject({
+        total: 1,
+      });
+      expect(db.query).toHaveBeenCalledTimes(6);
+    });
+
+    it('uses the stored subtotal when the item row provides one', async () => {
+      const db = { query: vi.fn().mockResolvedValue([itemRow({ subtotal: '7.00' })]) };
+      const repository = new OrderRepository({ db });
+
+      const grouped = await repository._loadItemsByOrderIds([ORDER_ID]);
+
+      expect(grouped.get(ORDER_ID)[0].subtotal).toBe(7);
+    });
+
+    it('maps a seller order whose items disappeared', async () => {
+      const db = { query: vi.fn().mockResolvedValueOnce([orderRow()]) };
+      const repository = new OrderRepository({ db });
+      vi.spyOn(repository, 'sellerHasItemsOnOrder').mockResolvedValue(true);
+      vi.spyOn(repository, '_loadItemsByOrderIds').mockResolvedValue(new Map());
+
+      await expect(repository.findByIdForSeller(ORDER_ID, SELLER_ID)).resolves.toBeInstanceOf(
+        Order
+      );
+    });
+  });
+
+  describe('_loadItemsByOrderIds', () => {
+    it('returns an empty map for an empty id list without querying', async () => {
+      const db = { query: vi.fn() };
+      const repository = new OrderRepository({ db });
+
+      await expect(repository._loadItemsByOrderIds([])).resolves.toEqual(new Map());
+      expect(db.query).not.toHaveBeenCalled();
+    });
+
+    it('groups by seller and tolerates undefined rows and null subtotals', async () => {
+      const db = { query: vi.fn().mockResolvedValue([itemRow(), itemRow({ id: 'oi-2' })]) };
+      const repository = new OrderRepository({ db });
+
+      const grouped = await repository._loadItemsByOrderIds([ORDER_ID], { sellerId: SELLER_ID });
+
+      expect(grouped.get(ORDER_ID)).toHaveLength(2);
+      expect(grouped.get(ORDER_ID)[0].subtotal).toBe(10);
+      expect(db.query.mock.calls[0][0]).toContain('p.seller_id = :sellerId');
+
+      db.query.mockResolvedValueOnce(undefined);
+      await expect(repository._loadItemsByOrderIds([ORDER_ID])).resolves.toEqual(new Map());
+    });
+  });
+
+  describe('buyer and seller listings', () => {
+    it('findByBuyerId filters by status and handles rows disappearing after the count', async () => {
+      const db = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([{ total: '1' }])
+          .mockResolvedValueOnce([]),
+      };
+      const repository = new OrderRepository({ db });
+
+      await expect(
+        repository.findByBuyerId({ buyerId: BUYER_ID, status: 'confirmed', page: 'x', limit: 'y' })
+      ).resolves.toEqual({ items: [], total: 1 });
+      expect(db.query.mock.calls[0][1].replacements).toEqual({
+        buyerId: BUYER_ID,
+        status: 'confirmed',
+      });
+    });
+
+    it('findByBuyerId maps rows with their items', async () => {
+      const db = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([{ total: '1' }])
+          .mockResolvedValueOnce([orderRow()])
+          .mockResolvedValueOnce([itemRow()]),
+      };
+      const repository = new OrderRepository({ db });
+
+      const result = await repository.findByBuyerId({ buyerId: BUYER_ID });
+      expect(result.items[0]).toBeInstanceOf(Order);
+      expect(result.items[0].items).toHaveLength(1);
+    });
+
+    it('findBySellerId filters by status and handles empty rows', async () => {
+      const db = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([{ total: '1' }])
+          .mockResolvedValueOnce([]),
+      };
+      const repository = new OrderRepository({ db });
+
+      await expect(
+        repository.findBySellerId({ sellerId: SELLER_ID, status: 'delivered' })
+      ).resolves.toEqual({ items: [], total: 1 });
+      expect(db.query.mock.calls[0][1].replacements.status).toBe('delivered');
+    });
+
+    it('findBySellerId returns early when no order matches', async () => {
+      const db = { query: vi.fn().mockResolvedValue([{ total: 0 }]) };
+      const repository = new OrderRepository({ db });
+
+      await expect(repository.findBySellerId({ sellerId: SELLER_ID })).resolves.toEqual({
+        items: [],
+        total: 0,
+      });
+      expect(db.query).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('findByIdForSeller', () => {
+    it('returns null when the seller has no items on the order', async () => {
+      const db = { query: vi.fn().mockResolvedValue([]) };
+      const repository = new OrderRepository({ db });
+
+      await expect(repository.findByIdForSeller(ORDER_ID, SELLER_ID)).resolves.toBeNull();
+      expect(db.query).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns null when the order row disappeared', async () => {
+      const db = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([{ ok: 1 }])
+          .mockResolvedValueOnce([]),
+      };
+      const repository = new OrderRepository({ db });
+
+      await expect(repository.findByIdForSeller(ORDER_ID, SELLER_ID)).resolves.toBeNull();
+    });
+  });
+
+  describe('updateStatus', () => {
+    it('returns null when no row was updated', async () => {
+      const db = { query: vi.fn().mockResolvedValue([]) };
+      const repository = new OrderRepository({ db });
+
+      await expect(
+        repository.updateStatus({ orderId: ORDER_ID, status: 'shipped' })
+      ).resolves.toBeNull();
+    });
+
+    it('uses an allowed timestamp and forwards the transaction', async () => {
+      const db = {
+        query: vi.fn().mockResolvedValueOnce([orderRow()]).mockResolvedValueOnce([itemRow()]),
+      };
+      const repository = new OrderRepository({ db });
+      const transaction = { id: 'tx' };
+
+      const result = await repository.updateStatus({
+        orderId: ORDER_ID,
+        status: 'shipped',
+        timestampColumn: 'shipped_at',
+        itemsSellerId: SELLER_ID,
+        transaction,
+      });
+
+      expect(result).toBeInstanceOf(Order);
+      expect(db.query.mock.calls[0][0]).toContain('shipped_at = COALESCE(shipped_at, NOW())');
+      expect(db.query.mock.calls[0][1]).toMatchObject({ transaction });
+      expect(db.query.mock.calls[1][1].replacements.sellerId).toBe(SELLER_ID);
+    });
+
+    it('ignores an unsupported timestamp column', async () => {
+      const db = {
+        query: vi.fn().mockResolvedValueOnce([orderRow()]).mockResolvedValueOnce([]),
+      };
+      const repository = new OrderRepository({ db });
+
+      await repository.updateStatus({
+        orderId: ORDER_ID,
+        status: 'confirmed',
+        timestampColumn: 'DROP TABLE',
+      });
+
+      expect(db.query.mock.calls[0][0]).not.toContain('DROP TABLE');
+      expect(db.query.mock.calls[0][0]).not.toContain('COALESCE');
+    });
   });
 });

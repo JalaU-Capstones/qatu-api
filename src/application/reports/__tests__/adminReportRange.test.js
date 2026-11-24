@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  alignPeriod,
   assertDateRange,
   assertGroupBy,
   fillPeriodBuckets,
+  parseUtcDate,
   pickChartCurrency,
   reportValidationError,
 } from '../adminReportRange.js';
@@ -81,6 +83,18 @@ describe('adminReportRange', () => {
       []
     );
     expect(weeks.map((bucket) => bucket.period)).toEqual(['2026-03-02']);
+  });
+
+  it('returns null when parseUtcDate receives a malformed date', () => {
+    expect(parseUtcDate('2026/03/01')).toBeNull();
+    expect(parseUtcDate('2026-3-1')).toBeNull();
+    expect(parseUtcDate('')).toBeNull();
+    expect(parseUtcDate('2026-03-01')).toEqual(new Date(Date.UTC(2026, 2, 1)));
+  });
+
+  it('aligns a Sunday to the previous Monday', () => {
+    const sunday = new Date(Date.UTC(2026, 2, 1));
+    expect(alignPeriod(sunday, 'week')).toEqual(new Date(Date.UTC(2026, 1, 23)));
   });
 
   it('builds a validation error with the API status', () => {

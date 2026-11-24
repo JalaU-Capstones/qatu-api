@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DeleteProductImageUseCase } from '../DeleteProductImageUseCase.js';
 
 const PRODUCT_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -43,6 +43,67 @@ describe('DeleteProductImageUseCase', () => {
       deleteProductImage: vi.fn().mockResolvedValue({ deleted: true }),
     };
     useCase = new DeleteProductImageUseCase({ productRepository, storageService });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const validCommand = () => ({
+    productId: PRODUCT_ID,
+    imageId: IMAGE_ID,
+    sellerId: SELLER_ID,
+    accessToken: ACCESS_TOKEN,
+  });
+
+  const arrangeSuccess = () => {
+    productRepository.findById.mockResolvedValue(product({ state: 'draft' }));
+    productRepository.findImageById.mockResolvedValue(image());
+    productRepository.deleteImage.mockResolvedValue(true);
+  };
+
+  it('requires productRepository and storageService', () => {
+    expect(() => new DeleteProductImageUseCase()).toThrow('productRepository is required');
+    expect(() => new DeleteProductImageUseCase({ productRepository })).toThrow(
+      'storageService is required'
+    );
+  });
+
+  it('throws 404 when the image could not be deleted', async () => {
+    arrangeSuccess();
+    productRepository.deleteImage.mockResolvedValue(false);
+
+    await expect(useCase.execute(validCommand())).rejects.toMatchObject({
+      code: 'PRODUCT_NOT_FOUND',
+      statusCode: 404,
+      message: 'Product image not found',
+    });
+  });
+
+  it('swallows and logs a recomputePrimaryImage failure', async () => {
+    arrangeSuccess();
+    const recomputeError = new Error('recompute failed');
+    productRepository.recomputePrimaryImage.mockRejectedValue(recomputeError);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(useCase.execute(validCommand())).resolves.toHaveProperty('meta.timestamp');
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[deleteProductImage] recomputePrimaryImage failed:',
+      recomputeError
+    );
+  });
+
+  it('swallows and logs a storage deletion failure', async () => {
+    arrangeSuccess();
+    const storageError = new Error('storage down');
+    storageService.deleteProductImage.mockRejectedValue(storageError);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(useCase.execute(validCommand())).resolves.toHaveProperty('meta.timestamp');
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[deleteProductImage] storage delete threw:',
+      storageError
+    );
   });
 
   it('1. rejects a missing productId with 400 VALIDATION_ERROR', async () => {

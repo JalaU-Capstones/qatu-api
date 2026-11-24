@@ -211,6 +211,83 @@ describe('errorHandler Middleware', () => {
       })
     );
   });
+  describe('fallback messages and codes', () => {
+    const expectEnvelope = (res, status, code, message) => {
+      expect(res.status).toHaveBeenCalledWith(status);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: { code, message } }));
+    };
+
+    it('uses the email confirmation message for EMAIL_NOT_CONFIRMED', () => {
+      const res = createMockRes();
+
+      errorHandler(
+        Object.assign(new Error('bad credentials'), { code: 'EMAIL_NOT_CONFIRMED' }),
+        mockReq,
+        res,
+        mockNext
+      );
+
+      expectEnvelope(
+        res,
+        401,
+        'EMAIL_NOT_CONFIRMED',
+        'Please confirm your email before logging in'
+      );
+    });
+
+    it('defaults the code for a 401 without one', () => {
+      const res = createMockRes();
+
+      errorHandler(
+        Object.assign(new Error('no code'), { statusCode: 401 }),
+        mockReq,
+        res,
+        mockNext
+      );
+
+      expectEnvelope(res, 401, 'UNAUTHORIZED', 'Authentication failed');
+    });
+
+    it('defaults messages for 403, 404, 422, 409 and 400 errors without one', () => {
+      const cases = [
+        [403, 'FORBIDDEN', 'You do not have permission to access this resource'],
+        [404, 'NOT_FOUND', 'Resource not found'],
+        [422, 'UNPROCESSABLE_ENTITY', 'The request could not be processed'],
+        [409, 'CONFLICT', 'A resource with these attributes already exists'],
+        [400, 'VALIDATION_ERROR', 'Invalid input data'],
+      ];
+
+      for (const [statusCode, code, message] of cases) {
+        const res = createMockRes();
+
+        errorHandler(Object.assign(new Error(''), { statusCode }), mockReq, res, mockNext);
+
+        expectEnvelope(res, statusCode, code, message);
+      }
+    });
+
+    it('preserves code and message for non-server errors in the generic branch', () => {
+      const res = createMockRes();
+
+      errorHandler(
+        Object.assign(new Error('Teapot'), { statusCode: 418, code: 'I_AM_A_TEAPOT' }),
+        mockReq,
+        res,
+        mockNext
+      );
+
+      expectEnvelope(res, 418, 'I_AM_A_TEAPOT', 'Teapot');
+    });
+
+    it('uses generic code and message for non-server errors without them', () => {
+      const res = createMockRes();
+
+      errorHandler(Object.assign(new Error(''), { statusCode: 418 }), mockReq, res, mockNext);
+
+      expectEnvelope(res, 418, 'ERROR', 'An error occurred');
+    });
+  });
+
   describe('422 Unprocessable Entity (business rules)', () => {
     it('serializes code, message and details', () => {
       const res = createMockRes();

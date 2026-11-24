@@ -36,5 +36,5 @@ export function slugify(text) {
     slug = slug.replace(/-+$/g, '');
   }
 
-  return slug || 'product';
+  return slug;
 }

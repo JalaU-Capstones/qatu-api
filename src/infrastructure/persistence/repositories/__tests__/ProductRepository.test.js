@@ -400,3 +400,416 @@ describe('ProductRepository (unit)', () => {
     });
   });
 });
+
+const ID = '7e2b9a6c-1f2d-4b6e-8c3a-9d5f1e2a4b7c';
+const SELLER_ID = 'c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e7f';
+
+const row = (overrides = {}) => ({
+  id: ID,
+  seller_id: SELLER_ID,
+  category_id: null,
+  name: 'Chair',
+  slug: 'chair',
+  description: null,
+  price: '10.50',
+  currency: 'USD',
+  stock: 3,
+  attributes: '{"color":"black"}',
+  primary_image_path: null,
+  state: 'published',
+  average_rating: '4.50',
+  ratings_count: 1,
+  published_at: null,
+  created_at: '2026-10-09T08:00:00.000Z',
+  updated_at: '2026-10-10T08:00:00.000Z',
+  ...overrides,
+});
+
+const imageRow = () => ({
+  id: 'img-1',
+  product_id: ID,
+  path: 'product-images/chair.webp',
+  alt_text: null,
+  position: 0,
+  created_at: '2026-10-10T08:00:00.000Z',
+});
+
+describe('ProductRepository — remaining branches', () => {
+  let db;
+  let repository;
+
+  beforeEach(() => {
+    db = { query: vi.fn() };
+    repository = new ProductRepository({ db });
+  });
+
+  describe('query result normalization', () => {
+    const cases = [
+      ['nested array', (value) => [[value]]],
+      ['flat array', (value) => [value]],
+      ['unexpected object', () => undefined],
+      ['empty rows', () => []],
+    ];
+
+    const methods = [
+      [
+        'create',
+        () =>
+          repository.create({
+            sellerId: SELLER_ID,
+            categoryId: null,
+            name: 'Chair',
+            slug: 'chair',
+          }),
+      ],
+      ['publish', () => repository.publish({ productId: ID, sellerId: SELLER_ID })],
+      ['unpublish', () => repository.unpublish({ productId: ID, sellerId: SELLER_ID })],
+      [
+        'update',
+        () => repository.update({ productId: ID, sellerId: SELLER_ID, fields: { name: 'X' } }),
+      ],
+      ['softDelete', () => repository.softDelete({ productId: ID, sellerId: SELLER_ID })],
+      ['findImageById', () => repository.findImageById('img-1')],
+      ['deleteImage', () => repository.deleteImage('img-1')],
+      ['recomputePrimaryImage', () => repository.recomputePrimaryImage(ID)],
+      ['addImage', () => repository.addImage({ productId: ID, path: 'product-images/chair.webp' })],
+      ['listImages', () => repository.listImages(ID)],
+      ['findById', () => repository.findById(ID)],
+    ];
+
+    it.each(methods)('%s normalizes every query result shape', async (_name, invoke) => {
+      for (const [_shape, build] of cases) {
+        db.query.mockResolvedValueOnce(build(row()));
+        await expect(invoke()).resolves.toBeDefined();
+        expect(db.query).toHaveBeenCalledTimes(cases.findIndex(([shape]) => shape === _shape) + 1);
+      }
+
+      db.query.mockResolvedValueOnce([]);
+      const result = await invoke();
+      expect(result === null || (Array.isArray(result) && result.length === 0)).toBe(true);
+    });
+
+    it.each([
+      ['create', () => repository.create({ sellerId: SELLER_ID, name: 'Chair', slug: 'chair' })],
+      ['publish', () => repository.publish({ productId: ID, sellerId: SELLER_ID })],
+      ['unpublish', () => repository.unpublish({ productId: ID, sellerId: SELLER_ID })],
+      [
+        'update',
+        () => repository.update({ productId: ID, sellerId: SELLER_ID, fields: { stock: 1 } }),
+      ],
+      ['softDelete', () => repository.softDelete({ productId: ID, sellerId: SELLER_ID })],
+      ['findImageById', () => repository.findImageById('img-1')],
+      ['deleteImage', () => repository.deleteImage('img-1')],
+      ['recomputePrimaryImage', () => repository.recomputePrimaryImage(ID)],
+      ['addImage', () => repository.addImage({ productId: ID, path: 'path' })],
+      ['findById', () => repository.findById(ID)],
+    ])('%s returns null when no row is returned', async (_name, invoke) => {
+      db.query.mockResolvedValueOnce([]);
+      await expect(invoke()).resolves.toBeNull();
+    });
+
+    it('normalizes listImages and countImages result shapes', async () => {
+      db.query.mockResolvedValueOnce([[imageRow()]]);
+      await expect(repository.listImages(ID)).resolves.toEqual([imageRow()]);
+
+      db.query.mockResolvedValueOnce([imageRow()]);
+      await expect(repository.listImages(ID)).resolves.toEqual([imageRow()]);
+
+      db.query.mockResolvedValueOnce(undefined);
+      await expect(repository.listImages(ID)).resolves.toEqual([]);
+
+      db.query.mockResolvedValueOnce([[{ n: 4 }]]);
+      await expect(repository.countImages(ID)).resolves.toBe(4);
+
+      db.query.mockResolvedValueOnce([imageRow()]);
+      await expect(repository.countImages(ID)).resolves.toBe(0);
+
+      db.query.mockResolvedValueOnce(undefined);
+      await expect(repository.countImages(ID)).resolves.toBe(0);
+    });
+  });
+
+  describe('transaction forwarding', () => {
+    const transaction = { id: 'tx' };
+
+    it.each([
+      [
+        'publish',
+        () => repository.publish({ productId: ID, sellerId: SELLER_ID }, { transaction }),
+      ],
+      [
+        'unpublish',
+        () => repository.unpublish({ productId: ID, sellerId: SELLER_ID }, { transaction }),
+      ],
+      [
+        'update',
+        () =>
+          repository.update(
+            { productId: ID, sellerId: SELLER_ID, fields: { name: 'Chair' } },
+            { transaction }
+          ),
+      ],
+      [
+        'softDelete',
+        () => repository.softDelete({ productId: ID, sellerId: SELLER_ID }, { transaction }),
+      ],
+      ['deleteImage', () => repository.deleteImage('img-1', { transaction })],
+      ['recomputePrimaryImage', () => repository.recomputePrimaryImage(ID, { transaction })],
+      [
+        'addImage',
+        () =>
+          repository.addImage(
+            { productId: ID, path: 'product-images/chair.webp' },
+            { transaction }
+          ),
+      ],
+      ['listImages', () => repository.listImages(ID, { transaction })],
+      ['countImages', () => repository.countImages(ID, { transaction })],
+      [
+        'setPrimaryImageIfNull',
+        () =>
+          repository.setPrimaryImageIfNull(
+            { productId: ID, path: 'product-images/chair.webp' },
+            { transaction }
+          ),
+      ],
+    ])('%s forwards an explicit transaction to sequelize', async (_name, invoke) => {
+      db.query.mockResolvedValue([[row()]]);
+
+      await invoke();
+
+      expect(db.query.mock.calls.some(([, options]) => options.transaction === transaction)).toBe(
+        true
+      );
+    });
+  });
+
+  describe('create', () => {
+    it('applies defaults and forwards an optional transaction', async () => {
+      db.query.mockResolvedValueOnce([[row()]]);
+      const transaction = { id: 'tx' };
+
+      await repository.create(
+        { sellerId: SELLER_ID, name: 'Chair', slug: 'chair', attributes: undefined },
+        { transaction }
+      );
+
+      expect(db.query.mock.calls[0][1]).toEqual({
+        replacements: {
+          sellerId: SELLER_ID,
+          categoryId: null,
+          name: 'Chair',
+          slug: 'chair',
+          description: null,
+          price: undefined,
+          currency: 'USD',
+          stock: 0,
+          attributes: '{}',
+        },
+        transaction,
+      });
+    });
+  });
+
+  describe('update', () => {
+    it('serializes attributes, skips disallowed fields and handles empty updates', async () => {
+      db.query.mockResolvedValueOnce([[row()]]);
+      await repository.update({
+        productId: ID,
+        sellerId: SELLER_ID,
+        fields: { name: 'New', attributes: undefined, injected: 'DROP TABLE' },
+      });
+
+      const [sql, options] = db.query.mock.calls[0];
+      expect(sql).toContain('attributes = :attributes::jsonb');
+      expect(sql).toContain('name = :name');
+      expect(sql).not.toContain('injected');
+      expect(options.replacements).toEqual({
+        productId: ID,
+        sellerId: SELLER_ID,
+        attributes: '{}',
+        name: 'New',
+      });
+
+      await expect(
+        repository.update({ productId: ID, sellerId: SELLER_ID, fields: {} })
+      ).resolves.toBeNull();
+      expect(db.query).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('setPrimaryImageIfNull', () => {
+    it('reports whether the conditional UPDATE matched a row', async () => {
+      db.query.mockResolvedValueOnce([[{ id: ID }]]);
+      await expect(
+        repository.setPrimaryImageIfNull({ productId: ID, path: 'p.webp' })
+      ).resolves.toBe(true);
+
+      db.query.mockResolvedValueOnce([]);
+      await expect(
+        repository.setPrimaryImageIfNull({ productId: ID, path: 'p.webp' })
+      ).resolves.toBe(false);
+
+      db.query.mockResolvedValueOnce(undefined);
+      await expect(
+        repository.setPrimaryImageIfNull({ productId: ID, path: 'p.webp' })
+      ).resolves.toBe(false);
+    });
+  });
+
+  describe('toDomain', () => {
+    it('falls back to an empty object for malformed JSON attributes', () => {
+      const product = repository.toDomain(row({ attributes: '{broken' }));
+
+      expect(product).toBeInstanceOf(Product);
+      expect(product.attributes).toEqual({});
+      expect(product.category_id).toBeNull();
+    });
+
+    it('keeps a real description instead of applying the null fallback', () => {
+      expect(repository.toDomain(row({ description: 'A wooden chair' })).description).toBe(
+        'A wooden chair'
+      );
+    });
+
+    it('applies the empty attributes fallback', () => {
+      expect(repository.toDomain(row({ attributes: null })).attributes).toEqual({});
+    });
+  });
+
+  describe('findAll', () => {
+    it('uses defaults for invalid pagination and supports uppercase sort order', async () => {
+      db.query.mockResolvedValueOnce([[row()]]);
+
+      await repository.findAll({ page: 'abc', limit: 0, sort: { field: 'price', order: 'ASC' } });
+
+      expect(db.query.mock.calls[0][1].replacements).toMatchObject({ limit: 20, offset: 0 });
+      expect(db.query.mock.calls[0][0]).toContain('ORDER BY p.price ASC');
+    });
+
+    it('ignores blank price filters and missing totals', async () => {
+      db.query.mockResolvedValueOnce([[row()]]);
+
+      const result = await repository.findAll({
+        page: null,
+        limit: null,
+        filters: { minPrice: '', maxPrice: null, categoryId: null, sellerId: '' },
+      });
+
+      expect(db.query.mock.calls[0][0]).not.toContain('p.price >=');
+      expect(db.query.mock.calls[0][0]).not.toContain('p.price <=');
+      expect(result.total).toBe(0);
+    });
+
+    it('handles flat and unexpected query results', async () => {
+      db.query.mockResolvedValueOnce([row({ total_count: 2 })]);
+      await expect(repository.findAll()).resolves.toMatchObject({ total: 2 });
+
+      db.query.mockResolvedValueOnce(undefined);
+      await expect(repository.findAll()).resolves.toEqual({ items: [], total: 0 });
+    });
+  });
+
+  describe('listBySeller', () => {
+    it('uses default pagination and returns early when the count is zero', async () => {
+      db.query.mockResolvedValueOnce([[{ total: 0 }]]);
+
+      await expect(repository.listBySeller(SELLER_ID)).resolves.toEqual({
+        items: [],
+        total: 0,
+        page: 1,
+        limit: 20,
+      });
+      expect(db.query).toHaveBeenCalledTimes(1);
+    });
+
+    it('filters by status and maps a flat result set', async () => {
+      db.query
+        .mockResolvedValueOnce([{ total: '1' }])
+        .mockResolvedValueOnce([row({ state: 'draft' })]);
+
+      const result = await repository.listBySeller(SELLER_ID, {
+        page: 'x',
+        limit: 'y',
+        status: 'draft',
+      });
+
+      expect(result).toMatchObject({ total: 1, page: 1, limit: 20 });
+      expect(result.items[0]).toBeInstanceOf(Product);
+      expect(db.query.mock.calls[0][0]).toContain('p.state = :status');
+      expect(db.query.mock.calls[0][1].replacements).toMatchObject({ status: 'draft' });
+    });
+
+    it('handles nested, flat and unexpected result shapes', async () => {
+      db.query.mockResolvedValueOnce([{ total: 1 }]).mockResolvedValueOnce([[row()]]);
+      await expect(repository.listBySeller(SELLER_ID)).resolves.toMatchObject({ total: 1 });
+
+      db.query.mockResolvedValueOnce([{ total: 1 }]).mockResolvedValueOnce([row()]);
+      await expect(repository.listBySeller(SELLER_ID)).resolves.toMatchObject({ total: 1 });
+
+      db.query.mockResolvedValueOnce([{ total: 1 }]).mockResolvedValueOnce(undefined);
+      await expect(repository.listBySeller(SELLER_ID)).resolves.toMatchObject({ total: 1 });
+
+      db.query.mockResolvedValueOnce(undefined).mockResolvedValueOnce(undefined);
+      await expect(repository.listBySeller(SELLER_ID)).resolves.toMatchObject({ total: 0 });
+    });
+  });
+
+  describe('findByIdWithDetails', () => {
+    it('falls back to empty values for malformed JSON fields', async () => {
+      db.query.mockResolvedValueOnce([
+        [
+          row({
+            attributes: 'not-json',
+            seller: 'not-json',
+            category: 'not-json',
+            images: 'not-json',
+          }),
+        ],
+      ]);
+
+      await expect(repository.findByIdWithDetails(ID)).resolves.toEqual({
+        ...row({
+          attributes: 'not-json',
+          seller: 'not-json',
+          category: 'not-json',
+          images: 'not-json',
+        }),
+        attributes: {},
+        seller: null,
+        category: null,
+        images: [],
+      });
+    });
+
+    it('handles flat results and null optional fields', async () => {
+      db.query.mockResolvedValueOnce([
+        row({ attributes: null, seller: null, category: null, images: null }),
+      ]);
+
+      const result = await repository.findByIdWithDetails(ID);
+      expect(result.attributes).toEqual({});
+      expect(result.seller).toBeNull();
+      expect(result.images).toEqual([]);
+    });
+
+    it('returns null for unexpected query results', async () => {
+      db.query.mockResolvedValueOnce(undefined);
+      await expect(repository.findByIdWithDetails(ID)).resolves.toBeNull();
+
+      db.query.mockResolvedValueOnce([[]]);
+      await expect(repository.findByIdWithDetails(ID)).resolves.toBeNull();
+    });
+  });
+
+  describe('decrementStockIfAvailable', () => {
+    it('omits the transaction when none is provided', async () => {
+      db.query.mockResolvedValueOnce([{ stock: '2' }]);
+
+      await expect(
+        repository.decrementStockIfAvailable({ productId: ID, quantity: 1 })
+      ).resolves.toBe(2);
+      expect(db.query.mock.calls[0][1]).not.toHaveProperty('transaction');
+    });
+  });
+});

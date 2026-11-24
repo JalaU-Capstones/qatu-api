@@ -153,6 +153,19 @@ describe('UpdateCategoryUseCase', () => {
     expect(categoryRepository.update).not.toHaveBeenCalled();
   });
 
+  it('should reject a non-string name and allow clearing the parent', async () => {
+    categoryRepository.update.mockResolvedValue(buildCategory({ parent_id: null }));
+
+    await expect(useCase.execute({ categoryId: CATEGORY_ID, name: 123 })).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Category name must be between 2 and 80 characters.',
+    });
+
+    await useCase.execute({ categoryId: CATEGORY_ID, parent_id: null });
+    expect(categoryRepository.update).toHaveBeenCalledWith(CATEGORY_ID, { parent_id: null });
+  });
+
   it('should set a valid parent category', async () => {
     categoryRepository.findById
       .mockResolvedValueOnce(buildCategory())

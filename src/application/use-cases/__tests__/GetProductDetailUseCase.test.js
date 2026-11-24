@@ -115,6 +115,18 @@ describe('GetProductDetailUseCase', () => {
     expect(result.data.id).toBe(validId);
   });
 
+  it('should throw 404 when the repository returns no product', async () => {
+    const mockRepo = { findByIdWithDetails: vi.fn().mockResolvedValue(null) };
+    const useCase = new GetProductDetailUseCase({ productRepository: mockRepo });
+    const dto = new GetProductDetailRequestDTO({ productId: validId });
+
+    await expect(useCase.execute(dto)).rejects.toMatchObject({
+      message: 'Product not found',
+      code: 'PRODUCT_NOT_FOUND',
+      statusCode: 404,
+    });
+  });
+
   it('should throw 404 without querying database if productId is not a valid UUID', async () => {
     const mockRepo = { findByIdWithDetails: vi.fn() };
     const useCase = new GetProductDetailUseCase({ productRepository: mockRepo });

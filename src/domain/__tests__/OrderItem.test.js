@@ -77,4 +77,67 @@ describe('OrderItem Domain Entity', () => {
       created_at: '2026-10-14T10:00:00.000Z',
     });
   });
+
+  it('defaults optional product identifiers and image path to null', () => {
+    const item = new OrderItem({
+      orderId: validData.orderId,
+      productName: validData.productName,
+      quantity: 1,
+      unitPrice: 10,
+    });
+
+    expect(item.productId).toBeNull();
+    expect(item.productImagePath).toBeNull();
+    expect(item.createdAt).toBeNull();
+    expect(item.toJSON()).toEqual({
+      id: null,
+      order_id: validData.orderId,
+      product_id: null,
+      product_name: validData.productName,
+      product_image_path: null,
+      quantity: 1,
+      unit_price: 10,
+      subtotal: 10,
+      created_at: null,
+    });
+  });
+
+  it('falls back to snake_case aliases and accepts explicit nulls', () => {
+    const item = new OrderItem({
+      order_id: validData.orderId,
+      product_id: undefined,
+      product_name: validData.productName,
+      product_image_path: null,
+      quantity: 2,
+      unit_price: 25,
+      created_at: '2026-10-15T10:00:00.000Z',
+    });
+
+    expect(item.productId).toBeNull();
+    expect(item.productImagePath).toBeNull();
+    expect(item.createdAt).toEqual(new Date('2026-10-15T10:00:00.000Z'));
+    expect(item.createdAt).not.toBe(item.createdAt);
+  });
+
+  it('keeps an explicit subtotal instead of computing it', () => {
+    const item = new OrderItem({
+      ...validData,
+      subtotal: 999,
+      id: null,
+      productId: null,
+      productImagePath: '',
+    });
+
+    expect(item.id).toBeNull();
+    expect(item.subtotal).toBe(999);
+    expect(item.productImagePath).toBeNull();
+    expect(Object.isFrozen(item)).toBe(true);
+  });
+
+  it('rejects non-string identifiers, prices and invalid quantities', () => {
+    expect(() => new OrderItem({ ...validData, orderId: null })).toThrow(TypeError);
+    expect(() => new OrderItem({ ...validData, productName: 123 })).toThrow(TypeError);
+    expect(() => new OrderItem({ ...validData, unitPrice: '10' })).toThrow(RangeError);
+    expect(() => new OrderItem({ ...validData, quantity: undefined })).toThrow(RangeError);
+  });
 });

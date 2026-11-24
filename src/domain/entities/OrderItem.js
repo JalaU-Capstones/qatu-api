@@ -26,11 +26,9 @@ export class OrderItem {
     orderId,
     order_id,
     productId = null,
-    product_id,
     productName,
     product_name,
     productImagePath = null,
-    product_image_path,
     quantity,
     unitPrice,
     unit_price,
@@ -41,9 +39,8 @@ export class OrderItem {
     const resolvedOrderId = orderId !== undefined ? orderId : order_id;
     const resolvedProductName = productName !== undefined ? productName : product_name;
     const resolvedUnitPrice = unitPrice !== undefined ? unitPrice : unit_price;
-    const resolvedProductId = productId !== undefined ? productId : (product_id ?? null);
-    const resolvedImagePath =
-      productImagePath !== undefined ? productImagePath : (product_image_path ?? null);
+    const resolvedProductId = productId;
+    const resolvedImagePath = productImagePath;
 
     if (!resolvedOrderId || typeof resolvedOrderId !== 'string') {
       throw new TypeError('OrderItem orderId is required');

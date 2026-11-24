@@ -13,6 +13,11 @@ const product = (overrides = {}) => ({
 });
 
 describe('DeleteProductUseCase', () => {
+  it('requires a productRepository', () => {
+    expect(() => new DeleteProductUseCase()).toThrow('productRepository is required');
+    expect(() => new DeleteProductUseCase({})).toThrow('productRepository is required');
+  });
+
   let productRepository;
   let useCase;
 

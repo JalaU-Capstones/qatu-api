@@ -67,4 +67,17 @@ describe('GetCurrentUserUseCase', () => {
 
     expect(result.data.user.email).toBe('buyer@example.com');
   });
+
+  it('defaults created_at and roles when the profile omits them', async () => {
+    mockProfileRepository.findById.mockResolvedValue({
+      id: 'user-uuid-2',
+      username: 'buyer_test',
+      email: 'buyer@example.com',
+    });
+
+    const result = await useCase.execute({ userId: 'user-uuid-2' });
+
+    expect(result.data.user.created_at).toEqual(expect.any(String));
+    expect(result.data.roles).toEqual([]);
+  });
 });

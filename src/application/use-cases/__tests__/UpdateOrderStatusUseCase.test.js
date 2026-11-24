@@ -56,6 +56,78 @@ describe('UpdateOrderStatusUseCase', () => {
 
   it('requires dependencies', () => {
     expect(() => new UpdateOrderStatusUseCase()).toThrow('orderRepository is required');
+    expect(() => new UpdateOrderStatusUseCase({ orderRepository: {} })).toThrow(
+      'outboxRepository is required'
+    );
+    expect(
+      () => new UpdateOrderStatusUseCase({ orderRepository: {}, outboxRepository: {} })
+    ).toThrow('transactionManager is required');
+  });
+
+  it.each([
+    [{ userId: sellerId, nextStatus: 'shipped' }, 'orderId is required', 'VALIDATION_ERROR', 400],
+    [
+      { orderId: 123, userId: sellerId, nextStatus: 'shipped' },
+      'orderId is required',
+      'VALIDATION_ERROR',
+      400,
+    ],
+    [{ orderId, nextStatus: 'shipped' }, 'Authentication failed', 'UNAUTHORIZED', 401],
+    [{ orderId, userId: 123, nextStatus: 'shipped' }, 'Authentication failed', 'UNAUTHORIZED', 401],
+    [{ orderId, userId: sellerId }, 'status is required', 'VALIDATION_ERROR', 400],
+    [{ orderId, userId: sellerId, nextStatus: 123 }, 'status is required', 'VALIDATION_ERROR', 400],
+  ])('rejects invalid command %j', async (command, message, code, statusCode) => {
+    const { useCase, orderRepository } = buildUseCase();
+
+    await expect(useCase.execute(command)).rejects.toMatchObject({ message, code, statusCode });
+    expect(orderRepository.findById).not.toHaveBeenCalled();
+  });
+
+  it('throws 404 when the transactional update returns no order', async () => {
+    const { useCase, orderRepository } = buildUseCase();
+    orderRepository.updateStatus.mockResolvedValueOnce(null);
+
+    await expect(
+      useCase.execute({ orderId, userId: sellerId, nextStatus: 'shipped' })
+    ).rejects.toMatchObject({ message: 'Order not found', code: 'NOT_FOUND', statusCode: 404 });
+  });
+
+  it('fails closed with no roles when no profileRepository is injected', async () => {
+    const orderRepository = {
+      findById: vi.fn().mockResolvedValue(baseOrder('confirmed')),
+      sellerHasItemsOnOrder: vi.fn().mockResolvedValue(false),
+      updateStatus: vi.fn(),
+    };
+    const outboxRepository = { enqueue: vi.fn() };
+    const transactionManager = { run: vi.fn(async (work) => work({ id: 'tx' })) };
+    const useCase = new UpdateOrderStatusUseCase({
+      orderRepository,
+      outboxRepository,
+      transactionManager,
+    });
+
+    await expect(
+      useCase.execute({ orderId, userId: buyerId, nextStatus: 'cancelled' })
+    ).rejects.toMatchObject({ message: 'Invalid status transition', statusCode: 422 });
+  });
+
+  it('fails closed when the profile has no roles array', async () => {
+    const orderRepository = {
+      findById: vi.fn().mockResolvedValue(baseOrder('confirmed')),
+      sellerHasItemsOnOrder: vi.fn().mockResolvedValue(false),
+      updateStatus: vi.fn(),
+    };
+    const transactionManager = { run: vi.fn(async (work) => work({ id: 'tx' })) };
+    const useCase = new UpdateOrderStatusUseCase({
+      orderRepository,
+      outboxRepository: { enqueue: vi.fn() },
+      transactionManager,
+      profileRepository: { findById: vi.fn().mockResolvedValue(null) },
+    });
+
+    await expect(
+      useCase.execute({ orderId, userId: buyerId, nextStatus: 'cancelled' })
+    ).rejects.toMatchObject({ statusCode: 422 });
   });
 
   it('Scenario: Update order status confirmed → shipped and enqueues outbox', async () => {
