@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.integration.test.js'],
+    maxWorkers: 1,
+    hookTimeout: 120_000,
     testTimeout: 30000,
   },
 });
