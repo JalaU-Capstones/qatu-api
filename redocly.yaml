@@ -14,7 +14,7 @@ rules:
   operation-2xx-response: error
   operation-4xx-response: warn
   no-invalid-media-type-examples: error
-  no-example-value-and-externalValue: error
+  spec-example-values: error
   no-server-example.com: off
   security-defined: error
   tag-description: warn

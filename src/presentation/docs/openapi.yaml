@@ -97,11 +97,12 @@ paths:
   /seller-applications/me:
     $ref: './paths/seller-applications.yaml#/getMine'
 
+  # ── Admin Seller Applications ─────────────────────────────────────────────────
   /admin/seller-applications:
-    $ref: './paths/seller-applications.yaml#/adminList'
+    $ref: './paths/admin.yaml#/sellerApplications'
 
   /admin/seller-applications/{applicationId}:
-    $ref: './paths/seller-applications.yaml#/adminReview'
+    $ref: './paths/admin.yaml#/reviewSellerApplication'
 
   # ── Categories ────────────────────────────────────────────────────────────────
   /categories:

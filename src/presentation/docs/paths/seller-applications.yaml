@@ -4,6 +4,7 @@ create:
     summary: Submit a seller application
     description: |
       Allows an authenticated buyer to apply to become a seller.
+      Administrators cannot submit seller applications.
       A user may only have one pending or active application at a time.
     tags:
       - seller-applications
@@ -65,6 +66,8 @@ create:
         $ref: '../components/responses/errors.yaml#/BadRequest'
       '401':
         $ref: '../components/responses/errors.yaml#/Unauthorized'
+      '403':
+        $ref: '../components/responses/errors.yaml#/Forbidden'
       '409':
         $ref: '../components/responses/errors.yaml#/Conflict'
       '422':
@@ -124,129 +127,5 @@ getMine:
         $ref: '../components/responses/errors.yaml#/Unauthorized'
       '404':
         $ref: '../components/responses/errors.yaml#/NotFound'
-      '500':
-        $ref: '../components/responses/errors.yaml#/InternalServerError'
-
-adminList:
-  get:
-    operationId: adminListSellerApplications
-    summary: List all seller applications (admin)
-    description: |
-      Returns a paginated list of seller applications. Admin only.
-      Can be filtered by `status` (pending, approved, rejected).
-    tags:
-      - seller-applications
-      - admin
-    parameters:
-      - $ref: '../components/parameters/pagination.yaml#/page'
-      - $ref: '../components/parameters/pagination.yaml#/limit'
-      - name: status
-        in: query
-        description: Filter applications by status.
-        schema:
-          type: string
-          enum: [pending, approved, rejected]
-    responses:
-      '200':
-        description: Paginated list of seller applications.
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [data]
-              properties:
-                data:
-                  type: array
-                  items:
-                    $ref: '../components/schemas/SellerApplication.yaml'
-                meta:
-                  $ref: '../components/schemas/shared.yaml#/PaginationMeta'
-      '401':
-        $ref: '../components/responses/errors.yaml#/Unauthorized'
-      '403':
-        $ref: '../components/responses/errors.yaml#/Forbidden'
-      '500':
-        $ref: '../components/responses/errors.yaml#/InternalServerError'
-
-adminReview:
-  patch:
-    operationId: adminReviewSellerApplication
-    summary: Approve or reject a seller application (admin)
-    description: |
-      Updates the status of a seller application to `approved` or `rejected`.
-      Admin only. On approval, the user's role is elevated to `seller`.
-    tags:
-      - seller-applications
-      - admin
-    parameters:
-      - $ref: '../components/parameters/path-ids.yaml#/applicationId'
-      - $ref: '../components/parameters/csrf-token.yaml#/csrfToken'
-    requestBody:
-      required: true
-      content:
-        application/json:
-          schema:
-            type: object
-            required:
-              - status
-            properties:
-              status:
-                type: string
-                enum: [approved, rejected]
-                example: approved
-              rejection_reason:
-                type: string
-                maxLength: 500
-                description: |
-                  Required when `status` is `rejected`. Explains the rejection to the
-                  applicant and is surfaced in the `SellerRejected` notification.
-                example: 'Insufficient business documentation.'
-          examples:
-            approveApplication:
-              summary: Approve application
-              value:
-                status: approved
-            rejectApplication:
-              summary: Reject application
-              value:
-                status: rejected
-                rejection_reason: 'Insufficient business description.'
-    responses:
-      '200':
-        description: Seller application reviewed successfully.
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [data]
-              properties:
-                data:
-                  $ref: '../components/schemas/SellerApplication.yaml'
-                meta:
-                  $ref: '../components/schemas/shared.yaml#/Meta'
-      '400':
-        $ref: '../components/responses/errors.yaml#/BadRequest'
-      '401':
-        $ref: '../components/responses/errors.yaml#/Unauthorized'
-      '403':
-        $ref: '../components/responses/errors.yaml#/Forbidden'
-      '404':
-        $ref: '../components/responses/errors.yaml#/NotFound'
-      '422':
-        description: The application has already been reviewed or the requested transition is invalid.
-        content:
-          application/json:
-            schema:
-              $ref: '../components/schemas/Error.yaml'
-            examples:
-              alreadyReviewed:
-                summary: Application already approved or rejected
-                value:
-                  error:
-                    code: 'ALREADY_REVIEWED'
-                    message: 'This application has already been reviewed.'
-                    details: []
-                  meta:
-                    timestamp: '2026-10-14T12:00:00.000Z'
       '500':
         $ref: '../components/responses/errors.yaml#/InternalServerError'
