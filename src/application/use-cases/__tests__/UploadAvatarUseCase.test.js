@@ -60,6 +60,23 @@ describe('UploadAvatarUseCase', () => {
     );
   });
 
+  it('accepts a file name without an extension', async () => {
+    const result = await useCase.execute({
+      userId,
+      requestingUserId: userId,
+      buffer: PNG_BUF,
+      mimeType: 'image/png',
+      originalName: 'avatar',
+      size: PNG_BUF.length,
+      accessToken: 'test-jwt',
+    });
+
+    expect(mockStorageService.uploadAvatar).toHaveBeenCalledWith(
+      expect.objectContaining({ extension: 'png', originalName: 'avatar' })
+    );
+    expect(result.data.id).toBe(userId);
+  });
+
   it('should throw 400 VALIDATION_ERROR when accessToken is missing', async () => {
     await expect(
       useCase.execute({

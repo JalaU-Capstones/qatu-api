@@ -21,4 +21,21 @@ describe('IProfileRepository Interface', () => {
     const repo = new IProfileRepository();
     await expect(repo.update('id-1', { bio: 'test' })).rejects.toThrow('Method not implemented');
   });
+
+  it('should throw Method not implemented when calling getRoleNames', async () => {
+    const repo = new IProfileRepository();
+    await expect(repo.getRoleNames('user-1')).rejects.toThrow('Method not implemented');
+  });
+
+  it('should throw Method not implemented when calling assignRole with default options', async () => {
+    const repo = new IProfileRepository();
+    await expect(repo.assignRole('profile-1', 'seller')).rejects.toThrow('Method not implemented');
+  });
+
+  it('should throw Method not implemented when calling assignRole with explicit options', async () => {
+    const repo = new IProfileRepository();
+    await expect(
+      repo.assignRole('profile-1', 'admin', { assignedBy: 'admin-1', transaction: {} })
+    ).rejects.toThrow('Method not implemented');
+  });
 });

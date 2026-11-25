@@ -36,4 +36,18 @@ describe('slugify', () => {
     expect(result.length).toBeLessThanOrEqual(100);
     expect(result.endsWith('-')).toBe(false);
   });
+
+  it('coerces non-string values and falls back to product for empty input', () => {
+    expect(slugify(12345)).toBe('12345');
+    expect(slugify(null)).toBe('product');
+    expect(slugify(undefined)).toBe('product');
+    expect(slugify('')).toBe('product');
+  });
+
+  it('truncates a single long word without a word boundary', () => {
+    const result = slugify('a'.repeat(150));
+
+    expect(result).toBe('a'.repeat(100));
+    expect(result.endsWith('-')).toBe(false);
+  });
 });

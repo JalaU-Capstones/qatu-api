@@ -52,6 +52,18 @@ describe('cookieHelper', () => {
       expect(res.cookie).toHaveBeenCalledTimes(3);
     });
 
+    it('marks cookies as secure in production', () => {
+      process.env.NODE_ENV = 'production';
+      const res = fakeRes();
+
+      setSessionCookies(res, { accessToken: 'a', refreshToken: 'r', csrfToken: 'c' });
+      clearSessionCookies(res);
+
+      expect(res.cookie).toHaveBeenCalledTimes(3);
+      expect(res.cookie.mock.calls.every(([, , options]) => options.secure === true)).toBe(true);
+      expect(res.clearCookie.mock.calls.every(([, options]) => options.secure === true)).toBe(true);
+    });
+
     it('sets access_token with HttpOnly, Strict, Path=/, and 1h Max-Age', () => {
       const res = fakeRes();
       setSessionCookies(res, { accessToken: 'a', refreshToken: 'r', csrfToken: 'c' });
@@ -139,5 +151,25 @@ describe('cookieHelper', () => {
       expect(getCsrfTokenFromCookies({ cookies: { csrf_token: 'x' } })).toBe('x');
       expect(getCsrfTokenFromCookies({ cookies: {} })).toBeNull();
     });
+  });
+});
+
+describe('cookieHelper environment fallback', () => {
+  afterEach(() => {
+    vi.doUnmock('../../config/env.js');
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it('uses env.NODE_ENV when process.env.NODE_ENV is unset', async () => {
+    vi.stubEnv('NODE_ENV', '');
+    vi.doMock('../../config/env.js', () => ({ env: { NODE_ENV: 'production' } }));
+    vi.resetModules();
+    const { setSessionCookies: setCookies } = await import('../cookieHelper.js');
+    const res = { cookie: vi.fn(), clearCookie: vi.fn() };
+
+    setCookies(res, { accessToken: 'a', refreshToken: 'r', csrfToken: 'c' });
+
+    expect(res.cookie.mock.calls[0][2].secure).toBe(true);
   });
 });

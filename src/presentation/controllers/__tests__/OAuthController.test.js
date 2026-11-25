@@ -66,4 +66,21 @@ describe('OAuthController.exchange', () => {
     expect(next).toHaveBeenCalledWith(err);
     expect(res.status).not.toHaveBeenCalled();
   });
+
+  it('falls back to an empty body when neither body nor validatedBody is present', async () => {
+    useCase.execute.mockResolvedValue({
+      user: { id: 'u1' },
+      profile: { id: 'u1' },
+      roles: [],
+      accessToken: 'at',
+      refreshToken: 'rt',
+    });
+
+    await controller.exchange({}, res, next);
+
+    expect(useCase.execute).toHaveBeenCalledWith({
+      accessToken: undefined,
+      refreshToken: undefined,
+    });
+  });
 });

@@ -152,6 +152,22 @@ describe('NotificationConsumer', () => {
     expect(channel.ack).not.toHaveBeenCalled();
   });
 
+  it('routes messages delivered through the broker callback', async () => {
+    const handle = vi.spyOn(consumer, 'handle').mockResolvedValue(undefined);
+    await consumer.start(channel);
+    const callback = channel.consume.mock.calls[0][1];
+    const message = { content: Buffer.from('payload') };
+
+    callback(message);
+
+    await vi.waitFor(() => expect(handle).toHaveBeenCalledWith(message));
+  });
+
+  it('stop() is a no-op before start()', async () => {
+    await expect(consumer.stop()).resolves.toBeUndefined();
+    expect(channel.cancel).not.toHaveBeenCalled();
+  });
+
   it('stop() cancels the consumer and tolerates an already closed channel', async () => {
     await consumer.start(channel);
     await consumer.stop();

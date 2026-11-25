@@ -27,6 +27,11 @@ const product = (overrides = {}) => ({
 });
 
 describe('UnpublishProductUseCase', () => {
+  it('requires a productRepository', () => {
+    expect(() => new UnpublishProductUseCase()).toThrow('productRepository is required');
+    expect(() => new UnpublishProductUseCase({})).toThrow('productRepository is required');
+  });
+
   let productRepository;
   let useCase;
 
@@ -182,5 +187,17 @@ describe('UnpublishProductUseCase', () => {
       productId: PRODUCT_ID,
       sellerId: SELLER_ID,
     });
+  });
+
+  it('falls back to the unpublished row when no detailed product is returned', async () => {
+    const published = product({ state: 'published', published_at: PUBLISHED_AT });
+    productRepository.findById.mockResolvedValue(published);
+    const unpublished = { ...published, state: 'unpublished' };
+    productRepository.unpublish.mockResolvedValue(unpublished);
+    productRepository.findByIdWithDetails.mockResolvedValue(null);
+
+    const result = await useCase.execute({ productId: PRODUCT_ID, sellerId: SELLER_ID });
+
+    expect(result.data.state).toBe('unpublished');
   });
 });

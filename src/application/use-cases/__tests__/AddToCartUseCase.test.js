@@ -252,6 +252,32 @@ describe('AddToCartUseCase', () => {
     expect(cartRepository.countByUser).not.toHaveBeenCalled();
   });
 
+  it('reports an out-of-stock cart when no units remain', async () => {
+    const product = new Product({
+      id: productId,
+      name: 'Sold Out Product',
+      slug: 'sold-out-product',
+      price: 10,
+      stock: 2,
+      state: 'published',
+    });
+    const cartRepository = {
+      findByUserAndProduct: vi
+        .fn()
+        .mockResolvedValue(new CartItem({ id: 'c-2', userId, productId, quantity: 2 })),
+      incrementQuantity: vi.fn(),
+      countByUser: vi.fn(),
+    };
+    const productRepository = { findById: vi.fn().mockResolvedValue(product) };
+    const useCase = new AddToCartUseCase({ cartRepository, productRepository });
+
+    await expect(
+      useCase.execute(new AddToCartRequestDTO({ userId, productId, quantity: 1 }))
+    ).rejects.toMatchObject({ code: 'INSUFFICIENT_STOCK', statusCode: 422 });
+
+    expect(cartRepository.incrementQuantity).not.toHaveBeenCalled();
+  });
+
   it('Guards against regression: never calls cartRepository.countByUser and never accesses productRepository.db', async () => {
     const product = new Product({
       id: productId,

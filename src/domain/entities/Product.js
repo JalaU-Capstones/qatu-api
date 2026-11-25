@@ -78,7 +78,7 @@ export class Product {
     const rawRatingsCount = ratings_count !== undefined ? ratings_count : (ratingsCount ?? 0);
     this.ratings_count = Number(rawRatingsCount);
 
-    const rawPublished = published_at !== undefined ? published_at : publishedAt;
+    const rawPublished = published_at ?? publishedAt;
     this.published_at = rawPublished ? new Date(rawPublished) : null;
 
     const rawCreated = created_at !== undefined ? created_at : createdAt;

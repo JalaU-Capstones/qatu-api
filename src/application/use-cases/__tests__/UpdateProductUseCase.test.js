@@ -39,6 +39,34 @@ describe('UpdateProductUseCase', () => {
     useCase = new UpdateProductUseCase({ productRepository });
   });
 
+  it('requires a productRepository', () => {
+    expect(() => new UpdateProductUseCase()).toThrow('productRepository is required');
+    expect(() => new UpdateProductUseCase({})).toThrow('productRepository is required');
+  });
+
+  it.each([[null], [undefined], [[]], ['name']])(
+    'rejects a non-object fields value (%j)',
+    async (fields) => {
+      await expect(
+        useCase.execute({ productId: PRODUCT_ID, sellerId: SELLER_ID, fields })
+      ).rejects.toMatchObject({
+        code: 'VALIDATION_ERROR',
+        statusCode: 400,
+        message: 'At least one field is required',
+      });
+    }
+  );
+
+  it('rethrows an unexpected repository error unchanged', async () => {
+    const unexpected = new Error('connection reset');
+    productRepository.findById.mockResolvedValue(product());
+    productRepository.update.mockRejectedValue(unexpected);
+
+    await expect(
+      useCase.execute({ productId: PRODUCT_ID, sellerId: SELLER_ID, fields: { name: 'New Name' } })
+    ).rejects.toBe(unexpected);
+  });
+
   it('1. rejects a missing productId with 400 VALIDATION_ERROR', async () => {
     await expect(
       useCase.execute({ sellerId: SELLER_ID, fields: { name: 'New Name' } })
@@ -340,5 +368,21 @@ describe('UpdateProductUseCase', () => {
     expect(result.data.currency).toBe('USD');
     expect(result.data.price).toBe(50);
     expect(productRepository.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the updated row when no detailed product is returned', async () => {
+    const existing = product();
+    productRepository.findById.mockResolvedValue(existing);
+    const updated = { ...existing, price: '99.99' };
+    productRepository.update.mockResolvedValue(updated);
+    productRepository.findByIdWithDetails.mockResolvedValue(null);
+
+    const result = await useCase.execute({
+      productId: PRODUCT_ID,
+      sellerId: SELLER_ID,
+      fields: { price: 99.99 },
+    });
+
+    expect(result.data.price).toBe(99.99);
   });
 });

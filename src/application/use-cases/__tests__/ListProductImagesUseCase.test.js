@@ -15,6 +15,11 @@ describe('ListProductImagesUseCase', () => {
     useCase = new ListProductImagesUseCase({ productRepository });
   });
 
+  it('requires a productRepository', () => {
+    expect(() => new ListProductImagesUseCase()).toThrow('productRepository is required');
+    expect(() => new ListProductImagesUseCase({})).toThrow('productRepository is required');
+  });
+
   it('throws 400 VALIDATION_ERROR when productId is missing', async () => {
     await expect(useCase.execute({})).rejects.toMatchObject({
       code: 'VALIDATION_ERROR',

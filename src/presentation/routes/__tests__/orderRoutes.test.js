@@ -1,8 +1,10 @@
+import express from 'express';
 import request from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../../app.js';
 import { Order } from '../../../domain/entities/Order.js';
 import { supabase } from '../../../infrastructure/config/supabase.js';
+import { errorHandler } from '../../middleware/errorHandler.js';
 import { createOrderRouter } from '../orderRoutes.js';
 
 vi.mock('../../../infrastructure/config/supabase.js', () => ({
@@ -433,5 +435,65 @@ describe('Order Routes Integration - /v1/orders', () => {
       });
       expect(JSON.stringify(res.body)).not.toContain('deadlock');
     });
+  });
+});
+
+describe('order route handlers', () => {
+  const handlerOrderId = '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a';
+  let app;
+  let orderController;
+
+  beforeEach(async () => {
+    vi.doMock('../../middleware/authMiddleware.js', () => ({
+      authMiddleware: (req, _res, next) => {
+        req.user = { id: 'buyer-1' };
+        return next();
+      },
+    }));
+    vi.resetModules();
+    const { createOrderRouter: freshCreateOrderRouter } = await import('../orderRoutes.js');
+
+    orderController = {
+      createOrder: vi.fn((_req, res) => res.status(201).json({})),
+      listOrders: vi.fn((_req, res) => res.status(200).json({})),
+      updateOrderStatus: vi.fn((_req, res) => res.status(200).json({})),
+      getOrderById: vi.fn((_req, res) => res.status(200).json({})),
+    };
+    const router = freshCreateOrderRouter({ orderController });
+
+    app = express();
+    app.use(express.json());
+    app.use('/v1/orders', router);
+    app.use(errorHandler);
+  });
+
+  afterEach(() => {
+    vi.doUnmock('../../middleware/authMiddleware.js');
+    vi.resetModules();
+  });
+
+  it('delegates PATCH /:id/status to the controller after validation', async () => {
+    const response = await request(app)
+      .patch(`/v1/orders/${handlerOrderId}/status`)
+      .send({ status: 'confirmed' });
+
+    expect(response.status).toBe(200);
+    expect(orderController.updateOrderStatus).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an invalid status before reaching the controller', async () => {
+    const response = await request(app)
+      .patch(`/v1/orders/${handlerOrderId}/status`)
+      .send({ status: 'unknown' });
+
+    expect(response.status).toBe(400);
+    expect(orderController.updateOrderStatus).not.toHaveBeenCalled();
+  });
+
+  it('delegates GET /:id to the controller', async () => {
+    const response = await request(app).get(`/v1/orders/${handlerOrderId}`);
+
+    expect(response.status).toBe(200);
+    expect(orderController.getOrderById).toHaveBeenCalledOnce();
   });
 });

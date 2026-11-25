@@ -59,6 +59,16 @@ describe('RefreshSessionUseCase', () => {
     });
   });
 
+  it('uses a generic message when the auth service rejects with a non-Error', async () => {
+    mockAuthService.refreshSession.mockRejectedValue('boom');
+
+    await expect(useCase.execute({ refreshToken: 'bad-token' })).rejects.toMatchObject({
+      code: 'INVALID_REFRESH_TOKEN',
+      statusCode: 401,
+      message: 'Invalid or expired refresh token',
+    });
+  });
+
   it('throws 404 NOT_FOUND when user profile is not found', async () => {
     mockAuthService.refreshSession.mockResolvedValue({
       userId: 'user-uuid-1',
@@ -72,6 +82,24 @@ describe('RefreshSessionUseCase', () => {
       statusCode: 404,
       message: 'User profile not found',
     });
+  });
+
+  it('defaults created_at and roles when the profile omits them', async () => {
+    mockAuthService.refreshSession.mockResolvedValue({
+      userId: 'user-uuid-2',
+      accessToken: 'new-access',
+      refreshToken: 'new-refresh',
+    });
+    mockProfileRepository.findById.mockResolvedValue({
+      id: 'user-uuid-2',
+      username: 'buyer_test',
+      email: 'buyer@example.com',
+    });
+
+    const result = await useCase.execute({ refreshToken: 'valid-token' });
+
+    expect(result.response.data.user.created_at).toEqual(expect.any(String));
+    expect(result.response.data.roles).toEqual([]);
   });
 
   it('returns response and session tokens on successful refresh', async () => {

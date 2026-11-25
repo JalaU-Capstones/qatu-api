@@ -113,5 +113,34 @@ describe('OutboxRepository', () => {
 
       expect(mockDb.query.mock.calls[0][1].replacements.error).toHaveLength(500);
     });
+
+    it('uses a generic message when the error is missing', async () => {
+      await repository.scheduleRetry({ id: 'evt-1', maxAttempts: 3 });
+
+      expect(mockDb.query.mock.calls[0][1].replacements.error).toBe('unknown error');
+      expect(mockDb.query.mock.calls[0][1]).not.toHaveProperty('transaction');
+    });
+  });
+
+  describe('operations without an explicit transaction', () => {
+    it('claims a batch without a transaction', async () => {
+      mockDb.query.mockResolvedValueOnce([]);
+
+      await expect(repository.claimPendingBatch(10)).resolves.toEqual([]);
+      expect(mockDb.query.mock.calls[0][1]).toEqual({
+        replacements: { limit: 10 },
+        type: QueryTypes.SELECT,
+      });
+    });
+
+    it('marks an event published without a transaction', async () => {
+      await repository.markPublished('evt-1');
+
+      expect(mockDb.query.mock.calls[0][1]).toEqual({
+        replacements: { id: 'evt-1' },
+        type: QueryTypes.UPDATE,
+      });
+      expect(mockDb.query.mock.calls[0][0]).toContain("status = 'published'");
+    });
   });
 });

@@ -49,7 +49,7 @@ export function canTransition(fromStatus, toStatus, actorRole) {
   }
 
   const table = actorRole === 'buyer' ? BUYER_TRANSITIONS : SELLER_TRANSITIONS;
-  const allowed = table.get(fromStatus) || [];
+  const allowed = table.get(fromStatus);
   return allowed.includes(toStatus);
 }
 

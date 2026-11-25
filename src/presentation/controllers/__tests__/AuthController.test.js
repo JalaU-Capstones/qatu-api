@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthController } from '../AuthController.js';
 
 describe('AuthController', () => {
@@ -334,5 +334,38 @@ describe('AuthController', () => {
       expect(res.status).toHaveBeenCalledWith(204);
       expect(res.send).toHaveBeenCalled();
     });
+  });
+});
+
+describe('AuthController logout error path', () => {
+  afterEach(() => {
+    vi.doUnmock('../../../infrastructure/auth/cookieHelper.js');
+    vi.resetModules();
+  });
+
+  it('forwards an error raised while clearing cookies to next', async () => {
+    const clearSessionCookies = vi.fn(() => {
+      throw new Error('cannot clear cookies');
+    });
+    vi.doMock('../../../infrastructure/auth/cookieHelper.js', () => ({
+      clearSessionCookies,
+      setSessionCookies: vi.fn(),
+    }));
+    vi.resetModules();
+    const { AuthController: FreshAuthController } = await import('../AuthController.js');
+    const controller = new FreshAuthController({
+      registerBuyerUseCase: { execute: vi.fn() },
+    });
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
+      clearCookie: vi.fn().mockReturnThis(),
+    };
+    const next = vi.fn();
+
+    await controller.logout({ cookies: {} }, res, next);
+
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ message: 'cannot clear cookies' }));
+    expect(res.status).not.toHaveBeenCalled();
   });
 });

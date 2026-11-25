@@ -521,3 +521,506 @@ describe('ProductController', () => {
     });
   });
 });
+
+const SELLER_ID = '00000000-0000-4000-8000-000000000002';
+const PRODUCT_ID = '550e8400-e29b-41d4-a716-446655440000';
+
+function createResponse() {
+  const json = vi.fn();
+  const end = vi.fn();
+  const location = vi.fn().mockReturnValue({ json });
+  const status = vi.fn().mockReturnValue({ json, end, location });
+  return { status, json, end, location };
+}
+
+const sellerReq = (overrides = {}) => ({
+  user: { id: SELLER_ID, roles: ['seller'] },
+  ...overrides,
+});
+
+describe('ProductController — remaining branches', () => {
+  let useCases;
+  let controller;
+
+  beforeEach(() => {
+    useCases = {
+      listProductsUseCase: { execute: vi.fn() },
+      listSellerProductsUseCase: { execute: vi.fn() },
+      getProductByIdUseCase: { execute: vi.fn() },
+      createProductUseCase: { execute: vi.fn() },
+      publishProductUseCase: { execute: vi.fn() },
+      unpublishProductUseCase: { execute: vi.fn() },
+      updateProductUseCase: { execute: vi.fn() },
+      deleteProductUseCase: { execute: vi.fn() },
+      deleteProductImageUseCase: { execute: vi.fn() },
+      uploadProductImageUseCase: { execute: vi.fn() },
+      listProductImagesUseCase: { execute: vi.fn() },
+    };
+    controller = new ProductController(useCases);
+  });
+
+  describe('list', () => {
+    it('uses empty query and forwards use case errors', async () => {
+      const error = new Error('boom');
+      useCases.listProductsUseCase.execute.mockRejectedValueOnce(error);
+
+      const next = vi.fn();
+      await controller.list({}, {}, next);
+      expect(next).toHaveBeenCalledWith(error);
+
+      useCases.listProductsUseCase.execute.mockResolvedValueOnce({ data: [] });
+      const res = createResponse();
+      await controller.list({ query: undefined }, res, vi.fn());
+      expect(useCases.listProductsUseCase.execute).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 1 })
+      );
+    });
+  });
+
+  describe('listSellerProducts', () => {
+    it('returns the seller products with validated query values', async () => {
+      const result = { data: [], meta: {} };
+      useCases.listSellerProductsUseCase.execute.mockResolvedValue(result);
+      const res = createResponse();
+
+      await controller.listSellerProducts(
+        sellerReq({ validatedQuery: { page: 2, limit: 10, status: 'published' } }),
+        res,
+        vi.fn()
+      );
+
+      expect(useCases.listSellerProductsUseCase.execute).toHaveBeenCalledWith(SELLER_ID, {
+        page: 2,
+        limit: 10,
+        status: 'published',
+      });
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json).toHaveBeenCalledWith(result);
+    });
+
+    it('defaults to an empty query object', async () => {
+      useCases.listSellerProductsUseCase.execute.mockResolvedValue({ data: [] });
+
+      await controller.listSellerProducts(sellerReq(), createResponse(), vi.fn());
+
+      expect(useCases.listSellerProductsUseCase.execute).toHaveBeenCalledWith(SELLER_ID, {
+        page: undefined,
+        limit: undefined,
+        status: undefined,
+      });
+    });
+
+    it('forwards a missing dependency error', async () => {
+      const without = new ProductController({ listProductsUseCase: useCases.listProductsUseCase });
+      const next = vi.fn();
+
+      await without.listSellerProducts(sellerReq(), {}, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          statusCode: 500,
+          message: 'listSellerProductsUseCase is required',
+        })
+      );
+    });
+
+    it('forwards an UNAUTHORIZED error when the user is missing', async () => {
+      const next = vi.fn();
+
+      await controller.listSellerProducts({ user: {} }, {}, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'UNAUTHORIZED', statusCode: 401 })
+      );
+    });
+
+    it('forwards a FORBIDDEN error for non-sellers and missing roles', async () => {
+      for (const req of [
+        { user: { id: SELLER_ID, roles: ['buyer'] } },
+        { user: { id: SELLER_ID } },
+      ]) {
+        const next = vi.fn();
+        await controller.listSellerProducts(req, {}, next);
+        expect(next).toHaveBeenCalledWith(
+          expect.objectContaining({ code: 'FORBIDDEN', statusCode: 403 })
+        );
+      }
+    });
+
+    it('forwards use case errors', async () => {
+      const error = new Error('db down');
+      useCases.listSellerProductsUseCase.execute.mockRejectedValue(error);
+      const next = vi.fn();
+
+      await controller.listSellerProducts(sellerReq(), {}, next);
+
+      expect(next).toHaveBeenCalledWith(error);
+    });
+  });
+
+  describe('create', () => {
+    it('prefers validated body and the camelCase category id', async () => {
+      useCases.createProductUseCase.execute.mockResolvedValue({ data: {} });
+
+      await controller.create(
+        sellerReq({
+          body: { name: 'Raw' },
+          validatedBody: {
+            name: 'Validated',
+            slug: 'validated',
+            description: 'Desc',
+            price: 10,
+            currency: 'USD',
+            stock: 3,
+            categoryId: 'cat-1',
+            attributes: { color: 'red' },
+          },
+        }),
+        createResponse(),
+        vi.fn()
+      );
+
+      expect(useCases.createProductUseCase.execute.mock.calls[0][0]).toMatchObject({
+        sellerId: SELLER_ID,
+        name: 'Validated',
+        slug: 'validated',
+        description: 'Desc',
+        price: 10,
+        currency: 'USD',
+        stock: 3,
+        categoryId: 'cat-1',
+        attributes: { color: 'red' },
+      });
+    });
+
+    it('tolerates a missing body and forwards an UNAUTHORIZED error', async () => {
+      useCases.createProductUseCase.execute.mockResolvedValue({ data: {} });
+      await controller.create(sellerReq(), createResponse(), vi.fn());
+      expect(useCases.createProductUseCase.execute.mock.calls[0][0].categoryId).toBe('');
+
+      const next = vi.fn();
+      await controller.create({ user: {} }, {}, next);
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'UNAUTHORIZED', statusCode: 401 })
+      );
+    });
+  });
+
+  describe('publish and unpublish', () => {
+    it('prefers validated params and productId alias', async () => {
+      useCases.publishProductUseCase.execute.mockResolvedValue({ data: {} });
+      useCases.unpublishProductUseCase.execute.mockResolvedValue({ data: {} });
+
+      await controller.publish(
+        sellerReq({ params: { id: 'raw' }, validatedParams: { productId: PRODUCT_ID } }),
+        createResponse(),
+        vi.fn()
+      );
+      await controller.unpublish(
+        sellerReq({ params: { id: 'raw' }, validatedParams: { productId: PRODUCT_ID } }),
+        createResponse(),
+        vi.fn()
+      );
+
+      expect(useCases.publishProductUseCase.execute).toHaveBeenCalledWith({
+        productId: PRODUCT_ID,
+        sellerId: SELLER_ID,
+      });
+      expect(useCases.unpublishProductUseCase.execute).toHaveBeenCalledWith({
+        productId: PRODUCT_ID,
+        sellerId: SELLER_ID,
+      });
+    });
+
+    it('forwards missing dependency and UNAUTHORIZED errors for both methods', async () => {
+      const without = new ProductController({ listProductsUseCase: useCases.listProductsUseCase });
+      for (const method of ['unpublish', 'publish']) {
+        let next = vi.fn();
+        // eslint-disable-next-line security/detect-object-injection
+        await without[method](sellerReq(), {}, next);
+        expect(next).toHaveBeenCalledWith(
+          expect.objectContaining({
+            statusCode: 500,
+            message: `${method}ProductUseCase is required`,
+          })
+        );
+
+        next = vi.fn();
+        // eslint-disable-next-line security/detect-object-injection
+        await controller[method]({ user: {} }, {}, next);
+        expect(next).toHaveBeenCalledWith(
+          expect.objectContaining({ code: 'UNAUTHORIZED', statusCode: 401 })
+        );
+      }
+    });
+
+    it('forwards use case errors for unpublish', async () => {
+      const error = new Error('boom');
+      useCases.unpublishProductUseCase.execute.mockRejectedValue(error);
+      const next = vi.fn();
+
+      await controller.unpublish(sellerReq({ params: { id: PRODUCT_ID } }), {}, next);
+
+      expect(next).toHaveBeenCalledWith(error);
+    });
+  });
+
+  describe('update, remove and deleteImage', () => {
+    it('updates a product with validated params and body', async () => {
+      useCases.updateProductUseCase.execute.mockResolvedValue({ data: {} });
+
+      await controller.update(
+        sellerReq({
+          params: { id: 'raw' },
+          validatedParams: { productId: PRODUCT_ID },
+          body: { name: 'Raw' },
+          validatedBody: { name: 'Validated' },
+        }),
+        createResponse(),
+        vi.fn()
+      );
+
+      expect(useCases.updateProductUseCase.execute).toHaveBeenCalledWith({
+        productId: PRODUCT_ID,
+        sellerId: SELLER_ID,
+        fields: { name: 'Validated' },
+      });
+    });
+
+    it('forwards missing dependency and UNAUTHORIZED errors for update, remove and deleteImage', async () => {
+      const without = new ProductController({ listProductsUseCase: useCases.listProductsUseCase });
+      for (const [method, message] of [
+        ['update', 'updateProductUseCase is required'],
+        ['remove', 'deleteProductUseCase is required'],
+        ['deleteImage', 'deleteProductImageUseCase is required'],
+      ]) {
+        let next = vi.fn();
+        // eslint-disable-next-line security/detect-object-injection
+        await without[method](sellerReq(), {}, next);
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 500, message }));
+
+        next = vi.fn();
+        // eslint-disable-next-line security/detect-object-injection
+        await controller[method]({ user: {} }, {}, next);
+        expect(next).toHaveBeenCalledWith(
+          expect.objectContaining({ code: 'UNAUTHORIZED', statusCode: 401 })
+        );
+      }
+    });
+
+    it('removes a product and responds with 204', async () => {
+      useCases.deleteProductUseCase.execute.mockResolvedValue(undefined);
+      const res = createResponse();
+
+      await controller.remove(
+        sellerReq({ params: { id: 'raw' }, validatedParams: { productId: PRODUCT_ID } }),
+        res,
+        vi.fn()
+      );
+
+      expect(useCases.deleteProductUseCase.execute).toHaveBeenCalledWith({
+        productId: PRODUCT_ID,
+        sellerId: SELLER_ID,
+      });
+      expect(res.status).toHaveBeenCalledWith(204);
+      expect(res.end).toHaveBeenCalled();
+    });
+
+    it('deletes an image using a Bearer token and validated params', async () => {
+      useCases.deleteProductImageUseCase.execute.mockResolvedValue(undefined);
+      const res = createResponse();
+
+      await controller.deleteImage(
+        sellerReq({
+          params: { id: 'raw', imageId: 'img-1' },
+          validatedParams: { productId: PRODUCT_ID, imageId: 'img-2' },
+          headers: { authorization: 'Bearer token-1' },
+        }),
+        res,
+        vi.fn()
+      );
+
+      expect(useCases.deleteProductImageUseCase.execute).toHaveBeenCalledWith({
+        productId: PRODUCT_ID,
+        imageId: 'img-2',
+        sellerId: SELLER_ID,
+        accessToken: 'token-1',
+      });
+      expect(res.status).toHaveBeenCalledWith(204);
+    });
+
+    it('uses a test token and rejects a missing storage token', async () => {
+      useCases.deleteProductImageUseCase.execute.mockResolvedValue(undefined);
+
+      await controller.deleteImage(
+        sellerReq({
+          params: { id: PRODUCT_ID, imageId: 'img-1' },
+          headers: { 'x-test-user-id': SELLER_ID },
+        }),
+        createResponse(),
+        vi.fn()
+      );
+      expect(useCases.deleteProductImageUseCase.execute.mock.calls[0][0].accessToken).toBe(
+        'test-token'
+      );
+
+      const next = vi.fn();
+      await controller.deleteImage(
+        sellerReq({ params: { id: PRODUCT_ID, imageId: 'img-1' }, headers: {} }),
+        {},
+        next
+      );
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'UNAUTHORIZED', statusCode: 401 })
+      );
+    });
+
+    it('forwards use case errors for update, remove and deleteImage', async () => {
+      const error = new Error('boom');
+      useCases.updateProductUseCase.execute.mockRejectedValue(error);
+      useCases.deleteProductUseCase.execute.mockRejectedValue(error);
+      useCases.deleteProductImageUseCase.execute.mockRejectedValue(error);
+      const req = sellerReq({
+        params: { id: PRODUCT_ID, imageId: 'img-1' },
+        cookies: { access_token: 'token' },
+      });
+
+      for (const method of ['update', 'remove', 'deleteImage']) {
+        const next = vi.fn();
+        // eslint-disable-next-line security/detect-object-injection
+        await controller[method](req, {}, next);
+        expect(next).toHaveBeenCalledWith(error);
+      }
+    });
+  });
+
+  describe('uploadImage fallbacks', () => {
+    it('uses a Bearer token with surrounding whitespace and ignores blank headers', async () => {
+      useCases.uploadProductImageUseCase.execute.mockResolvedValue({
+        data: {},
+        meta: {},
+        location: '/v1/products/images/1',
+      });
+      const res = createResponse();
+
+      await controller.uploadImage(
+        sellerReq({
+          params: { productId: PRODUCT_ID },
+          validatedBody: { altText: 'Alt', position: 2 },
+          headers: { authorization: 'Bearer   token-2   ' },
+        }),
+        res,
+        vi.fn()
+      );
+
+      expect(useCases.uploadProductImageUseCase.execute).toHaveBeenCalledWith(
+        expect.objectContaining({ accessToken: 'token-2', altText: 'Alt', position: 2 })
+      );
+
+      const next = vi.fn();
+      await controller.uploadImage(
+        sellerReq({ headers: { authorization: 'Basic token' } }),
+        {},
+        next
+      );
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'UNAUTHORIZED', statusCode: 401 })
+      );
+    });
+
+    it('uses non-Bearer authorization headers as an absent token', async () => {
+      const next = vi.fn();
+      await controller.uploadImage(sellerReq({ headers: { authorization: undefined } }), {}, next);
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'UNAUTHORIZED', statusCode: 401 })
+      );
+    });
+
+    it('forwards an UNAUTHORIZED error when the user is missing', async () => {
+      const next = vi.fn();
+
+      await controller.uploadImage({ headers: {} }, {}, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'UNAUTHORIZED', statusCode: 401 })
+      );
+    });
+
+    it('treats a blank Bearer token as an absent session token', async () => {
+      const next = vi.fn();
+
+      await controller.uploadImage(
+        sellerReq({ headers: { authorization: 'Bearer    ' } }),
+        {},
+        next
+      );
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'UNAUTHORIZED', statusCode: 401 })
+      );
+    });
+  });
+
+  describe('listImages and getById fallbacks', () => {
+    it('uses validated params for listImages', async () => {
+      useCases.listProductImagesUseCase.execute.mockResolvedValue({ data: [] });
+
+      await controller.listImages(
+        { params: { id: 'raw' }, validatedParams: { productId: PRODUCT_ID } },
+        createResponse(),
+        vi.fn()
+      );
+
+      expect(useCases.listProductImagesUseCase.execute).toHaveBeenCalledWith({
+        productId: PRODUCT_ID,
+      });
+    });
+
+    it('uses validated params and productId alias for getById', async () => {
+      useCases.getProductByIdUseCase.execute.mockResolvedValue({ data: {} });
+
+      await controller.getById(
+        {
+          params: { id: 'raw' },
+          validatedParams: { productId: PRODUCT_ID },
+          user: { id: SELLER_ID },
+        },
+        createResponse(),
+        vi.fn()
+      );
+
+      expect(useCases.getProductByIdUseCase.execute.mock.calls[0][0]).toMatchObject({
+        productId: PRODUCT_ID,
+        currentUserId: SELLER_ID,
+      });
+    });
+  });
+
+  it('tolerates a missing params object across product methods', async () => {
+    const req = sellerReq({ cookies: { access_token: 'storage-token' } });
+    const methods = {
+      publish: useCases.publishProductUseCase,
+      unpublish: useCases.unpublishProductUseCase,
+      update: useCases.updateProductUseCase,
+      remove: useCases.deleteProductUseCase,
+      uploadImage: useCases.uploadProductImageUseCase,
+      listImages: useCases.listProductImagesUseCase,
+      deleteImage: useCases.deleteProductImageUseCase,
+      getById: useCases.getProductByIdUseCase,
+    };
+
+    for (const useCase of Object.values(methods)) {
+      useCase.execute.mockResolvedValue({ data: {}, location: '/v1/products/images/1' });
+    }
+
+    for (const [method, useCase] of Object.entries(methods)) {
+      const next = vi.fn();
+
+      // eslint-disable-next-line security/detect-object-injection
+      await controller[method](req, createResponse(), next);
+
+      expect(next).not.toHaveBeenCalled();
+      expect(useCase.execute).toHaveBeenCalledOnce();
+    }
+  });
+});

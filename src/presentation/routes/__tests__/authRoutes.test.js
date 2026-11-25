@@ -1,7 +1,9 @@
+import express from 'express';
 import request from 'supertest';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../../app.js';
 import { supabase } from '../../../infrastructure/config/supabase.js';
+import { errorHandler } from '../../middleware/errorHandler.js';
 import { createAuthRouter } from '../authRoutes.js';
 
 vi.mock('../../../infrastructure/config/supabase.js', () => ({
@@ -658,5 +660,73 @@ describe('Auth Routes Integration', () => {
       const r5 = await agent.get('/v1/auth/me');
       expect(r5.status).toBe(401);
     });
+  });
+});
+
+describe('auth route handlers', () => {
+  let app;
+  let authController;
+  let oauthController;
+
+  beforeEach(async () => {
+    vi.doMock('../../middleware/rateLimiter.js', () => ({
+      oauthExchangeLimiter: (_req, _res, next) => next(),
+    }));
+    vi.resetModules();
+    const { createAuthRouter: freshCreateAuthRouter } = await import('../authRoutes.js');
+
+    authController = {
+      register: vi.fn((_req, res) => res.status(201).json({})),
+      login: vi.fn((_req, res) => res.status(200).json({})),
+      refresh: vi.fn((_req, res) => res.status(200).json({})),
+      logout: vi.fn((_req, res) => res.status(204).end()),
+      me: vi.fn((_req, res) => res.status(200).json({})),
+    };
+    oauthController = {
+      exchange: vi.fn((_req, res) => res.status(200).json({})),
+    };
+    const router = freshCreateAuthRouter({ authController, oauthController });
+
+    app = express();
+    app.use(express.json());
+    app.use('/v1/auth', router);
+    app.use(errorHandler);
+  });
+
+  afterEach(() => {
+    vi.doUnmock('../../middleware/rateLimiter.js');
+    vi.resetModules();
+  });
+
+  it('delegates POST /login to the controller after validation', async () => {
+    const response = await request(app)
+      .post('/v1/auth/login')
+      .send({ email: 'buyer@example.com', password: 'Secret123!' });
+
+    expect(response.status).toBe(200);
+    expect(authController.login).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an invalid login body before reaching the controller', async () => {
+    const response = await request(app).post('/v1/auth/login').send({ email: 'bad' });
+
+    expect(response.status).toBe(400);
+    expect(authController.login).not.toHaveBeenCalled();
+  });
+
+  it('delegates POST /oauth/exchange to the OAuth controller', async () => {
+    const response = await request(app)
+      .post('/v1/auth/oauth/exchange')
+      .send({ access_token: 'id-token', refresh_token: 'refresh-token' });
+
+    expect(response.status).toBe(200);
+    expect(oauthController.exchange).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an invalid OAuth body before reaching the controller', async () => {
+    const response = await request(app).post('/v1/auth/oauth/exchange').send({});
+
+    expect(response.status).toBe(400);
+    expect(oauthController.exchange).not.toHaveBeenCalled();
   });
 });

@@ -47,6 +47,49 @@ describe('CartController', () => {
     next = vi.fn();
   });
 
+  it('requires addToCartUseCase in the constructor', () => {
+    expect(() => new CartController()).toThrow('addToCartUseCase is required');
+  });
+
+  describe('addItem', () => {
+    it('forwards an UNAUTHORIZED error when the user is missing', async () => {
+      req.user = null;
+
+      await controller.addItem(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'UNAUTHORIZED', statusCode: 401 })
+      );
+      expect(mockAddToCartUseCase.execute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getCart', () => {
+    it('forwards an error when getCartUseCase is not injected', async () => {
+      const withoutGetCart = new CartController({ addToCartUseCase: mockAddToCartUseCase });
+
+      await withoutGetCart.getCart(req, res, next);
+
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'getCartUseCase is not injected' })
+      );
+    });
+  });
+
+  it('uses the raw body when validatedBody is absent in addItem', async () => {
+    req.validatedBody = undefined;
+    req.body = { product_id: productId, quantity: 2 };
+    mockAddToCartUseCase.execute.mockResolvedValue({ toJSON: () => ({ id: 'item-1' }) });
+
+    await controller.addItem(req, res, next);
+
+    expect(mockAddToCartUseCase.execute.mock.calls[0][0]).toMatchObject({
+      userId,
+      productId,
+      quantity: 2,
+    });
+  });
+
   describe('updateItem', () => {
     it('Scenario 1: Valid request -> 200 OK with formatted JSON', async () => {
       req.params = { id: cartItemId };
@@ -77,6 +120,25 @@ describe('CartController', () => {
           statusCode: 401,
         })
       );
+    });
+  });
+
+  it('uses the raw body and returns null when updateItem finds no item', async () => {
+    req.params = { id: cartItemId };
+    req.validatedBody = undefined;
+    req.body = { quantity: 2 };
+    mockUpdateCartItemUseCase.execute.mockResolvedValue(null);
+
+    await controller.updateItem(req, res, next);
+
+    expect(mockUpdateCartItemUseCase.execute).toHaveBeenCalledWith({
+      userId,
+      cartItemId,
+      quantity: 2,
+    });
+    expect(res.json).toHaveBeenCalledWith({
+      data: null,
+      meta: expect.objectContaining({ timestamp: expect.any(String) }),
     });
   });
 

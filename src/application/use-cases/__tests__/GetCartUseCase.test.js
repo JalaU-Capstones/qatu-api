@@ -127,6 +127,54 @@ describe('GetCartUseCase', () => {
     expect(result[0].product).toBeUndefined();
   });
 
+  it('should return an empty array when the repository returns null', async () => {
+    mockCartRepository.findByUserId.mockResolvedValue(null);
+
+    const useCase = new GetCartUseCase({ cartRepository: mockCartRepository });
+    await expect(useCase.execute({ userId })).resolves.toEqual([]);
+  });
+
+  it('should apply safe defaults to a joined product with only a name', async () => {
+    mockCartRepository.findByUserId.mockResolvedValue([
+      createSampleRow({
+        product_seller_id: null,
+        product_category_id: null,
+        product_description: null,
+        product_price: undefined,
+        product_currency: null,
+        product_stock: undefined,
+        product_attributes: undefined,
+        product_primary_image_path: undefined,
+        product_state: null,
+        product_average_rating: undefined,
+        product_ratings_count: undefined,
+        product_published_at: null,
+        product_created_at: null,
+        product_updated_at: null,
+      }),
+    ]);
+
+    const useCase = new GetCartUseCase({ cartRepository: mockCartRepository });
+    const result = await useCase.execute({ userId, includeProduct: true });
+
+    expect(result[0].product).toMatchObject({
+      seller_id: null,
+      category_id: null,
+      description: null,
+      price: 0,
+      currency: 'USD',
+      stock: 0,
+      attributes: {},
+      primary_image_path: null,
+      state: 'draft',
+      average_rating: 0,
+      ratings_count: 0,
+      published_at: null,
+      created_at: null,
+      updated_at: null,
+    });
+  });
+
   it('should reject a missing userId with a validation error', async () => {
     const useCase = new GetCartUseCase({ cartRepository: mockCartRepository });
 

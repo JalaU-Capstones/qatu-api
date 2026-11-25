@@ -3,6 +3,11 @@ import { Product } from '../../../domain/entities/Product.js';
 import { ListSellerProductsUseCase } from '../ListSellerProductsUseCase.js';
 
 describe('ListSellerProductsUseCase', () => {
+  it('requires a productRepository', () => {
+    expect(() => new ListSellerProductsUseCase()).toThrow('productRepository is required');
+    expect(() => new ListSellerProductsUseCase({})).toThrow('productRepository is required');
+  });
+
   it('returns paginated seller product data', async () => {
     const product = new Product({
       id: 'p-1',
@@ -85,6 +90,24 @@ describe('ListSellerProductsUseCase', () => {
 
     const useCase = new ListSellerProductsUseCase({ productRepository: mockRepo });
     await useCase.execute('00000000-0000-4000-8000-000000000002');
+
+    expect(mockRepo.listBySeller).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000002', {
+      page: 1,
+      limit: 20,
+      status: undefined,
+    });
+  });
+
+  it('falls back when page and limit cannot be coerced to numbers', async () => {
+    const mockRepo = {
+      listBySeller: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, limit: 20 }),
+    };
+    const useCase = new ListSellerProductsUseCase({ productRepository: mockRepo });
+
+    await useCase.execute('00000000-0000-4000-8000-000000000002', {
+      page: 'abc',
+      limit: 'def',
+    });
 
     expect(mockRepo.listBySeller).toHaveBeenCalledWith('00000000-0000-4000-8000-000000000002', {
       page: 1,

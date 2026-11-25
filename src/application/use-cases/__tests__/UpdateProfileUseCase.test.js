@@ -31,6 +31,30 @@ describe('UpdateProfileUseCase', () => {
     expect(() => new UpdateProfileUseCase()).toThrow('profileRepository is required');
   });
 
+  it.each([
+    [{ bio: 123 }, 'Bio must be a string.'],
+    [{ avatar_path: 123 }, 'Avatar path must be a string.'],
+  ])('rejects invalid update type %j', async (updates, message) => {
+    await expect(useCase.execute({ userId, updates })).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      statusCode: 400,
+      message,
+    });
+    expect(mockProfileRepository.update).not.toHaveBeenCalled();
+  });
+
+  it('allows clearing the avatar path with null', async () => {
+    mockProfileRepository.update.mockResolvedValueOnce(updatedProfileEntity);
+
+    const result = await useCase.execute({ userId, updates: { avatar_path: null } });
+
+    expect(result.data.id).toBe(userId);
+    expect(mockProfileRepository.update).toHaveBeenCalledWith(
+      userId,
+      expect.objectContaining({ avatar_path: null })
+    );
+  });
+
   it('should update profile with valid full_name, bio, avatar_path, and locale', async () => {
     mockProfileRepository.update.mockResolvedValueOnce(updatedProfileEntity);
 

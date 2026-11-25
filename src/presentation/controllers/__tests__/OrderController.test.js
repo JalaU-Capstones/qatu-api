@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OrderController } from '../OrderController.js';
 
 describe('OrderController', () => {
@@ -226,6 +226,202 @@ describe('OrderController', () => {
       await controller.createOrder({ user: { id: userId }, validatedBody: body }, makeRes(), next);
 
       expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 500 }));
+    });
+  });
+});
+
+const USER_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+const ORDER_ID = '9d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a';
+
+function createResponse() {
+  const json = vi.fn();
+  const status = vi.fn().mockReturnValue({ json });
+  return { status, json };
+}
+
+describe('OrderController — remaining branches', () => {
+  let useCases;
+  let controller;
+
+  beforeEach(() => {
+    useCases = {
+      listOrdersUseCase: { execute: vi.fn() },
+      getOrderByIdUseCase: { execute: vi.fn() },
+      createOrderUseCase: { execute: vi.fn() },
+      updateOrderStatusUseCase: { execute: vi.fn() },
+    };
+    controller = new OrderController(useCases);
+  });
+
+  describe('listOrders', () => {
+    it('defaults to an empty query and forwards use case errors', async () => {
+      useCases.listOrdersUseCase.execute.mockResolvedValueOnce({ data: [] });
+
+      await controller.listOrders({ user: { id: USER_ID } }, createResponse(), vi.fn());
+
+      expect(useCases.listOrdersUseCase.execute.mock.calls[0][0]).toMatchObject({
+        userId: USER_ID,
+        page: 1,
+        limit: 20,
+        status: undefined,
+        view: 'buyer',
+      });
+
+      const error = new Error('db down');
+      useCases.listOrdersUseCase.execute.mockRejectedValueOnce(error);
+      const next = vi.fn();
+      await controller.listOrders({ user: { id: USER_ID } }, createResponse(), next);
+      expect(next).toHaveBeenCalledWith(error);
+    });
+  });
+
+  describe('getOrderById', () => {
+    it('forwards UNAUTHORIZED and missing use case errors', async () => {
+      let next = vi.fn();
+      await controller.getOrderById({}, createResponse(), next);
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'UNAUTHORIZED', statusCode: 401 })
+      );
+
+      const without = new OrderController({ listOrdersUseCase: useCases.listOrdersUseCase });
+      next = vi.fn();
+      await without.getOrderById({ user: { id: USER_ID }, params: { id: ORDER_ID } }, {}, next);
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          statusCode: 500,
+          message: 'getOrderByIdUseCase is not configured',
+        })
+      );
+    });
+
+    it('forwards use case errors', async () => {
+      const error = new Error('not found');
+      useCases.getOrderByIdUseCase.execute.mockRejectedValue(error);
+      const next = vi.fn();
+
+      await controller.getOrderById(
+        { user: { id: USER_ID }, params: { id: ORDER_ID } },
+        createResponse(),
+        next
+      );
+
+      expect(next).toHaveBeenCalledWith(error);
+    });
+  });
+
+  describe('updateOrderStatus', () => {
+    it('uses raw body and forwards UNAUTHORIZED and missing use case errors', async () => {
+      useCases.updateOrderStatusUseCase.execute.mockResolvedValue({ data: {} });
+
+      await controller.updateOrderStatus(
+        { user: { id: USER_ID }, params: { id: ORDER_ID }, body: { status: 'shipped' } },
+        createResponse(),
+        vi.fn()
+      );
+      expect(useCases.updateOrderStatusUseCase.execute).toHaveBeenCalledWith({
+        orderId: ORDER_ID,
+        userId: USER_ID,
+        nextStatus: 'shipped',
+      });
+
+      let next = vi.fn();
+      await controller.updateOrderStatus({}, createResponse(), next);
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'UNAUTHORIZED', statusCode: 401 })
+      );
+
+      const without = new OrderController({ listOrdersUseCase: useCases.listOrdersUseCase });
+      next = vi.fn();
+      await without.updateOrderStatus(
+        { user: { id: USER_ID }, params: { id: ORDER_ID } },
+        {},
+        next
+      );
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          statusCode: 500,
+          message: 'updateOrderStatusUseCase is not configured',
+        })
+      );
+    });
+
+    it('forwards use case errors', async () => {
+      const error = new Error('boom');
+      useCases.updateOrderStatusUseCase.execute.mockRejectedValue(error);
+      const next = vi.fn();
+
+      await controller.updateOrderStatus(
+        { user: { id: USER_ID }, params: { id: ORDER_ID }, validatedBody: { status: 'shipped' } },
+        createResponse(),
+        next
+      );
+
+      expect(next).toHaveBeenCalledWith(error);
+    });
+  });
+
+  it('tolerates a fully missing body in createOrder and updateOrderStatus', async () => {
+    const noBodyReq = { user: { id: USER_ID }, params: { id: ORDER_ID } };
+
+    const next = vi.fn();
+    await controller.createOrder(noBodyReq, createResponse(), next);
+    expect(next).toHaveBeenCalled();
+
+    useCases.updateOrderStatusUseCase.execute.mockResolvedValueOnce({ data: {} });
+    await controller.updateOrderStatus(noBodyReq, createResponse(), vi.fn());
+    expect(useCases.updateOrderStatusUseCase.execute).toHaveBeenCalledWith({
+      orderId: ORDER_ID,
+      userId: USER_ID,
+      nextStatus: undefined,
+    });
+  });
+
+  describe('createOrder', () => {
+    it('uses raw body and forwards use case errors', async () => {
+      useCases.createOrderUseCase.execute.mockResolvedValueOnce({ data: {} });
+
+      await controller.createOrder(
+        {
+          user: { id: USER_ID },
+          body: {
+            payment_method: 'cash_on_delivery',
+            shipping_address: {
+              full_name: 'Aaron Florez',
+              phone: '71234567',
+              street: '123 Main St',
+              city: 'La Paz',
+              country: 'BO',
+            },
+          },
+        },
+        createResponse(),
+        vi.fn()
+      );
+      expect(useCases.createOrderUseCase.execute.mock.calls[0][0]).toMatchObject({
+        buyerId: USER_ID,
+        paymentMethod: 'cash_on_delivery',
+      });
+
+      const error = new Error('boom');
+      useCases.createOrderUseCase.execute.mockRejectedValueOnce(error);
+      const next = vi.fn();
+      await controller.createOrder(
+        {
+          user: { id: USER_ID },
+          body: {
+            shipping_address: {
+              full_name: 'Aaron Florez',
+              phone: '71234567',
+              street: '123 Main St',
+              city: 'La Paz',
+              country: 'BO',
+            },
+          },
+        },
+        createResponse(),
+        next
+      );
+      expect(next).toHaveBeenCalledWith(error);
     });
   });
 });

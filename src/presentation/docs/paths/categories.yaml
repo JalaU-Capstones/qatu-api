@@ -73,7 +73,7 @@ adminCreate:
               name:
                 type: string
                 minLength: 2
-                maxLength: 100
+                maxLength: 80
                 example: Electronics
               slug:
                 type: string
@@ -162,7 +162,7 @@ adminUpdate:
               name:
                 type: string
                 minLength: 2
-                maxLength: 100
+                maxLength: 80
                 example: Consumer Electronics
               slug:
                 type: string
@@ -199,6 +199,8 @@ adminUpdate:
         $ref: '../components/responses/errors.yaml#/Forbidden'
       '404':
         $ref: '../components/responses/errors.yaml#/NotFound'
+      '409':
+        $ref: '../components/responses/errors.yaml#/Conflict'
       '422':
         description: Category semantic validation failed.
         content:

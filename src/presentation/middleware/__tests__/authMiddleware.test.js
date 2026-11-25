@@ -134,6 +134,20 @@ describe('authMiddleware', () => {
       expect(next).toHaveBeenCalledOnce();
       expect(req.user.role).toBeNull();
     });
+
+    it('sets email to null when the Supabase user has no email', async () => {
+      supabase.auth.getUser.mockResolvedValueOnce({
+        data: {
+          user: { id: 'u-noemail', role: 'buyer', user_metadata: { role: 'buyer' } },
+        },
+        error: null,
+      });
+      req.cookies = { access_token: 'valid-cookie' };
+
+      await authMiddleware(req, res, next);
+
+      expect(req.user.email).toBeNull();
+    });
   });
 
   describe('bearer fallback', () => {
@@ -284,6 +298,27 @@ describe('authMiddleware', () => {
           error: expect.objectContaining({ code: 'UNAUTHORIZED' }),
         })
       );
+    });
+
+    it('treats a throwing jwt.decode as a non-expired token', async () => {
+      const decodeSpy = vi.spyOn(jwt, 'decode').mockImplementationOnce(() => {
+        throw new Error('decode failed');
+      });
+      supabase.auth.getUser.mockResolvedValueOnce({
+        data: { user: null },
+        error: { message: 'invalid' },
+      });
+      req.cookies = { access_token: 'broken-token' };
+
+      await authMiddleware(req, res, next);
+
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: expect.objectContaining({ code: 'UNAUTHORIZED' }),
+        })
+      );
+      decodeSpy.mockRestore();
     });
   });
 

@@ -48,6 +48,20 @@ describe('ProductListDTO', () => {
       expect(dto.sort_order).toBe('asc');
     });
 
+    it('should default empty pagination and falsy sort values', () => {
+      const dto = new ListProductsRequestDTO({
+        page: '',
+        limit: null,
+        sortBy: '',
+        sort_order: '',
+      });
+
+      expect(dto.page).toBe(1);
+      expect(dto.limit).toBe(20);
+      expect(dto.sort_by).toBe('created_at');
+      expect(dto.sort_order).toBe('desc');
+    });
+
     it('should return the correct nested shape in toRepositoryParams()', () => {
       const dto = new ListProductsRequestDTO({
         page: '2',
@@ -187,6 +201,16 @@ describe('ProductListDTO', () => {
 
       const dto = new ProductListItemDTO(product);
       expect(dto.toJSON().primary_image_path).toBeNull();
+    });
+
+    it('accepts a plain object and defaults attributes again in toJSON()', () => {
+      const dto = new ProductListItemDTO({ id: 'p-plain', name: 'Plain', slug: 'plain', price: 1 });
+
+      expect(dto.attributes).toEqual({});
+      expect(dto.primary_image_path).toBeNull();
+
+      dto.attributes = undefined;
+      expect(dto.toJSON().attributes).toEqual({});
     });
   });
 });

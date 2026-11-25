@@ -72,4 +72,18 @@ describe('resolveImageUrl', () => {
     env.SUPABASE_STORAGE_PUBLIC_URL = '';
     expect(resolveImageUrl('avatars/abc/f.png', 'avatars')).toBeNull();
   });
+
+  it('returns null for a non-string value', () => {
+    expect(resolveImageUrl(42, 'avatars')).toBeNull();
+    expect(resolveImageUrl({}, 'avatars')).toBeNull();
+  });
+
+  it('resolves a path without a bucket by joining it directly to the base', () => {
+    expect(resolveImageUrl('files/report.pdf')).toBe(
+      'http://localhost:54321/storage/v1/object/public/files/report.pdf'
+    );
+    expect(resolveImageUrl('/files/report.pdf')).toBe(
+      'http://localhost:54321/storage/v1/object/public/files/report.pdf'
+    );
+  });
 });

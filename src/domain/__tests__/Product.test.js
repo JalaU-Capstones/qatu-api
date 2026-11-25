@@ -142,4 +142,80 @@ describe('Product Entity', () => {
     expect(product.average_rating).toBe(4.2);
     expect(product.ratings_count).toBe(5);
   });
+
+  it('falls back to zero or defaults when optional numeric and text fields are empty', () => {
+    const product = new Product({
+      id: 'uuid-edge',
+      seller_id: 'seller-1',
+      name: 'Edge Case',
+      slug: 'edge-case',
+      price: null,
+      stock: null,
+      currency: '',
+      state: '',
+      attributes: ['not', 'an', 'object'],
+      average_rating: undefined,
+      averageRating: undefined,
+      ratings_count: undefined,
+      ratingsCount: undefined,
+      published_at: undefined,
+      publishedAt: null,
+      primary_image_path: null,
+      primaryImagePath: null,
+    });
+
+    expect(product.price).toBe(0);
+    expect(product.stock).toBe(0);
+    expect(product.currency).toBe('USD');
+    expect(product.state).toBe('draft');
+    expect(product.attributes).toEqual({});
+    expect(product.average_rating).toBe(0);
+    expect(product.ratings_count).toBe(0);
+    expect(product.published_at).toBeNull();
+    expect(product.primary_image_path).toBeNull();
+  });
+
+  it('accepts explicit zero values for price, stock and ratings', () => {
+    const product = new Product({
+      id: 'uuid-zero',
+      seller_id: 'seller-1',
+      name: 'Free Item',
+      slug: 'free-item',
+      price: 0,
+      stock: 0,
+      average_rating: 0,
+      ratings_count: 0,
+    });
+
+    expect(product.price).toBe(0);
+    expect(product.stock).toBe(0);
+    expect(product.average_rating).toBe(0);
+    expect(product.ratings_count).toBe(0);
+  });
+
+  it('uses generated timestamps when no date aliases are provided', () => {
+    const product = new Product({
+      id: 'uuid-no-dates',
+      seller_id: 'seller-1',
+      name: 'No Dates',
+      slug: 'no-dates',
+      price: 1,
+    });
+
+    expect(product.created_at).toBeInstanceOf(Date);
+    expect(product.updated_at).toBeInstanceOf(Date);
+  });
+
+  it('tolerates null attributes and timestamps when serializing a mutated entity', () => {
+    const product = new Product(fullParams);
+    product.attributes = null;
+    product.created_at = null;
+    product.updated_at = null;
+
+    const json = product.toJSON();
+
+    expect(json.attributes).toEqual({});
+    expect(json.created_at).toBeNull();
+    expect(json.updated_at).toBeNull();
+  });
 });

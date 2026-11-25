@@ -26,6 +26,11 @@ const product = (overrides = {}) => ({
 });
 
 describe('PublishProductUseCase', () => {
+  it('requires a productRepository', () => {
+    expect(() => new PublishProductUseCase()).toThrow('productRepository is required');
+    expect(() => new PublishProductUseCase({})).toThrow('productRepository is required');
+  });
+
   let productRepository;
   let useCase;
 
@@ -152,6 +157,23 @@ describe('PublishProductUseCase', () => {
       message: 'A product must have at least one image before being published',
     });
     expect(productRepository.publish).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the published row when no detailed product is returned', async () => {
+    productRepository.findById.mockResolvedValue(
+      product({ primary_image_path: 'product-images/x/y.png' })
+    );
+    const updated = product({
+      primary_image_path: 'product-images/x/y.png',
+      state: 'published',
+      published_at: '2026-10-15T10:00:00.000Z',
+    });
+    productRepository.publish.mockResolvedValue(updated);
+    productRepository.findByIdWithDetails.mockResolvedValue(null);
+
+    const result = await useCase.execute({ productId: PRODUCT_ID, sellerId: SELLER_ID });
+
+    expect(result.data.state).toBe('published');
   });
 
   it('publishes the seller draft and returns product detail with metadata', async () => {

@@ -1,3 +1,4 @@
+import { MESSAGE_SENT_ROUTING_KEY } from '../../domain/events/MessageSent.js';
 import { ORDER_PLACED_ROUTING_KEY } from '../../domain/events/OrderPlaced.js';
 import { ORDER_STATUS_CHANGED_ROUTING_KEY } from '../../domain/events/OrderStatusChanged.js';
 import {
@@ -50,6 +51,10 @@ export class CreateNotificationFromEventUseCase {
 
     if (routingKey === SELLER_REJECTED_ROUTING_KEY) {
       return this._handleSellerRejected(eventId, payload);
+    }
+
+    if (routingKey === MESSAGE_SENT_ROUTING_KEY) {
+      return this._handleMessageSent(eventId, payload);
     }
 
     return { status: 'ignored' };
@@ -144,6 +149,36 @@ export class CreateNotificationFromEventUseCase {
       body: `Tu solicitud para convertirte en vendedor no fue aprobada.${reasonText}`,
       actionUrl: '/seller/apply',
       payload: { application_id, rejection_reason: rejection_reason || null },
+    });
+
+    return { status: inserted ? 'created' : 'duplicate' };
+  }
+
+  /** @private */
+  async _handleMessageSent(eventId, payload) {
+    const { message_id, conversation_id, sender_id, recipient_id, product_id } = payload || {};
+    if (
+      !isNonEmptyString(message_id) ||
+      !isNonEmptyString(conversation_id) ||
+      !isNonEmptyString(sender_id) ||
+      !isNonEmptyString(recipient_id)
+    ) {
+      throw new InvalidEventPayloadError('message.sent payload is incomplete');
+    }
+
+    const inserted = await this.notificationRepository.createFromEvent({
+      eventId,
+      profileId: recipient_id,
+      type: 'message_received',
+      title: 'Nuevo mensaje recibido',
+      body: 'Has recibido un nuevo mensaje sobre un producto en Qatu.',
+      actionUrl: `/conversations/${conversation_id}`,
+      payload: {
+        message_id,
+        conversation_id,
+        sender_id,
+        product_id: product_id || null,
+      },
     });
 
     return { status: inserted ? 'created' : 'duplicate' };
