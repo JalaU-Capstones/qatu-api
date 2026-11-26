@@ -71,12 +71,17 @@ export class UpdateOrderStatusUseCase {
         throw err;
       }
 
+      const sellerIds = await this.orderRepository.findSellerIdsByOrderId(orderId, {
+        transaction,
+      });
+
       await this.outboxRepository.enqueue(
         buildOrderStatusChangedEvent({
           order: saved,
           fromStatus,
           toStatus: nextStatus,
           changedBy: userId,
+          sellerIds,
         }),
         { transaction }
       );

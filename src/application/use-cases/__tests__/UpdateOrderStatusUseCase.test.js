@@ -28,6 +28,7 @@ describe('UpdateOrderStatusUseCase', () => {
       findById: vi.fn().mockResolvedValue(order),
       sellerHasItemsOnOrder: vi.fn().mockResolvedValue(sellerOwns),
       updateStatus: vi.fn().mockResolvedValue(updated || baseOrder('shipped')),
+      findSellerIdsByOrderId: vi.fn().mockResolvedValue([sellerId, otherSellerId]),
     };
     const outboxRepository = {
       enqueue: vi.fn().mockResolvedValue('evt-1'),
@@ -157,10 +158,14 @@ describe('UpdateOrderStatusUseCase', () => {
           to_status: 'shipped',
           buyer_id: buyerId,
           changed_by: sellerId,
+          seller_ids: [sellerId, otherSellerId],
         }),
       }),
       expect.any(Object)
     );
+    expect(orderRepository.findSellerIdsByOrderId).toHaveBeenCalledWith(orderId, {
+      transaction: { id: 'tx' },
+    });
   });
 
   it('Scenario: Invalid status transition delivered → pending', async () => {
@@ -319,6 +324,7 @@ describe('UpdateOrderStatusUseCase', () => {
       'from_status',
       'order_id',
       'order_number',
+      'seller_ids',
       'to_status',
     ]);
   });
