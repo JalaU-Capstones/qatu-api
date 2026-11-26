@@ -38,8 +38,29 @@ describe('OrderStatusChanged event (ADR-017: PII-free payload)', () => {
       'from_status',
       'order_id',
       'order_number',
+      'seller_ids',
       'to_status',
     ]);
+  });
+
+  it('deduplicates the seller ids and defaults to an empty list', () => {
+    const minimalOrder = { id: 'o-1', orderNumber: 'ORD-1', buyerId: 'b-1' };
+    const withSellers = buildOrderStatusChangedEvent({
+      order: minimalOrder,
+      fromStatus: 'pending',
+      toStatus: 'confirmed',
+      changedBy: 's-1',
+      sellerIds: ['s-1', 's-2', 's-1'],
+    });
+    const withoutSellers = buildOrderStatusChangedEvent({
+      order: minimalOrder,
+      fromStatus: 'pending',
+      toStatus: 'confirmed',
+      changedBy: 's-1',
+    });
+
+    expect(withSellers.payload.seller_ids).toEqual(['s-1', 's-2']);
+    expect(withoutSellers.payload.seller_ids).toEqual([]);
   });
 
   it('never leaks buyer email, name, address, phone or notes', () => {
