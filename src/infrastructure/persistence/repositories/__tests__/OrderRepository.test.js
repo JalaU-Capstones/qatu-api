@@ -630,4 +630,32 @@ describe('OrderRepository — remaining branches', () => {
       expect(db.query.mock.calls[0][0]).not.toContain('COALESCE');
     });
   });
+
+  describe('findSellerIdsByOrderId', () => {
+    it('returns the distinct sellers of the order inside the given transaction', async () => {
+      const transaction = { id: 'tx' };
+      const db = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([{ seller_id: SELLER_ID }, { seller_id: 'seller-2' }, {}]),
+      };
+      const repository = new OrderRepository({ db });
+
+      await expect(repository.findSellerIdsByOrderId(ORDER_ID, { transaction })).resolves.toEqual([
+        SELLER_ID,
+        'seller-2',
+      ]);
+      const [sql, options] = db.query.mock.calls[0];
+      expect(sql).toContain('SELECT DISTINCT p.seller_id');
+      expect(options).toMatchObject({ replacements: { orderId: ORDER_ID }, transaction });
+    });
+
+    it('returns an empty list when the query yields nothing', async () => {
+      const repository = new OrderRepository({
+        db: { query: vi.fn().mockResolvedValueOnce(null) },
+      });
+
+      await expect(repository.findSellerIdsByOrderId(ORDER_ID)).resolves.toEqual([]);
+    });
+  });
 });
