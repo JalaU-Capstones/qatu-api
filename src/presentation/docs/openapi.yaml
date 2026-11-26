@@ -215,6 +215,9 @@ paths:
   /notifications:
     $ref: './paths/notifications.yaml#/list'
 
+  /notifications/unread-count:
+    $ref: './paths/notifications.yaml#/unreadCount'
+
   /notifications/{notificationId}/read:
     $ref: './paths/notifications.yaml#/markRead'
 
