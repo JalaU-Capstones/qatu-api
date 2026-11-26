@@ -39,6 +39,12 @@ export class IOrderRepository {
     throw new Error('Method not implemented: sellerHasItemsOnOrder');
   }
 
+  /** Sellers with at least one line on the order */
+  // eslint-disable-next-line no-unused-vars
+  async findSellerIdsByOrderId(orderId, { transaction } = {}) {
+    throw new Error('Method not implemented: findSellerIdsByOrderId');
+  }
+
   /** Order detail with only that seller's items. */
   // eslint-disable-next-line no-unused-vars
   async findByIdForSeller(orderId, sellerId) {
