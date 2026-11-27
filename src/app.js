@@ -1,11 +1,16 @@
 import cookieParser from 'cookie-parser';
 import express from 'express';
-import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import { env } from './infrastructure/config/env.js';
 import { registerApiDocs } from './presentation/docs/swagger.js';
 import { corsMiddleware } from './presentation/middleware/corsMiddleware.js';
 import { csrfMiddleware } from './presentation/middleware/csrfMiddleware.js';
 import { errorHandler } from './presentation/middleware/errorHandler.js';
+import {
+  createAuthenticatedLimiter,
+  createAuthLimiter,
+  createPublicLimiter,
+} from './presentation/middleware/rateLimiter.js';
 import { adminCategoryRouter } from './presentation/routes/adminCategoryRoutes.js';
 import { adminReportRouter } from './presentation/routes/adminReportRoutes.js';
 import { adminSellerApplicationRouter } from './presentation/routes/adminSellerApplicationRoutes.js';
@@ -37,7 +42,11 @@ export function createApp({
 } = {}) {
   const app = express();
 
-  // Security Headers
+  if (env.TRUST_PROXY !== false) {
+    app.set('trust proxy', env.TRUST_PROXY);
+  }
+
+  // Security Headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, etc.)
   app.use(helmet());
 
   // Dedicated CORS Middleware
@@ -52,75 +61,31 @@ export function createApp({
   // Interactive Swagger UI API Documentation
   registerApiDocs(app);
 
-  // Rate Limiting on Authentication Endpoints
-  const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20, // Limit each IP to 20 requests per window
-    skip: (req) => req.path === '/refresh',
-    message: {
-      error: {
-        code: 'TOO_MANY_REQUESTS',
-        message:
-          'Too many registration/auth requests from this IP. Please try again after 15 minutes.',
-      },
-      meta: {
-        timestamp: new Date().toISOString(),
-      },
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
+  // Rate Limiters (10 req/min auth, 100 req/min public, 1000 req/min authenticated)
+  const authLimiter = createAuthLimiter();
+  const publicLimiter = createPublicLimiter();
+  const authenticatedLimiter = createAuthenticatedLimiter();
 
-  // Rate Limiting on Public Endpoints
-  const publicLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 100, // Limit each IP to 100 requests per window
-    message: {
-      error: {
-        code: 'TOO_MANY_REQUESTS',
-        message: 'Too many requests from this IP. Please try again after 1 minute.',
-      },
-      meta: {
-        timestamp: new Date().toISOString(),
-      },
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
+  const authTierLimiter = (req, res, next) => {
+    if (req.path === '/me' || req.path === '/password') {
+      return authenticatedLimiter(req, res, next);
+    }
+    return authLimiter(req, res, next);
+  };
 
-  // Rate Limiting on authenticated cart endpoints
-  const cartLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 60, // Limit each IP to 60 requests per window
-    message: {
-      error: {
-        code: 'TOO_MANY_REQUESTS',
-        message: 'Too many cart requests from this IP. Please try again after 1 minute.',
-      },
-      meta: {
-        timestamp: new Date().toISOString(),
-      },
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
+  const productTierLimiter = (req, res, next) => {
+    if (req.method === 'GET') {
+      return publicLimiter(req, res, next);
+    }
+    return authenticatedLimiter(req, res, next);
+  };
 
-  // Rate Limiting on authenticated orders endpoints
-  const orderLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 60, // Limit each IP to 60 requests per window
-    message: {
-      error: {
-        code: 'TOO_MANY_REQUESTS',
-        message: 'Too many orders requests from this IP. Please try again after 1 minute.',
-      },
-      meta: {
-        timestamp: new Date().toISOString(),
-      },
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
+  const profileTierLimiter = (req, res, next) => {
+    if (req.method === 'GET' && !req.path.startsWith('/me')) {
+      return publicLimiter(req, res, next);
+    }
+    return authenticatedLimiter(req, res, next);
+  };
 
   // Health Endpoint
   app.get('/health', (req, res) => {
@@ -131,19 +96,19 @@ export function createApp({
   app.use(csrfMiddleware);
 
   // API Routes
-  app.use('/v1/auth', authLimiter, authRoutes);
-  app.use('/v1/products', publicLimiter, productRoutes);
-  app.use('/v1/seller', publicLimiter, sellerProductRoutes);
+  app.use('/v1/auth', authTierLimiter, authRoutes);
+  app.use('/v1/products', productTierLimiter, productRoutes);
+  app.use('/v1/seller', authenticatedLimiter, sellerProductRoutes);
   app.use('/v1/categories', publicLimiter, categoryRoutes);
-  app.use('/v1/cart', cartLimiter, cartRoutes);
-  app.use('/v1/orders', orderLimiter, orderRoutes);
-  app.use('/v1/profiles', publicLimiter, profileRoutes);
-  app.use('/v1/seller-applications', publicLimiter, sellerApplicationRoutes);
-  app.use('/v1/admin/reports', publicLimiter, adminReportRoutes);
-  app.use('/v1/admin/seller-applications', publicLimiter, adminSellerApplicationRoutes);
-  app.use('/v1/admin/categories', publicLimiter, adminCategoryRoutes);
-  app.use('/v1/conversations', orderLimiter, conversationRoutes);
-  app.use('/v1/notifications', publicLimiter, notificationRoutes);
+  app.use('/v1/cart', authenticatedLimiter, cartRoutes);
+  app.use('/v1/orders', authenticatedLimiter, orderRoutes);
+  app.use('/v1/profiles', profileTierLimiter, profileRoutes);
+  app.use('/v1/seller-applications', authenticatedLimiter, sellerApplicationRoutes);
+  app.use('/v1/admin/reports', authenticatedLimiter, adminReportRoutes);
+  app.use('/v1/admin/seller-applications', authenticatedLimiter, adminSellerApplicationRoutes);
+  app.use('/v1/admin/categories', authenticatedLimiter, adminCategoryRoutes);
+  app.use('/v1/conversations', authenticatedLimiter, conversationRoutes);
+  app.use('/v1/notifications', authenticatedLimiter, notificationRoutes);
 
   // Global Error Handler
   app.use(errorHandler);

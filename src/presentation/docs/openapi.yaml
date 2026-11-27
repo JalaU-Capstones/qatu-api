@@ -6,11 +6,15 @@ info:
   description: |
     RESTful API for Qatu Marketplace — an online digital marketplace where sellers offer products to buyers.
 
-    **Authentication:** Bearer JWT issued by Supabase Auth.
+    **Authentication:** HttpOnly session cookies (`access_token`, `refresh_token`, `csrf_token`) or transitional Bearer JWT issued by Supabase Auth.
     **Versioning:** URL-based (`/v1`).
-    **Rate limits:** See `Architecture/API-Design`.
+    **Security Headers:** All responses include Helmet hardening headers (`Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`).
+    **Rate Limits:**
+    - **Auth endpoints** (`/v1/auth/register`, `/v1/auth/login`, `/v1/auth/logout`, `/v1/auth/oauth/exchange`): **10 requests/minute** per IP.
+    - **Public endpoints** (`/v1/categories`, `GET /v1/products`, `GET /v1/profiles/{id}`, `/v1/auth/refresh`): **100 requests/minute** per IP.
+    - **Authenticated endpoints** (`/v1/cart`, `/v1/orders`, `/v1/conversations`, `/v1/seller/*`, `/v1/seller-applications`, `/v1/admin/*`, `/v1/auth/me`, `/v1/profiles/me`): **1000 requests/minute**.
 
-    Full documentation: see the Wiki at `Architecture/API-Design`.
+    Every rate-limited response includes `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers (plus `Retry-After` on `429 Too Many Requests`).
   contact:
     name: Qatu Team — Group 2
     url: https://gitlab.com/jala-university1/cohort-5/ES.CSSD-245.GA.T2.26.M2/SD/group-b/grupo-2

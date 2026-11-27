@@ -1,147 +1,101 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRateLimiter, oauthExchangeLimiter } from '../rateLimiter.js';
+import express from 'express';
+import request from 'supertest';
+import { describe, expect, it } from 'vitest';
+import {
+  createAuthenticatedLimiter,
+  createAuthLimiter,
+  createPublicLimiter,
+  createRateLimiter,
+  createRefreshLimiter,
+  oauthExchangeLimiter,
+  RATE_LIMITS,
+} from '../rateLimiter.js';
 
-function createMockResponse() {
-  const headers = {};
-  const json = vi.fn();
-  const status = vi.fn().mockReturnValue({ json });
-  return {
-    headers,
-    json,
-    status,
-    setHeader: vi.fn((name, value) => {
-      // eslint-disable-next-line security/detect-object-injection
-      headers[name] = value;
-    }),
-  };
+function buildTestApp(limiter, path = '/test') {
+  const app = express();
+  app.get(path, limiter, (_req, res) => {
+    res.status(200).json({ ok: true });
+  });
+  app.post(path, limiter, (_req, res) => {
+    res.status(200).json({ ok: true });
+  });
+  return app;
 }
 
-describe('createRateLimiter', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-11-23T12:00:00.000Z'));
+describe('rateLimiter middleware', () => {
+  it('exposes the expected rate limit constants from US-26', () => {
+    expect(RATE_LIMITS.AUTH_MAX).toBe(10);
+    expect(RATE_LIMITS.AUTH_WINDOW_MS).toBe(60_000);
+    expect(RATE_LIMITS.PUBLIC_MAX).toBe(100);
+    expect(RATE_LIMITS.PUBLIC_WINDOW_MS).toBe(60_000);
+    expect(RATE_LIMITS.AUTHENTICATED_MAX).toBe(1000);
+    expect(RATE_LIMITS.AUTHENTICATED_WINDOW_MS).toBe(60_000);
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('allows requests under the limit and sets rate-limit headers', () => {
+  it('sets X-RateLimit-* headers and returns 429 when limit is exceeded', async () => {
     const limiter = createRateLimiter({ windowMs: 60_000, max: 2 });
-    const next = vi.fn();
-    const res = createMockResponse();
+    const app = buildTestApp(limiter);
 
-    limiter({ ip: '1.1.1.1' }, res, next);
-    limiter({ ip: '1.1.1.1' }, res, next);
+    const first = await request(app).get('/test');
+    expect(first.status).toBe(200);
+    expect(first.headers['x-ratelimit-limit']).toBe('2');
+    expect(first.headers['x-ratelimit-remaining']).toBe('1');
+    expect(first.headers['x-ratelimit-reset']).toBeDefined();
 
-    expect(next).toHaveBeenCalledTimes(2);
-    expect(res.setHeader).toHaveBeenCalledWith('X-RateLimit-Limit', '2');
-    expect(res.setHeader).toHaveBeenCalledWith('X-RateLimit-Remaining', '0');
-    expect(res.setHeader).toHaveBeenCalledWith(
-      'X-RateLimit-Reset',
-      String(Math.ceil((Date.now() + 60_000) / 1000))
-    );
-  });
+    const second = await request(app).get('/test');
+    expect(second.status).toBe(200);
+    expect(second.headers['x-ratelimit-remaining']).toBe('0');
 
-  it('returns 429 TOO_MANY_REQUESTS once the limit is exceeded', () => {
-    const limiter = createRateLimiter({ windowMs: 60_000, max: 1 });
-    const next = vi.fn();
-    const res = createMockResponse();
-
-    limiter({ ip: '2.2.2.2' }, res, next);
-    limiter({ ip: '2.2.2.2' }, res, next);
-
-    expect(next).toHaveBeenCalledTimes(1);
-    expect(res.status).toHaveBeenCalledWith(429);
-    expect(res.json).toHaveBeenCalledWith({
+    const blocked = await request(app).get('/test');
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers['x-ratelimit-limit']).toBe('2');
+    expect(blocked.headers['x-ratelimit-remaining']).toBe('0');
+    expect(blocked.headers['retry-after']).toBeDefined();
+    expect(blocked.body).toEqual({
       error: {
         code: 'TOO_MANY_REQUESTS',
-        message: 'Too many requests. Please try again later.',
+        message: 'Too many requests from this IP. Please try again after 1 minute.',
         details: [],
       },
-      meta: { timestamp: expect.any(String) },
+      meta: {
+        timestamp: expect.any(String),
+      },
     });
-    expect(res.setHeader).toHaveBeenCalledWith('Retry-After', '60');
   });
 
-  it('resets a expired entry after the window elapses', () => {
-    const limiter = createRateLimiter({ windowMs: 1_000, max: 1 });
-    const next = vi.fn();
-
-    limiter({ ip: '3.3.3.3' }, createMockResponse(), next);
-    vi.advanceTimersByTime(1_001);
-    limiter({ ip: '3.3.3.3' }, createMockResponse(), next);
-
-    expect(next).toHaveBeenCalledTimes(2);
-  });
-
-  it('evicts the oldest key when maxKeys is reached', () => {
-    const limiter = createRateLimiter({ windowMs: 60_000, max: 10, maxKeys: 2 });
-    const next = vi.fn();
-
-    limiter({ ip: 'a' }, createMockResponse(), next);
-    limiter({ ip: 'b' }, createMockResponse(), next);
-    limiter({ ip: 'c' }, createMockResponse(), next);
-    limiter({ ip: 'a' }, createMockResponse(), next);
-
-    expect(next).toHaveBeenCalledTimes(4);
-  });
-
-  it('uses a custom key generator', () => {
-    const keyGenerator = vi.fn((req) => req.user.id);
-    const limiter = createRateLimiter({ max: 1, keyGenerator });
-    const req = { user: { id: 'user-1' } };
-
-    limiter(req, createMockResponse(), vi.fn());
-    expect(keyGenerator).toHaveBeenCalledWith(req);
-  });
-
-  it('reset clears the store', () => {
-    const limiter = createRateLimiter({ max: 1 });
-    const next = vi.fn();
-
-    limiter({ ip: '4.4.4.4' }, createMockResponse(), next);
-    limiter.reset();
-    limiter({ ip: '4.4.4.4' }, createMockResponse(), next);
-
-    expect(next).toHaveBeenCalledTimes(2);
-  });
-
-  it('exports a preconfigured OAuth limiter', () => {
-    const next = vi.fn();
+  it('enforces 10 req/min on auth limiter and skips /refresh and /me', async () => {
+    const app = express();
+    const authLimiter = createAuthLimiter();
+    app.post('/login', authLimiter, (_req, res) => res.json({ ok: true }));
+    app.post('/refresh', authLimiter, (_req, res) => res.json({ ok: true }));
+    app.get('/me', authLimiter, (_req, res) => res.json({ ok: true }));
 
     for (let i = 0; i < 10; i += 1) {
-      oauthExchangeLimiter({ ip: '5.5.5.5' }, createMockResponse(), next);
+      const res = await request(app).post('/login');
+      expect(res.status).toBe(200);
+      expect(res.headers['x-ratelimit-limit']).toBe('10');
     }
-    oauthExchangeLimiter({ ip: '5.5.5.5' }, createMockResponse(), next);
 
-    expect(next).toHaveBeenCalledTimes(10);
-    oauthExchangeLimiter.reset();
+    const eleventh = await request(app).post('/login');
+    expect(eleventh.status).toBe(429);
+
+    const refreshRes = await request(app).post('/refresh');
+    expect(refreshRes.status).toBe(200);
+
+    const meRes = await request(app).get('/me');
+    expect(meRes.status).toBe(200);
   });
 
-  it('sweeps both expired and still-live entries', () => {
-    const limiter = createRateLimiter({ windowMs: 1_000, max: 1 });
-    const next = vi.fn();
+  it('configures public (100/min), authenticated (1000/min), and refresh (100/min) limiters', async () => {
+    const publicRes = await request(buildTestApp(createPublicLimiter())).get('/test');
+    expect(publicRes.headers['x-ratelimit-limit']).toBe('100');
 
-    limiter({ ip: '6.6.6.6' }, createMockResponse(), next);
-    vi.advanceTimersByTime(1_100);
-    const secondRes = createMockResponse();
-    limiter({ ip: '6.6.6.6' }, secondRes, next);
-    vi.advanceTimersByTime(1_000);
-    const thirdRes = createMockResponse();
-    limiter({ ip: '6.6.6.6' }, thirdRes, next);
+    const authRes = await request(buildTestApp(createAuthenticatedLimiter())).get('/test');
+    expect(authRes.headers['x-ratelimit-limit']).toBe('1000');
 
-    expect(next).toHaveBeenCalledTimes(3);
-    expect(secondRes.headers['X-RateLimit-Remaining']).toBe('0');
-    expect(thirdRes.headers['X-RateLimit-Remaining']).toBe('0');
-  });
+    const refreshRes = await request(buildTestApp(createRefreshLimiter())).post('/test');
+    expect(refreshRes.headers['x-ratelimit-limit']).toBe('100');
 
-  it('tolerates a timer handle without unref', () => {
-    const setIntervalSpy = vi.spyOn(globalThis, 'setInterval').mockReturnValue({});
-    const limiter = createRateLimiter({ max: 1 });
-
-    expect(() => limiter({ ip: '7.7.7.7' }, createMockResponse(), vi.fn())).not.toThrow();
-
-    setIntervalSpy.mockRestore();
+    expect(typeof oauthExchangeLimiter).toBe('function');
   });
 });

@@ -1,5 +1,4 @@
 import express, { Router } from 'express';
-import rateLimit from 'express-rate-limit';
 import { ExchangeOAuthTokenUseCase } from '../../application/use-cases/ExchangeOAuthTokenUseCase.js';
 import { GetCurrentUserUseCase } from '../../application/use-cases/GetCurrentUserUseCase.js';
 import { LoginUseCase } from '../../application/use-cases/LoginUseCase.js';
@@ -12,7 +11,7 @@ import { ProfileRepository } from '../../infrastructure/persistence/repositories
 import { AuthController } from '../controllers/AuthController.js';
 import { OAuthController } from '../controllers/OAuthController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
-import { oauthExchangeLimiter } from '../middleware/rateLimiter.js';
+import { createRefreshLimiter, oauthExchangeLimiter } from '../middleware/rateLimiter.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import { loginSchema } from '../validators/LoginSchema.js';
 import { oauthExchangeSchema } from '../validators/oauthExchangeSchema.js';
@@ -89,21 +88,7 @@ export function createAuthRouter({
     });
 
   // Rate limiter specifically for token refresh (100 req/min/IP per ADR-012)
-  const refreshLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 100, // 100 req/min/IP
-    message: {
-      error: {
-        code: 'TOO_MANY_REQUESTS',
-        message: 'Too many refresh requests from this IP. Please try again after 1 minute.',
-      },
-      meta: {
-        timestamp: new Date().toISOString(),
-      },
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
+  const refreshLimiter = createRefreshLimiter();
 
   router.post('/register', validateRequest(registerSchema), (req, res, next) =>
     controller.register(req, res, next)
