@@ -19,3 +19,6 @@ supabase/.env
 supabase/.env.local
 supabase/.env.*.local
 supabase/snippets/
+
+# Performance test results
+performance/*.json
