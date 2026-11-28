@@ -5,6 +5,7 @@ stages:
   - build
   - test
   - coverage
+  - sonarqube
   - build-image
   - push-image
 
@@ -116,7 +117,63 @@ coverage:
     - if: $CI_COMMIT_TAG
 
 # ─────────────────────────────────────────────────────────────────
-# Stage 5: build-image — build container, push temp tag
+# Stage 5: sonarqube
+# Scan qatu-api then wait for the quality gate before any image job
+sonarqube-check:
+  stage: sonarqube
+  image:
+    name: sonarsource/sonar-scanner-cli:11
+    entrypoint: ['']
+  # Scanner image does not run the Node install from the root before_script
+  before_script:
+    - 'true'
+  # First scan may fail the gate, image jobs must still run
+  allow_failure: true
+  needs:
+    - job: coverage
+      artifacts: true
+  script:
+    - >
+      sonar-scanner
+      -Dsonar.projectKey=qatu-api
+      -Dsonar.sources=src
+      -Dsonar.coverageReportPaths=coverage/cobertura-coverage.xml
+      -Dsonar.host.url=$SONAR_HOST_URL
+      -Dsonar.token=$SONAR_TOKEN
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+sonarqube-quality-gate:
+  stage: sonarqube
+  image:
+    name: sonarsource/sonar-scanner-cli:11
+    entrypoint: ['']
+  # Scanner image does not run the Node install from the root before_script
+  before_script:
+    - 'true'
+  # First scan may fail the gate, image jobs must still run
+  allow_failure: true
+  needs:
+    - job: sonarqube-check
+      artifacts: false
+    - job: coverage
+      artifacts: true
+  script:
+    - >
+      sonar-scanner
+      -Dsonar.projectKey=qatu-api
+      -Dsonar.sources=src
+      -Dsonar.coverageReportPaths=coverage/cobertura-coverage.xml
+      -Dsonar.host.url=$SONAR_HOST_URL
+      -Dsonar.token=$SONAR_TOKEN
+      -Dsonar.qualitygate.wait=true
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# ─────────────────────────────────────────────────────────────────
+# Stage 6: build-image — build container, push temp tag
 # Runs on all branches (validates Dockerfile) + tags
 # ─────────────────────────────────────────────────────────────────
 build-image:
@@ -151,9 +208,11 @@ build-image:
   needs:
     - job: test
     - job: coverage
+    - job: sonarqube-quality-gate
+      artifacts: false
 
 # ─────────────────────────────────────────────────────────────────
-# Stage 6: push-image — re-tag with SemVer + push final tags
+# Stage 7: push-image — re-tag with SemVer + push final tags
 # Only on v* tag pushes (release events)
 # ─────────────────────────────────────────────────────────────────
 push-image:
