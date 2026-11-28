@@ -30,7 +30,10 @@
     "openapi:bundle": "redocly bundle qatu@v1 -o dist/openapi.bundle.yaml",
     "openapi:lint": "redocly lint qatu@v1 && spectral lint src/presentation/docs/openapi.yaml",
     "openapi:validate": "redocly lint qatu@v1 --format=stylish",
-    "openapi:preview": "redocly preview-docs qatu@v1"
+    "openapi:preview": "redocly preview-docs qatu@v1",
+    "performance:load": "k6 run performance/load.js",
+    "performance:stress": "k6 run performance/stress.js",
+    "performance:spike": "k6 run performance/spike.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",

@@ -70,13 +70,16 @@ export function createAuthLimiter() {
  * Public endpoints: 100 requests per minute per IP.
  */
 export function createPublicLimiter() {
+  const max = process.env.PUBLIC_RATE_LIMIT_MAX
+    ? Number(process.env.PUBLIC_RATE_LIMIT_MAX)
+    : RATE_LIMITS.PUBLIC_MAX;
+
   return createRateLimiter({
     windowMs: RATE_LIMITS.PUBLIC_WINDOW_MS,
-    max: RATE_LIMITS.PUBLIC_MAX,
+    max,
     message: 'Too many requests from this IP. Please try again after 1 minute.',
   });
 }
-
 /**
  * Authenticated endpoints: 1000 requests per minute.
  */
