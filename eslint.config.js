@@ -70,5 +70,20 @@ export default [
       'no-unused-vars': 'off',
     },
   },
+  {
+    files: ['performance/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2024,
+      sourceType: 'module',
+      globals: {
+        __ENV: 'readonly',
+        console: 'readonly',
+      },
+    },
+    rules: {
+      'no-console': 'off',
+      'no-unused-vars': 'error',
+    },
+  },
   prettierConfig,
 ];
