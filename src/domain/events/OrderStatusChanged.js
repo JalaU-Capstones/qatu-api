@@ -1,16 +1,14 @@
 export const ORDER_STATUS_CHANGED_EVENT_TYPE = 'OrderStatusChanged';
 export const ORDER_STATUS_CHANGED_ROUTING_KEY = 'order.status_changed';
 
-/**
- * Minimal, PII-free `OrderStatusChanged` payload.
- *
- * @param {Object} params
- * @param {import('../entities/Order.js').Order} params.order
- * @param {string} params.fromStatus
- * @param {string} params.toStatus
- * @param {string} params.changedBy
- */
-export function buildOrderStatusChangedEvent({ order, fromStatus, toStatus, changedBy }) {
+/** Small payload with no PII; sellerIds also get the notice */
+export function buildOrderStatusChangedEvent({
+  order,
+  fromStatus,
+  toStatus,
+  changedBy,
+  sellerIds = [],
+}) {
   return {
     eventType: ORDER_STATUS_CHANGED_EVENT_TYPE,
     aggregateType: 'order',
@@ -23,6 +21,7 @@ export function buildOrderStatusChangedEvent({ order, fromStatus, toStatus, chan
       to_status: toStatus,
       buyer_id: order.buyerId,
       changed_by: changedBy,
+      seller_ids: [...new Set(sellerIds)],
     },
   };
 }

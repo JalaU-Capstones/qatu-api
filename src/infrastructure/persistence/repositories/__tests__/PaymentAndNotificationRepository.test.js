@@ -88,14 +88,16 @@ describe('NotificationRepository', () => {
     expect(() => new INotificationRepository()).toThrow('cannot be instantiated');
   });
 
-  it('inserts with ON CONFLICT DO NOTHING on the partial unique event_id index', async () => {
+  it('inserts with ON CONFLICT DO NOTHING on the partial unique (event_id, profile_id) index', async () => {
     mockDb.query.mockResolvedValueOnce([{ id: 'n-1' }]);
 
     const inserted = await repository.createFromEvent(event);
 
     expect(inserted).toBe(true);
     const [sql, options] = mockDb.query.mock.calls[0];
-    expect(sql).toContain('ON CONFLICT (event_id) WHERE event_id IS NOT NULL DO NOTHING');
+    expect(sql).toContain(
+      'ON CONFLICT (event_id, profile_id) WHERE event_id IS NOT NULL DO NOTHING'
+    );
     expect(options.replacements).toMatchObject({
       eventId: 'evt-1',
       profileId: 'buyer-1',

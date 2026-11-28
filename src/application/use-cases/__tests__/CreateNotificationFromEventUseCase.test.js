@@ -44,7 +44,7 @@ describe('CreateNotificationFromEventUseCase', () => {
       type: 'order_placed',
       title: 'Pedido realizado',
       body: 'Tu pedido ORD-00100042 fue registrado correctamente.',
-      actionUrl: '/orders',
+      actionUrl: '/orders/ORD-00100042',
       payload: {
         order_id: payload.order_id,
         order_number: 'ORD-00100042',
@@ -52,6 +52,40 @@ describe('CreateNotificationFromEventUseCase', () => {
         currency: 'USD',
       },
     });
+  });
+
+  it('notifies every seller on a new order once, never the buyer twice', async () => {
+    await useCase.execute({
+      eventId: EVENT_ID,
+      routingKey: 'order.placed',
+      payload: { ...payload, seller_ids: ['s1', 's2', 's1', payload.buyer_id, ''] },
+    });
+
+    const recipients = notificationRepository.createFromEvent.mock.calls.map(
+      ([call]) => call.profileId
+    );
+    expect(recipients).toEqual([payload.buyer_id, 's1', 's2']);
+    expect(notificationRepository.createFromEvent).toHaveBeenCalledWith({
+      eventId: EVENT_ID,
+      profileId: 's2',
+      type: 'order_placed',
+      title: 'Nuevo pedido recibido',
+      body: 'Recibiste el pedido ORD-00100042 con productos de tu tienda.',
+      actionUrl: '/seller/orders',
+      payload: { order_id: payload.order_id, order_number: 'ORD-00100042' },
+    });
+  });
+
+  it('reports created when only some recipients were new', async () => {
+    notificationRepository.createFromEvent.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+    const result = await useCase.execute({
+      eventId: EVENT_ID,
+      routingKey: 'order.placed',
+      payload,
+    });
+
+    expect(result).toEqual({ status: 'created' });
   });
 
   it('reports a duplicate delivery instead of failing', async () => {
@@ -98,9 +132,9 @@ describe('CreateNotificationFromEventUseCase', () => {
       eventId: EVENT_ID,
       profileId: payload.buyer_id,
       type: 'order_status_changed',
-      title: 'Estado del pedido actualizado',
+      title: 'Pedido enviado',
       body: 'Tu pedido ORD-00100042 ahora está enviado.',
-      actionUrl: '/orders',
+      actionUrl: '/orders/ORD-00100042',
       payload: {
         order_id: payload.order_id,
         order_number: payload.order_number,
@@ -109,6 +143,121 @@ describe('CreateNotificationFromEventUseCase', () => {
         changed_by: '00000000-0000-4000-8000-000000000002',
       },
     });
+  });
+
+  it('notifies the buyer and the other sellers, never the seller who changed the status', async () => {
+    const actor = 's1';
+    await useCase.execute({
+      eventId: EVENT_ID,
+      routingKey: 'order.status_changed',
+      payload: {
+        order_id: payload.order_id,
+        order_number: payload.order_number,
+        buyer_id: payload.buyer_id,
+        from_status: 'pending',
+        to_status: 'confirmed',
+        changed_by: actor,
+        seller_ids: [actor, 's2'],
+      },
+    });
+
+    const calls = notificationRepository.createFromEvent.mock.calls.map(([call]) => call);
+    expect(calls.map((call) => call.profileId)).toEqual([payload.buyer_id, 's2']);
+    expect(calls[0]).toMatchObject({
+      title: 'Pedido confirmado',
+      actionUrl: '/orders/ORD-00100042',
+    });
+    expect(calls[1]).toMatchObject({
+      title: 'Pedido confirmado',
+      body: 'El pedido ORD-00100042 ahora está confirmado.',
+      actionUrl: '/seller/orders',
+    });
+  });
+
+  it('tells the sellers when the buyer cancels, without notifying the buyer', async () => {
+    await useCase.execute({
+      eventId: EVENT_ID,
+      routingKey: 'order.status_changed',
+      payload: {
+        order_id: payload.order_id,
+        order_number: payload.order_number,
+        buyer_id: payload.buyer_id,
+        from_status: 'pending',
+        to_status: 'cancelled',
+        changed_by: payload.buyer_id,
+        seller_ids: ['s1'],
+      },
+    });
+
+    expect(notificationRepository.createFromEvent).toHaveBeenCalledTimes(1);
+    expect(notificationRepository.createFromEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 's1',
+        title: 'Pedido cancelado',
+        body: 'El comprador canceló el pedido ORD-00100042.',
+      })
+    );
+  });
+
+  it('ignores a status change with nobody left to notify', async () => {
+    const result = await useCase.execute({
+      eventId: EVENT_ID,
+      routingKey: 'order.status_changed',
+      payload: {
+        order_id: payload.order_id,
+        buyer_id: payload.buyer_id,
+        from_status: 'pending',
+        to_status: 'cancelled',
+        changed_by: payload.buyer_id,
+      },
+    });
+
+    expect(result).toEqual({ status: 'ignored' });
+    expect(notificationRepository.createFromEvent).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['p-1', 'uno de tus productos'],
+    [null, 'tu tienda'],
+  ])(
+    'creates a rating_received notification for the seller (product %j)',
+    async (productId, target) => {
+      const result = await useCase.execute({
+        eventId: EVENT_ID,
+        routingKey: 'rating.received',
+        payload: {
+          rating_id: 'r-1',
+          seller_id: 's1',
+          product_id: productId,
+          order_id: 'o-1',
+          score: 4,
+        },
+      });
+
+      expect(result).toEqual({ status: 'created' });
+      expect(notificationRepository.createFromEvent).toHaveBeenCalledWith({
+        eventId: EVENT_ID,
+        profileId: 's1',
+        type: 'rating_received',
+        title: 'Nueva calificación recibida',
+        body: `Recibiste una calificación de 4 de 5 estrellas para ${target}.`,
+        actionUrl: null,
+        payload: { rating_id: 'r-1', product_id: productId, order_id: 'o-1', score: 4 },
+      });
+    }
+  );
+
+  it.each([
+    [{ seller_id: 's1', score: 4 }],
+    [{ rating_id: 'r-1', score: 4 }],
+    [{ rating_id: 'r-1', seller_id: 's1', score: 6 }],
+    [{ rating_id: 'r-1', seller_id: 's1', score: 2.5 }],
+    [undefined],
+  ])('marks an invalid rating.received payload %j as permanent', async (eventPayload) => {
+    await expect(
+      useCase.execute({ eventId: EVENT_ID, routingKey: 'rating.received', payload: eventPayload })
+    ).rejects.toMatchObject({ permanent: true, message: 'rating.received payload is incomplete' });
+    expect(notificationRepository.createFromEvent).not.toHaveBeenCalled();
   });
 
   it.each([

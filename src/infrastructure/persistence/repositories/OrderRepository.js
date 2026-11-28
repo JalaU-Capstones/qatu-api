@@ -386,6 +386,21 @@ export class OrderRepository extends IOrderRepository {
     return Boolean(rows && rows.length > 0);
   }
 
+  async findSellerIdsByOrderId(orderId, { transaction } = {}) {
+    const rows = await this.db.query(
+      `SELECT DISTINCT p.seller_id
+       FROM public.order_items oi
+       INNER JOIN public.products p ON p.id = oi.product_id
+       WHERE oi.order_id = :orderId`,
+      {
+        replacements: { orderId },
+        type: QueryTypes.SELECT,
+        transaction,
+      }
+    );
+    return (rows || []).map((row) => row.seller_id).filter(Boolean);
+  }
+
   async findByIdForSeller(orderId, sellerId) {
     const owns = await this.sellerHasItemsOnOrder(orderId, sellerId);
     if (!owns) {

@@ -53,8 +53,8 @@ describe('CreateNotificationFromEventUseCase — message.sent', () => {
       profileId: RECIPIENT_ID,
       type: 'message_received',
       title: 'Nuevo mensaje recibido',
-      body: 'Has recibido un nuevo mensaje sobre un producto en Qatu.',
-      actionUrl: `/conversations/${CONVERSATION_ID}`,
+      body: 'Tienes un mensaje nuevo en tus conversaciones de Qatu.',
+      actionUrl: `/conversations?active=${CONVERSATION_ID}`,
       payload: {
         message_id: MESSAGE_ID,
         conversation_id: CONVERSATION_ID,
