@@ -144,6 +144,10 @@ TooManyRequests:
       schema:
         type: integer
       description: Epoch timestamp (seconds) when the current window resets.
+    Retry-After:
+      schema:
+        type: integer
+      description: Number of seconds to wait before retrying the request.
   content:
     application/json:
       schema:

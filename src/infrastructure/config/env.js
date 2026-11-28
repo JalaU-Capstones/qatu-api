@@ -7,6 +7,17 @@ function parsePositiveInt(value, fallback) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function parseTrustProxy(value, nodeEnv) {
+  if (value === undefined || value === '') {
+    return nodeEnv === 'production' ? 1 : false;
+  }
+  if (value === 'false' || value === '0') {
+    return false;
+  }
+  const hops = parseInt(value, 10);
+  return Number.isInteger(hops) && hops > 0 ? hops : 1;
+}
+
 /**
  * Validates and normalizes environment variables for the application.
  */
@@ -35,6 +46,7 @@ function createEnvConfig(source = process.env) {
   return {
     NODE_ENV: nodeEnv,
     PORT: Number.isNaN(port) ? 3000 : port,
+    TRUST_PROXY: parseTrustProxy(source.TRUST_PROXY, nodeEnv),
     DATABASE_URL:
       source.DATABASE_URL || 'postgresql://qatu:qatu_dev_password@localhost:5432/qatu_dev',
     SUPABASE_URL: supabaseUrl,

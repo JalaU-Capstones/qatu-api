@@ -669,9 +669,14 @@ describe('auth route handlers', () => {
   let oauthController;
 
   beforeEach(async () => {
-    vi.doMock('../../middleware/rateLimiter.js', () => ({
-      oauthExchangeLimiter: (_req, _res, next) => next(),
-    }));
+    vi.doMock('../../middleware/rateLimiter.js', async (importOriginal) => {
+      const actual = await importOriginal();
+      return {
+        ...actual,
+        oauthExchangeLimiter: (_req, _res, next) => next(),
+        createRefreshLimiter: () => (_req, _res, next) => next(),
+      };
+    });
     vi.resetModules();
     const { createAuthRouter: freshCreateAuthRouter } = await import('../authRoutes.js');
 
