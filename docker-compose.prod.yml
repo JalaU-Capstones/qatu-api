@@ -4,11 +4,10 @@
 # Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
 # Differences from base:
-#   - api builds the runtime stage (multi-stage, no dev deps).
+#   - api pulls the published registry image and does not build on the host
 #   - No host port exposure for rabbitmq (`expose` only, ADR-016).
 #   - No local postgres service (ADR-020). DB is Supabase.
-#   - No host port exposure for api either — a future nginx service in the
-#     client repo's compose will proxy from a shared external network.
+#   - api publishes host port 5000 to container port 3000
 #   - Migrations run automatically via entrypoint.sh (RUN_MIGRATIONS=true).
 #   - Restart policies active.
 #   - Runtime secrets/config from .env are re-declared as ${VAR} so they are
@@ -21,9 +20,11 @@ services:
     restart: unless-stopped
 
   api:
-    build:
-      context: .
-      target: runtime
+    # Reset drops the build key inherited from the base file
+    build: !reset null
+    image: registry.gitlab.com/jala-university1/cohort-5/es.cssd-245.ga.t2.26.m2/sd/group-b/grupo-2/api:latest
+    ports:
+      - '5000:3000'
     restart: unless-stopped
     environment:
       NODE_ENV: production
