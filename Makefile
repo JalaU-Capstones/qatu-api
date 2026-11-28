@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help install dev start lint lint-fix format format-check test test-watch test-coverage test-integration build docker-up docker-down docker-logs db-migrate db-migrate-undo db-migrate-undo-all db-migrate-status db-seed db-seed-undo clean openapi-bundle openapi-lint openapi-validate openapi-preview docker-build docker-build-prod docker-up-dev docker-up-prod docker-up-tools docker-ps docker-shell docker-migrate docker-seed docker-logs-api docker-clean docker-config publish-check tag tag-push supabase-start supabase-stop supabase-stop-no-backup supabase-status
+.PHONY: help install dev start lint lint-fix format format-check test test-watch test-coverage test-integration build docker-up docker-down docker-logs db-migrate db-migrate-undo db-migrate-undo-all db-migrate-status db-seed db-seed-undo clean openapi-bundle openapi-lint openapi-validate openapi-preview docker-build docker-build-prod docker-up-dev docker-up-prod docker-up-tools docker-ps docker-shell docker-migrate docker-seed docker-logs-api docker-clean docker-config publish-check tag tag-push supabase-start supabase-stop supabase-stop-no-backup supabase-status performance performance-check performance-report baseline-doc
 
 help:
 	@echo "Qatu API - Available targets:"
@@ -54,6 +54,12 @@ help:
 	@echo "  supabase-stop           Stop local Supabase, keeping data volumes"
 	@echo "  supabase-stop-no-backup Stop local Supabase and WIPE volumes (destructive)"
 	@echo "  supabase-status         Print local Supabase URLs and keys"
+	@echo ""
+	@echo "Testing:"
+	@echo "  performance        Run k6 load tests against local API (p95 < 500ms required)"
+	@echo "  performance-check  Run k6 tests and exit non-zero if p95 > 500ms"
+	@echo "  performance-report Generate performance report from the last test run"
+	@echo "  baseline-doc       Update performance baseline in docs/PERF-BASELINE.md"
 
 install:
 	pnpm install
@@ -207,3 +213,50 @@ supabase-stop-no-backup:       # Stop local Supabase and WIPE volumes (destructi
 
 supabase-status:               # Print local Supabase URLs and keys
 	npx supabase status
+
+# ── Performance Testing (k6) ──
+
+K6_SCRIPT ?= performance/load.js
+K6_DURATION ?= 30s
+K6_VUS ?= 10
+K6_BASE_URL ?= http://localhost:3000
+PERF_BASELINE_FILE := docs/PERF-BASELINE.md
+K6_BIN := $(shell command -v k6 2>/dev/null)
+ifeq ($(K6_BIN),)
+K6_CMD = docker run --rm --network host -u $$(id -u):$$(id -g) -v "$(CURDIR):/work" -w /work -e BASE_URL=$(K6_BASE_URL) grafana/k6
+else
+K6_CMD = BASE_URL=$(K6_BASE_URL) $(K6_BIN)
+endif
+
+performance:  ## Run k6 load test and display results
+	@echo "Running performance test: $(K6_SCRIPT) (vus=$(K6_VUS), duration=$(K6_DURATION))"
+	@$(K6_CMD) run --vus $(K6_VUS) --duration $(K6_DURATION) $(K6_SCRIPT)
+
+performance-check:  ## Run test; exit 1 if p95 response time > 500ms
+	@echo "Running performance check (threshold: p95 < 500ms)..."
+	@$(K6_CMD) run --vus $(K6_VUS) --duration $(K6_DURATION) --summary-time-unit=ms $(K6_SCRIPT) \
+		--summary-export=performance/last-result.json
+	@node -e "const r=require('./performance/last-result.json');const d=r.metrics.http_req_duration.values||r.metrics.http_req_duration;const p95=d['p(95)'];console.log('p95:',p95+'ms');if(p95>500){console.error('FAIL: p95 exceeds 500ms threshold');process.exit(1);}console.log('PASS: p95 within acceptable limits');"
+
+performance-report:  ## Display last performance test results
+	@if [ -f performance/last-result.json ]; then \
+		node -e "const r=require('./performance/last-result.json');const m=r.metrics;const reqs=m.http_reqs.values||m.http_reqs;const dur=m.http_req_duration.values||m.http_req_duration;const fail=m.http_req_failed;const err=fail.values?fail.values.rate:fail.value;console.log('=== Performance Report ===');console.log('Requests:',reqs.count);console.log('Throughput:',Number(reqs.rate).toFixed(2),'req/s');console.log('p95 Duration:',dur['p(95)']+'ms');console.log('Error Rate:',(err*100).toFixed(2)+'%');"; \
+	else echo "No test result found. Run 'make performance' first."; fi
+
+baseline-doc:  ## Create/update performance baseline documentation
+	@mkdir -p docs
+	@echo "# Performance Baseline" > $(PERF_BASELINE_FILE)
+	@echo "" >> $(PERF_BASELINE_FILE)
+	@echo "Baseline established: $(shell date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $(PERF_BASELINE_FILE)
+	@echo "Test environment: Local development stack" >> $(PERF_BASELINE_FILE)
+	@echo "k6 script: $(K6_SCRIPT)" >> $(PERF_BASELINE_FILE)
+	@echo "Configuration: $(K6_VUS) virtual users, $(K6_DURATION) duration" >> $(PERF_BASELINE_FILE)
+	@echo "" >> $(PERF_BASELINE_FILE)
+	@echo "## Thresholds" >> $(PERF_BASELINE_FILE)
+	@echo "- p95 response time: < 500ms" >> $(PERF_BASELINE_FILE)
+	@echo "- Error rate: < 1%" >> $(PERF_BASELINE_FILE)
+	@echo "" >> $(PERF_BASELINE_FILE)
+	@if [ -f performance/last-result.json ]; then \
+		node -e "const r=require('./performance/last-result.json');const m=r.metrics;const reqs=m.http_reqs.values||m.http_reqs;const dur=m.http_req_duration.values||m.http_req_duration;const fail=m.http_req_failed;const err=fail.values?fail.values.rate:fail.value;console.log('## Results');console.log('| Metric | Value |');console.log('|--------|-------|');console.log('| Total Requests |',reqs.count,'|');console.log('| Throughput |',Number(reqs.rate).toFixed(2),'req/s |');console.log('| p95 Response Time |',dur['p(95)'],'ms |');console.log('| Error Rate |',(err*100).toFixed(2),'% |');" >> $(PERF_BASELINE_FILE); \
+	fi
+	@echo "Baseline written to $(PERF_BASELINE_FILE)"
