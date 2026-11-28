@@ -137,7 +137,7 @@ sonarqube-check:
       sonar-scanner
       -Dsonar.projectKey=qatu-api
       -Dsonar.sources=src
-      -Dsonar.coverageReportPaths=coverage/cobertura-coverage.xml
+      -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
       -Dsonar.host.url=$SONAR_HOST_URL
       -Dsonar.token=$SONAR_TOKEN
   rules:
@@ -164,7 +164,7 @@ sonarqube-quality-gate:
       sonar-scanner
       -Dsonar.projectKey=qatu-api
       -Dsonar.sources=src
-      -Dsonar.coverageReportPaths=coverage/cobertura-coverage.xml
+      -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
       -Dsonar.host.url=$SONAR_HOST_URL
       -Dsonar.token=$SONAR_TOKEN
       -Dsonar.qualitygate.wait=true
