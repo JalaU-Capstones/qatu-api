@@ -69,4 +69,31 @@ describe('US-26: Rate Limiting and Secure Headers', () => {
     expect(cartRes.status).toBe(200);
     expect(cartRes.headers['x-ratelimit-limit']).toBe('1000');
   });
+
+  it('applies 1000 req/min authenticated rate limiter and Helmet headers to notification routes', async () => {
+    const notificationRouter = Router();
+    notificationRouter.get('/', (_req, res) => res.status(200).json({ data: [] }));
+    notificationRouter.patch('/read-all', (_req, res) =>
+      res.status(200).json({ data: { ok: true } })
+    );
+    notificationRouter.patch('/:id/read', (_req, res) =>
+      res.status(200).json({ data: { ok: true } })
+    );
+
+    const app = createApp({ notificationRoutes: notificationRouter });
+
+    const listRes = await request(app).get('/v1/notifications');
+    expect(listRes.status).toBe(200);
+    expect(listRes.headers['x-ratelimit-limit']).toBe('1000');
+    expect(listRes.headers['content-security-policy']).toContain("default-src 'self'");
+    expect(listRes.headers['x-content-type-options']).toBe('nosniff');
+
+    const readAllRes = await request(app).patch('/v1/notifications/read-all');
+    expect(readAllRes.status).toBe(200);
+    expect(readAllRes.headers['x-ratelimit-limit']).toBe('1000');
+
+    const readOneRes = await request(app).patch('/v1/notifications/123/read');
+    expect(readOneRes.status).toBe(200);
+    expect(readOneRes.headers['x-ratelimit-limit']).toBe('1000');
+  });
 });
